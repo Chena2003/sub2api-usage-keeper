@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	"cpa-usage-keeper/internal/repository/dto"
+	"sub2api-usage-keeper/internal/repository/dto"
 )
 
 func TestAPIAliasIsStableAndIdempotent(t *testing.T) {

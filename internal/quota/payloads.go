@@ -6,7 +6,7 @@ import (
 	"strconv"
 	"strings"
 
-	"cpa-usage-keeper/internal/cpa/dto/apicall"
+	"sub2api-usage-keeper/internal/cpa/dto/apicall"
 )
 
 func parseAntigravityQuotaPayload(response *apicall.Response) (*AntigravityQuotaPayload, error) {

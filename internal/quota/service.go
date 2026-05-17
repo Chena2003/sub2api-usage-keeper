@@ -9,7 +9,7 @@ import (
 	"sync"
 	"time"
 
-	"cpa-usage-keeper/internal/repository"
+	"sub2api-usage-keeper/internal/repository"
 
 	"gorm.io/gorm"
 )

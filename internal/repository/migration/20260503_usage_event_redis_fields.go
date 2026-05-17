@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"strings"
 
-	"cpa-usage-keeper/internal/entities"
+	"sub2api-usage-keeper/internal/entities"
 	"gorm.io/gorm"
 )
 

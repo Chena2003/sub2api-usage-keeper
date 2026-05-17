@@ -3,8 +3,8 @@ package service
 import (
 	"context"
 
-	repodto "cpa-usage-keeper/internal/repository/dto"
-	servicedto "cpa-usage-keeper/internal/service/dto"
+	repodto "sub2api-usage-keeper/internal/repository/dto"
+	servicedto "sub2api-usage-keeper/internal/service/dto"
 )
 
 type UsageProvider interface {

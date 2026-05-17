@@ -6,16 +6,18 @@ import (
 	"strings"
 	"testing"
 	"time"
-
-	"cpa-usage-keeper/internal/cpa"
 )
 
+const testSub2APIDatabaseURL = "postgres://sub2api:pw@sub2api-postgres:5432/sub2api?sslmode=disable"
+
 var configEnvKeys = []string{
-	"APP_PORT", "APP_BASE_PATH", "WORK_DIR", "CPA_BASE_URL", "CPA_MANAGEMENT_KEY", "POLL_INTERVAL",
-	"USAGE_SYNC_MODE", "REDIS_QUEUE_ADDR", "REDIS_QUEUE_TLS", "REDIS_QUEUE_BATCH_SIZE", "REDIS_QUEUE_IDLE_INTERVAL",
+	"APP_PORT", "APP_BASE_PATH", "WORK_DIR", "SUB2API_DATABASE_URL", "QUOTA_REFRESH_INTERVAL", "PUBLIC_MODE",
 	"SQLITE_PATH", "BACKUP_ENABLED", "BACKUP_DIR", "BACKUP_INTERVAL", "BACKUP_RETENTION_DAYS",
 	"REQUEST_TIMEOUT", "LOG_LEVEL", "LOG_FILE_ENABLED", "LOG_DIR", "LOG_RETENTION_DAYS",
-	"AUTH_ENABLED", "LOGIN_PASSWORD", "AUTH_SESSION_TTL", "TZ", "TLS_SKIP_VERIFY",
+	"AUTH_ENABLED", "LOGIN_PASSWORD", "AUTH_SESSION_TTL", "TZ", "TLS_ENABLED", "TLS_CERT_FILE", "TLS_KEY_FILE",
+	"CPA_BASE_URL", "CPA_MANAGEMENT_KEY", "POLL_INTERVAL", "USAGE_SYNC_MODE", "REDIS_QUEUE_ADDR",
+	"REDIS_QUEUE_TLS", "REDIS_QUEUE_KEY", "REDIS_QUEUE_BATCH_SIZE", "REDIS_QUEUE_IDLE_INTERVAL",
+	"REDIS_QUEUE_ERROR_BACKOFF", "REDIS_METADATA_SYNC_INTERVAL", "TLS_SKIP_VERIFY",
 }
 
 func TestMain(m *testing.M) {
@@ -84,9 +86,13 @@ func withIsolatedEnvFiles(t *testing.T) {
 	executableDir = func() (string, error) { return exeDir, nil }
 }
 
+func setRequiredSub2APIEnv(t *testing.T) {
+	t.Helper()
+	t.Setenv("SUB2API_DATABASE_URL", testSub2APIDatabaseURL)
+}
+
 func TestLoadFromEnvAppliesDefaults(t *testing.T) {
-	t.Setenv("CPA_BASE_URL", "http://127.0.0.1:"+cpa.ManagementRedisDefaultPort)
-	t.Setenv("CPA_MANAGEMENT_KEY", "secret")
+	setRequiredSub2APIEnv(t)
 
 	cfg, err := LoadFromEnv()
 	if err != nil {
@@ -98,6 +104,15 @@ func TestLoadFromEnvAppliesDefaults(t *testing.T) {
 	}
 	if cfg.AppBasePath != "" {
 		t.Fatalf("expected default app base path to be empty, got %q", cfg.AppBasePath)
+	}
+	if cfg.Sub2APIDatabaseURL != testSub2APIDatabaseURL {
+		t.Fatalf("expected sub2api database URL %q, got %q", testSub2APIDatabaseURL, cfg.Sub2APIDatabaseURL)
+	}
+	if cfg.QuotaRefreshInterval != 5*time.Minute {
+		t.Fatalf("expected default quota refresh interval 5m, got %s", cfg.QuotaRefreshInterval)
+	}
+	if !cfg.PublicMode {
+		t.Fatal("expected public mode to be enabled by default")
 	}
 	if !cfg.BackupEnabled {
 		t.Fatal("expected backup to be enabled by default")
@@ -126,30 +141,6 @@ func TestLoadFromEnvAppliesDefaults(t *testing.T) {
 	if cfg.AuthSessionTTL != 7*24*time.Hour {
 		t.Fatalf("expected default auth session ttl 168h, got %s", cfg.AuthSessionTTL)
 	}
-	if cfg.TLSSkipVerify {
-		t.Fatal("expected TLS skip verify to be disabled by default")
-	}
-	if cfg.RedisQueueTLS {
-		t.Fatal("expected redis queue TLS to be disabled by default")
-	}
-	if cfg.RedisQueueAddr != "" {
-		t.Fatalf("expected default redis queue addr to be empty, got %q", cfg.RedisQueueAddr)
-	}
-	if cfg.RedisQueueKey != RedisQueueKeyDefault {
-		t.Fatalf("expected default redis queue key queue, got %s", cfg.RedisQueueKey)
-	}
-	if cfg.RedisQueueBatchSize != 1000 {
-		t.Fatalf("expected default redis queue batch size 1000, got %d", cfg.RedisQueueBatchSize)
-	}
-	if cfg.RedisQueueIdleInterval != time.Second {
-		t.Fatalf("expected default redis queue idle interval 1s, got %s", cfg.RedisQueueIdleInterval)
-	}
-	if cfg.RedisQueueErrorBackoff != RedisQueueErrorBackoffDefault {
-		t.Fatalf("expected default redis queue error backoff 10s, got %s", cfg.RedisQueueErrorBackoff)
-	}
-	if cfg.MetadataSyncInterval != MetadataSyncIntervalDefault {
-		t.Fatalf("expected default metadata sync interval 30s, got %s", cfg.MetadataSyncInterval)
-	}
 	if !cfg.LogFileEnabled {
 		t.Fatal("expected log file output to be enabled by default")
 	}
@@ -165,7 +156,8 @@ func TestLoadReadsSpecifiedEnvFile(t *testing.T) {
 	withIsolatedEnvFiles(t)
 	envDir := t.TempDir()
 	envPath := filepath.Join(envDir, "custom.env")
-	if err := os.WriteFile(envPath, []byte("CPA_BASE_URL=https://from-file.example.com\nCPA_MANAGEMENT_KEY=from-file\nAPP_PORT=9091\nWORK_DIR=./custom-data\n"), 0o600); err != nil {
+	content := "SUB2API_DATABASE_URL=postgres://from-file\nAPP_PORT=9091\nWORK_DIR=./custom-data\n"
+	if err := os.WriteFile(envPath, []byte(content), 0o600); err != nil {
 		t.Fatalf("write env file: %v", err)
 	}
 
@@ -174,7 +166,7 @@ func TestLoadReadsSpecifiedEnvFile(t *testing.T) {
 		t.Fatalf("Load returned error: %v", err)
 	}
 
-	if cfg.CPABaseURL != "https://from-file.example.com" || cfg.CPAManagementKey != "from-file" || cfg.AppPort != "9091" || cfg.WorkDir != filepath.Join(envDir, "custom-data") || cfg.SQLitePath != filepath.Join(envDir, "custom-data", "app.db") || cfg.LogDir != filepath.Join(envDir, "custom-data", "logs") || cfg.BackupDir != filepath.Join(envDir, "custom-data", "backups") {
+	if cfg.Sub2APIDatabaseURL != "postgres://from-file" || cfg.AppPort != "9091" || cfg.WorkDir != filepath.Join(envDir, "custom-data") || cfg.SQLitePath != filepath.Join(envDir, "custom-data", "app.db") || cfg.LogDir != filepath.Join(envDir, "custom-data", "logs") || cfg.BackupDir != filepath.Join(envDir, "custom-data", "backups") {
 		t.Fatalf("expected config values from specified env file, got %+v", cfg)
 	}
 }
@@ -197,7 +189,8 @@ func TestLoadResolvesRelativeEnvFilePathBase(t *testing.T) {
 	if err := os.Mkdir("config", 0o755); err != nil {
 		t.Fatalf("mkdir config: %v", err)
 	}
-	if err := os.WriteFile(filepath.Join("config", "app.env"), []byte("CPA_BASE_URL=https://relative-env.example.com\nCPA_MANAGEMENT_KEY=relative\nWORK_DIR=./data\n"), 0o600); err != nil {
+	content := "SUB2API_DATABASE_URL=postgres://relative-env\nWORK_DIR=./data\n"
+	if err := os.WriteFile(filepath.Join("config", "app.env"), []byte(content), 0o600); err != nil {
 		t.Fatalf("write env file: %v", err)
 	}
 
@@ -220,7 +213,7 @@ func TestLoadIgnoresLegacyPathOverrides(t *testing.T) {
 	withIsolatedEnvFiles(t)
 	envDir := t.TempDir()
 	envPath := filepath.Join(envDir, "legacy.env")
-	content := "CPA_BASE_URL=https://legacy.example.com\nCPA_MANAGEMENT_KEY=legacy\nWORK_DIR=./work\nSQLITE_PATH=./legacy/app.db\nLOG_DIR=./legacy/logs\nBACKUP_DIR=./legacy/backups\n"
+	content := "SUB2API_DATABASE_URL=postgres://legacy\nWORK_DIR=./work\nSQLITE_PATH=./legacy/app.db\nLOG_DIR=./legacy/logs\nBACKUP_DIR=./legacy/backups\n"
 	if err := os.WriteFile(envPath, []byte(content), 0o600); err != nil {
 		t.Fatalf("write env file: %v", err)
 	}
@@ -251,7 +244,8 @@ func TestLoadFallsBackToExecutableDirEnv(t *testing.T) {
 	if err != nil {
 		t.Fatalf("get executable dir: %v", err)
 	}
-	if err := os.WriteFile(filepath.Join(exeDir, ".env"), []byte("CPA_BASE_URL=https://from-exe.example.com\nCPA_MANAGEMENT_KEY=from-exe\nWORK_DIR=./data\n"), 0o600); err != nil {
+	content := "SUB2API_DATABASE_URL=postgres://from-exe\nWORK_DIR=./data\n"
+	if err := os.WriteFile(filepath.Join(exeDir, ".env"), []byte(content), 0o600); err != nil {
 		t.Fatalf("write executable env file: %v", err)
 	}
 
@@ -260,7 +254,7 @@ func TestLoadFallsBackToExecutableDirEnv(t *testing.T) {
 		t.Fatalf("Load returned error: %v", err)
 	}
 
-	if cfg.CPABaseURL != "https://from-exe.example.com" || cfg.CPAManagementKey != "from-exe" || cfg.WorkDir != filepath.Join(exeDir, "data") || cfg.SQLitePath != filepath.Join(exeDir, "data", "app.db") || cfg.LogDir != filepath.Join(exeDir, "data", "logs") || cfg.BackupDir != filepath.Join(exeDir, "data", "backups") {
+	if cfg.Sub2APIDatabaseURL != "postgres://from-exe" || cfg.WorkDir != filepath.Join(exeDir, "data") || cfg.SQLitePath != filepath.Join(exeDir, "data", "app.db") || cfg.LogDir != filepath.Join(exeDir, "data", "logs") || cfg.BackupDir != filepath.Join(exeDir, "data", "backups") {
 		t.Fatalf("expected config values from executable dir env, got %+v", cfg)
 	}
 }
@@ -279,8 +273,7 @@ func TestLoadFromEnvAppliesDefaultTimeZone(t *testing.T) {
 	previousLocal := time.Local
 	t.Cleanup(func() { time.Local = previousLocal })
 	t.Setenv("TZ", "")
-	t.Setenv("CPA_BASE_URL", "http://127.0.0.1:"+cpa.ManagementRedisDefaultPort)
-	t.Setenv("CPA_MANAGEMENT_KEY", "secret")
+	setRequiredSub2APIEnv(t)
 
 	_, err := LoadFromEnv()
 	if err != nil {
@@ -296,8 +289,7 @@ func TestLoadFromEnvHonorsExplicitTimeZone(t *testing.T) {
 	previousLocal := time.Local
 	t.Cleanup(func() { time.Local = previousLocal })
 	t.Setenv("TZ", "UTC")
-	t.Setenv("CPA_BASE_URL", "http://127.0.0.1:"+cpa.ManagementRedisDefaultPort)
-	t.Setenv("CPA_MANAGEMENT_KEY", "secret")
+	setRequiredSub2APIEnv(t)
 
 	_, err := LoadFromEnv()
 	if err != nil {
@@ -313,8 +305,7 @@ func TestLoadFromEnvHonorsExplicitIANATimeZone(t *testing.T) {
 	previousLocal := time.Local
 	t.Cleanup(func() { time.Local = previousLocal })
 	t.Setenv("TZ", "America/New_York")
-	t.Setenv("CPA_BASE_URL", "http://127.0.0.1:"+cpa.ManagementRedisDefaultPort)
-	t.Setenv("CPA_MANAGEMENT_KEY", "secret")
+	setRequiredSub2APIEnv(t)
 
 	_, err := LoadFromEnv()
 	if err != nil {
@@ -330,8 +321,7 @@ func TestLoadFromEnvRejectsInvalidTimeZone(t *testing.T) {
 	previousLocal := time.Local
 	t.Cleanup(func() { time.Local = previousLocal })
 	t.Setenv("TZ", "Not/AZone")
-	t.Setenv("CPA_BASE_URL", "http://127.0.0.1:"+cpa.ManagementRedisDefaultPort)
-	t.Setenv("CPA_MANAGEMENT_KEY", "secret")
+	setRequiredSub2APIEnv(t)
 
 	_, err := LoadFromEnv()
 	if err == nil || !strings.Contains(err.Error(), "TZ is invalid") {
@@ -339,42 +329,51 @@ func TestLoadFromEnvRejectsInvalidTimeZone(t *testing.T) {
 	}
 }
 
-func TestLoadFromEnvRequiresCriticalValues(t *testing.T) {
+func TestLoadRequiresSub2APIDatabaseURL(t *testing.T) {
 	withIsolatedEnvFiles(t)
+	t.Setenv("AUTH_ENABLED", "false")
 
-	t.Run("missing base url", func(t *testing.T) {
-		t.Setenv("CPA_MANAGEMENT_KEY", "secret")
+	_, err := Load(LoadOptions{})
+	if err == nil || !strings.Contains(err.Error(), "SUB2API_DATABASE_URL is required") {
+		t.Fatalf("expected SUB2API_DATABASE_URL required error, got %v", err)
+	}
+}
 
-		_, err := LoadFromEnv()
-		if err == nil || err.Error() != "CPA_BASE_URL is required" {
-			t.Fatalf("expected CPA_BASE_URL required error, got %v", err)
-		}
-	})
+func TestLoadSub2APISettings(t *testing.T) {
+	t.Setenv("SUB2API_DATABASE_URL", testSub2APIDatabaseURL)
+	t.Setenv("AUTH_ENABLED", "true")
+	t.Setenv("LOGIN_PASSWORD", "secret")
+	t.Setenv("QUOTA_REFRESH_INTERVAL", "10m")
+	t.Setenv("PUBLIC_MODE", "true")
 
-	t.Run("missing management key", func(t *testing.T) {
-		t.Setenv("CPA_BASE_URL", "http://127.0.0.1:"+cpa.ManagementRedisDefaultPort)
+	cfg, err := Load(LoadOptions{})
+	if err != nil {
+		t.Fatalf("Load returned error: %v", err)
+	}
 
-		_, err := LoadFromEnv()
-		if err == nil || err.Error() != "CPA_MANAGEMENT_KEY is required" {
-			t.Fatalf("expected CPA_MANAGEMENT_KEY required error, got %v", err)
-		}
-	})
+	if cfg.Sub2APIDatabaseURL != testSub2APIDatabaseURL {
+		t.Fatalf("expected Sub2APIDatabaseURL %q, got %q", testSub2APIDatabaseURL, cfg.Sub2APIDatabaseURL)
+	}
+	if cfg.QuotaRefreshInterval != 10*time.Minute {
+		t.Fatalf("expected quota refresh interval 10m, got %s", cfg.QuotaRefreshInterval)
+	}
+	if !cfg.PublicMode {
+		t.Fatal("expected public mode to be true")
+	}
+}
 
-	t.Run("missing login password when auth enabled", func(t *testing.T) {
-		t.Setenv("CPA_BASE_URL", "http://127.0.0.1:"+cpa.ManagementRedisDefaultPort)
-		t.Setenv("CPA_MANAGEMENT_KEY", "secret")
-		t.Setenv("AUTH_ENABLED", "true")
+func TestLoadFromEnvRequiresLoginPasswordWhenAuthEnabled(t *testing.T) {
+	setRequiredSub2APIEnv(t)
+	t.Setenv("AUTH_ENABLED", "true")
 
-		_, err := LoadFromEnv()
-		if err == nil || err.Error() != "LOGIN_PASSWORD is required when AUTH_ENABLED is true" {
-			t.Fatalf("expected LOGIN_PASSWORD required error, got %v", err)
-		}
-	})
+	_, err := LoadFromEnv()
+	if err == nil || err.Error() != "LOGIN_PASSWORD is required when AUTH_ENABLED is true" {
+		t.Fatalf("expected LOGIN_PASSWORD required error, got %v", err)
+	}
 }
 
 func TestLoadFromEnvIgnoresRemovedLegacySyncEnvVars(t *testing.T) {
-	t.Setenv("CPA_BASE_URL", "http://127.0.0.1:"+cpa.ManagementRedisDefaultPort)
-	t.Setenv("CPA_MANAGEMENT_KEY", "secret")
+	setRequiredSub2APIEnv(t)
 	t.Setenv("USAGE_SYNC_MODE", "invalid")
 	t.Setenv("POLL_INTERVAL", "not-a-duration")
 
@@ -384,52 +383,11 @@ func TestLoadFromEnvIgnoresRemovedLegacySyncEnvVars(t *testing.T) {
 	}
 }
 
-func TestLoadFromEnvUsesRedisQueueAddrOverride(t *testing.T) {
-	t.Setenv("CPA_BASE_URL", "https://cpa.example.com")
-	t.Setenv("CPA_MANAGEMENT_KEY", "secret")
-	t.Setenv("REDIS_QUEUE_ADDR", "redis-stream.example.com:6380")
-
-	cfg, err := LoadFromEnv()
-	if err != nil {
-		t.Fatalf("LoadFromEnv returned error: %v", err)
-	}
-
-	if cfg.RedisQueueAddr != "redis-stream.example.com:6380" {
-		t.Fatalf("expected redis queue addr override, got %q", cfg.RedisQueueAddr)
-	}
-}
-
-func TestLoadFromEnvIgnoresRemovedRedisQueueKeyOverride(t *testing.T) {
-	t.Setenv("CPA_BASE_URL", "https://cpa.example.com")
-	t.Setenv("CPA_MANAGEMENT_KEY", "secret")
-	t.Setenv("REDIS_QUEUE_KEY", "custom-queue")
-
-	cfg, err := LoadFromEnv()
-	if err != nil {
-		t.Fatalf("LoadFromEnv returned error: %v", err)
-	}
-	if cfg.RedisQueueKey != RedisQueueKeyDefault {
-		t.Fatalf("expected removed redis queue key override to be ignored, got %q", cfg.RedisQueueKey)
-	}
-}
-
-func TestLoadFromEnvRejectsNonPositiveRedisQueueBatchSize(t *testing.T) {
-	t.Setenv("CPA_BASE_URL", "http://127.0.0.1:"+cpa.ManagementRedisDefaultPort)
-	t.Setenv("CPA_MANAGEMENT_KEY", "secret")
-	t.Setenv("REDIS_QUEUE_BATCH_SIZE", "0")
-
-	_, err := LoadFromEnv()
-	if err == nil || err.Error() != "REDIS_QUEUE_BATCH_SIZE must be positive" {
-		t.Fatalf("expected REDIS_QUEUE_BATCH_SIZE validation error, got %v", err)
-	}
-}
-
 func TestLoadFromEnvParsesOverrides(t *testing.T) {
-	t.Setenv("CPA_BASE_URL", "http://127.0.0.1:"+cpa.ManagementRedisDefaultPort)
-	t.Setenv("CPA_MANAGEMENT_KEY", "secret")
+	setRequiredSub2APIEnv(t)
 	t.Setenv("WORK_DIR", "/tmp/work")
 	t.Setenv("APP_PORT", "9090")
-	t.Setenv("APP_BASE_PATH", "/cpa/")
+	t.Setenv("APP_BASE_PATH", "/sub2api/")
 	t.Setenv("BACKUP_ENABLED", "false")
 	t.Setenv("BACKUP_INTERVAL", "2h")
 	t.Setenv("BACKUP_RETENTION_DAYS", "7")
@@ -440,31 +398,37 @@ func TestLoadFromEnvParsesOverrides(t *testing.T) {
 	t.Setenv("AUTH_ENABLED", "true")
 	t.Setenv("LOGIN_PASSWORD", "top-secret")
 	t.Setenv("AUTH_SESSION_TTL", "12h")
-	t.Setenv("REDIS_QUEUE_IDLE_INTERVAL", "2s")
-	t.Setenv("TLS_SKIP_VERIFY", "true")
-	t.Setenv("REDIS_QUEUE_TLS", "true")
+	t.Setenv("QUOTA_REFRESH_INTERVAL", "30m")
+	t.Setenv("PUBLIC_MODE", "false")
 
 	cfg, err := LoadFromEnv()
 	if err != nil {
 		t.Fatalf("LoadFromEnv returned error: %v", err)
 	}
 
-	if !cfg.TLSSkipVerify {
-		t.Fatal("expected TLS skip verify to be enabled when set to true")
-	}
-	if !cfg.RedisQueueTLS {
-		t.Fatal("expected redis queue TLS to be enabled when set to true")
-	}
-	if cfg.AppPort != "9090" || cfg.AppBasePath != "/cpa" || cfg.WorkDir != "/tmp/work" || cfg.SQLitePath != filepath.Join("/tmp/work", "app.db") || cfg.BackupEnabled || cfg.BackupDir != filepath.Join("/tmp/work", "backups") || cfg.BackupInterval != 2*time.Hour || cfg.BackupRetentionDays != 7 || cfg.RequestTimeout != 15*time.Second || cfg.LogLevel != "debug" || cfg.LogFileEnabled || cfg.LogDir != filepath.Join("/tmp/work", "logs") || cfg.LogRetentionDays != 14 || !cfg.AuthEnabled || cfg.LoginPassword != "top-secret" || cfg.AuthSessionTTL != 12*time.Hour || cfg.RedisQueueIdleInterval != 2*time.Second {
+	if cfg.AppPort != "9090" || cfg.AppBasePath != "/sub2api" || cfg.WorkDir != "/tmp/work" || cfg.SQLitePath != filepath.Join("/tmp/work", "app.db") || cfg.BackupEnabled || cfg.BackupDir != filepath.Join("/tmp/work", "backups") || cfg.BackupInterval != 2*time.Hour || cfg.BackupRetentionDays != 7 || cfg.RequestTimeout != 15*time.Second || cfg.LogLevel != "debug" || cfg.LogFileEnabled || cfg.LogDir != filepath.Join("/tmp/work", "logs") || cfg.LogRetentionDays != 14 || !cfg.AuthEnabled || cfg.LoginPassword != "top-secret" || cfg.AuthSessionTTL != 12*time.Hour || cfg.QuotaRefreshInterval != 30*time.Minute || cfg.PublicMode {
 		t.Fatalf("unexpected config override result: %+v", cfg)
+	}
+}
+
+func TestLoadFromEnvRejectsNonPositiveQuotaRefreshInterval(t *testing.T) {
+	for _, value := range []string{"0s", "-1m"} {
+		t.Run(value, func(t *testing.T) {
+			setRequiredSub2APIEnv(t)
+			t.Setenv("QUOTA_REFRESH_INTERVAL", value)
+
+			_, err := LoadFromEnv()
+			if err == nil || err.Error() != "QUOTA_REFRESH_INTERVAL must be positive" {
+				t.Fatalf("expected QUOTA_REFRESH_INTERVAL validation error, got %v", err)
+			}
+		})
 	}
 }
 
 func TestLoadFromEnvRejectsNonPositiveBackupInterval(t *testing.T) {
 	for _, value := range []string{"0s", "-1h"} {
 		t.Run(value, func(t *testing.T) {
-			t.Setenv("CPA_BASE_URL", "http://127.0.0.1:"+cpa.ManagementRedisDefaultPort)
-			t.Setenv("CPA_MANAGEMENT_KEY", "secret")
+			setRequiredSub2APIEnv(t)
 			t.Setenv("BACKUP_INTERVAL", value)
 
 			_, err := LoadFromEnv()
@@ -476,8 +440,7 @@ func TestLoadFromEnvRejectsNonPositiveBackupInterval(t *testing.T) {
 }
 
 func TestLoadFromEnvRejectsNegativeBackupRetentionDays(t *testing.T) {
-	t.Setenv("CPA_BASE_URL", "http://127.0.0.1:"+cpa.ManagementRedisDefaultPort)
-	t.Setenv("CPA_MANAGEMENT_KEY", "secret")
+	setRequiredSub2APIEnv(t)
 	t.Setenv("BACKUP_RETENTION_DAYS", "-1")
 
 	_, err := LoadFromEnv()
@@ -487,8 +450,7 @@ func TestLoadFromEnvRejectsNegativeBackupRetentionDays(t *testing.T) {
 }
 
 func TestLoadFromEnvRejectsNegativeLogRetentionDays(t *testing.T) {
-	t.Setenv("CPA_BASE_URL", "http://127.0.0.1:"+cpa.ManagementRedisDefaultPort)
-	t.Setenv("CPA_MANAGEMENT_KEY", "secret")
+	setRequiredSub2APIEnv(t)
 	t.Setenv("LOG_RETENTION_DAYS", "-1")
 
 	_, err := LoadFromEnv()
@@ -497,36 +459,9 @@ func TestLoadFromEnvRejectsNegativeLogRetentionDays(t *testing.T) {
 	}
 }
 
-func TestLoadFromEnvRejectsNonPositiveRedisQueueIdleInterval(t *testing.T) {
-	t.Setenv("CPA_BASE_URL", "http://127.0.0.1:"+cpa.ManagementRedisDefaultPort)
-	t.Setenv("CPA_MANAGEMENT_KEY", "secret")
-	t.Setenv("REDIS_QUEUE_IDLE_INTERVAL", "0s")
-
-	_, err := LoadFromEnv()
-	if err == nil || err.Error() != "REDIS_QUEUE_IDLE_INTERVAL must be positive" {
-		t.Fatalf("expected REDIS_QUEUE_IDLE_INTERVAL validation error, got %v", err)
-	}
-}
-
-func TestLoadFromEnvIgnoresRemovedRedisDrainEnvOverrides(t *testing.T) {
-	t.Setenv("CPA_BASE_URL", "http://127.0.0.1:"+cpa.ManagementRedisDefaultPort)
-	t.Setenv("CPA_MANAGEMENT_KEY", "secret")
-	t.Setenv("REDIS_QUEUE_ERROR_BACKOFF", "20s")
-	t.Setenv("REDIS_METADATA_SYNC_INTERVAL", "45s")
-
-	cfg, err := LoadFromEnv()
-	if err != nil {
-		t.Fatalf("LoadFromEnv returned error: %v", err)
-	}
-	if cfg.RedisQueueErrorBackoff != RedisQueueErrorBackoffDefault || cfg.MetadataSyncInterval != MetadataSyncIntervalDefault {
-		t.Fatalf("expected removed env overrides to be ignored, got error_backoff=%s metadata_interval=%s", cfg.RedisQueueErrorBackoff, cfg.MetadataSyncInterval)
-	}
-}
-
 func TestLoadFromEnvRejectsInvalidBasePath(t *testing.T) {
-	t.Setenv("CPA_BASE_URL", "http://127.0.0.1:"+cpa.ManagementRedisDefaultPort)
-	t.Setenv("CPA_MANAGEMENT_KEY", "secret")
-	t.Setenv("APP_BASE_PATH", "cpa")
+	setRequiredSub2APIEnv(t)
+	t.Setenv("APP_BASE_PATH", "sub2api")
 
 	_, err := LoadFromEnv()
 	if err == nil || err.Error() != "APP_BASE_PATH is invalid: must start with '/'" {
@@ -535,8 +470,7 @@ func TestLoadFromEnvRejectsInvalidBasePath(t *testing.T) {
 }
 
 func TestLoadFromEnvRejectsNonPositiveAuthSessionTTL(t *testing.T) {
-	t.Setenv("CPA_BASE_URL", "http://127.0.0.1:"+cpa.ManagementRedisDefaultPort)
-	t.Setenv("CPA_MANAGEMENT_KEY", "secret")
+	setRequiredSub2APIEnv(t)
 	t.Setenv("AUTH_SESSION_TTL", "0s")
 
 	_, err := LoadFromEnv()

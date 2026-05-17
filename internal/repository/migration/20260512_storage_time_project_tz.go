@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strings"
 
-	"cpa-usage-keeper/internal/timeutil"
+	"sub2api-usage-keeper/internal/timeutil"
 	"gorm.io/gorm"
 )
 

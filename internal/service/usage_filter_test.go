@@ -9,11 +9,11 @@ import (
 	"testing"
 	"time"
 
-	"cpa-usage-keeper/internal/config"
-	"cpa-usage-keeper/internal/entities"
-	"cpa-usage-keeper/internal/repository"
-	"cpa-usage-keeper/internal/repository/dto"
-	servicedto "cpa-usage-keeper/internal/service/dto"
+	"sub2api-usage-keeper/internal/config"
+	"sub2api-usage-keeper/internal/entities"
+	"sub2api-usage-keeper/internal/repository"
+	"sub2api-usage-keeper/internal/repository/dto"
+	servicedto "sub2api-usage-keeper/internal/service/dto"
 	"gorm.io/gorm"
 )
 

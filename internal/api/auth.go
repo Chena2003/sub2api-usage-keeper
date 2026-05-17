@@ -7,7 +7,7 @@ import (
 	"sync"
 	"time"
 
-	"cpa-usage-keeper/internal/auth"
+	"sub2api-usage-keeper/internal/auth"
 	"github.com/gin-gonic/gin"
 )
 

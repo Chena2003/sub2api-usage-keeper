@@ -1,30 +1,24 @@
 services:
-  cpa-usage-keeper:
-    image: ghcr.io/willxup/cpa-usage-keeper:latest
-    ports:
-      - "8080:8080"
-    environment:
-      CPA_BASE_URL: ${CPA_BASE_URL}
-      CPA_MANAGEMENT_KEY: ${CPA_MANAGEMENT_KEY}
-      AUTH_ENABLED: ${AUTH_ENABLED:-false}
-      LOGIN_PASSWORD: ${LOGIN_PASSWORD:-}
-      AUTH_SESSION_TTL: ${AUTH_SESSION_TTL:-168h}
-      APP_PORT: ${APP_PORT:-8080}
-      APP_BASE_PATH: ${APP_BASE_PATH:-}
-      TZ: ${TZ:-Asia/Shanghai}
-      REDIS_QUEUE_ADDR: ${REDIS_QUEUE_ADDR:-}
-      REDIS_QUEUE_TLS: ${REDIS_QUEUE_TLS:-false}
-      REDIS_QUEUE_BATCH_SIZE: ${REDIS_QUEUE_BATCH_SIZE:-1000}
-      REDIS_QUEUE_IDLE_INTERVAL: ${REDIS_QUEUE_IDLE_INTERVAL:-1s}
-      REQUEST_TIMEOUT: ${REQUEST_TIMEOUT:-30s}
-      TLS_SKIP_VERIFY: ${TLS_SKIP_VERIFY:-false}
-      WORK_DIR: ${WORK_DIR:-./data}
-      LOG_LEVEL: ${LOG_LEVEL:-info}
-      LOG_FILE_ENABLED: ${LOG_FILE_ENABLED:-true}
-      LOG_RETENTION_DAYS: ${LOG_RETENTION_DAYS:-7}
-      BACKUP_ENABLED: ${BACKUP_ENABLED:-true}
-      BACKUP_INTERVAL: ${BACKUP_INTERVAL:-24h}
-      BACKUP_RETENTION_DAYS: ${BACKUP_RETENTION_DAYS:-7}
-    volumes:
-      - ./data:/data
+  sub2api-usage-keeper:
+    image: sub2api-usage-keeper:latest
+    container_name: sub2api-usage-keeper
     restart: unless-stopped
+    environment:
+      SUB2API_DATABASE_URL: postgres://sub2api:${SUB2API_POSTGRES_PASSWORD}@sub2api-postgres:5432/sub2api?sslmode=disable
+      AUTH_ENABLED: "true"
+      LOGIN_PASSWORD: ${SUB2API_USAGE_PASSWORD}
+      APP_PORT: "8080"
+      TZ: Asia/Shanghai
+      WORK_DIR: /data
+      PUBLIC_MODE: "true"
+      QUOTA_REFRESH_INTERVAL: 5m
+    volumes:
+      - ./usage-dashboard/data:/data
+    ports:
+      - "127.0.0.1:8082:8080"
+    networks:
+      - sub2api-network
+
+networks:
+  sub2api-network:
+    external: true

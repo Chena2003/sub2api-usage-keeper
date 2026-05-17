@@ -7,8 +7,8 @@ import (
 	"strings"
 	"testing"
 
-	"cpa-usage-keeper/internal/entities"
-	servicedto "cpa-usage-keeper/internal/service/dto"
+	"sub2api-usage-keeper/internal/entities"
+	servicedto "sub2api-usage-keeper/internal/service/dto"
 )
 
 type pricingStub struct {

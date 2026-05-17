@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"cpa-usage-keeper/internal/entities"
+	"sub2api-usage-keeper/internal/entities"
 	"github.com/sirupsen/logrus"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"

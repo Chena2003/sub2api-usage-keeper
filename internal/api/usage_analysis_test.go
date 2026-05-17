@@ -7,11 +7,11 @@ import (
 	"testing"
 	"time"
 
-	"cpa-usage-keeper/internal/entities"
-	"cpa-usage-keeper/internal/redact"
-	"cpa-usage-keeper/internal/repository/dto"
-	"cpa-usage-keeper/internal/service"
-	servicedto "cpa-usage-keeper/internal/service/dto"
+	"sub2api-usage-keeper/internal/entities"
+	"sub2api-usage-keeper/internal/redact"
+	"sub2api-usage-keeper/internal/repository/dto"
+	"sub2api-usage-keeper/internal/service"
+	servicedto "sub2api-usage-keeper/internal/service/dto"
 )
 
 type usageAnalysisStub struct {

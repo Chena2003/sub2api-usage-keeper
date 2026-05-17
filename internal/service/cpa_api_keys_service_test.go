@@ -6,8 +6,8 @@ import (
 	"testing"
 	"time"
 
-	"cpa-usage-keeper/internal/config"
-	"cpa-usage-keeper/internal/repository"
+	"sub2api-usage-keeper/internal/config"
+	"sub2api-usage-keeper/internal/repository"
 )
 
 func TestUpdateCPAAPIKeyAliasAcceptsParsedInt64ID(t *testing.T) {

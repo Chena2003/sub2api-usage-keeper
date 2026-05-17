@@ -6,11 +6,11 @@ import (
 	"sort"
 	"strings"
 
-	"cpa-usage-keeper/internal/cpa/dto/response"
-	"cpa-usage-keeper/internal/entities"
-	"cpa-usage-keeper/internal/repository"
-	repodto "cpa-usage-keeper/internal/repository/dto"
-	servicedto "cpa-usage-keeper/internal/service/dto"
+	"sub2api-usage-keeper/internal/cpa/dto/response"
+	"sub2api-usage-keeper/internal/entities"
+	"sub2api-usage-keeper/internal/repository"
+	repodto "sub2api-usage-keeper/internal/repository/dto"
+	servicedto "sub2api-usage-keeper/internal/service/dto"
 	"github.com/sirupsen/logrus"
 	"gorm.io/gorm"
 )

@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"cpa-usage-keeper/internal/auth"
+	"sub2api-usage-keeper/internal/auth"
 )
 
 func TestAuthSessionReportsAuthenticatedWhenDisabled(t *testing.T) {

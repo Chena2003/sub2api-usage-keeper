@@ -3,21 +3,23 @@ package app
 import (
 	"bytes"
 	"context"
-	"os"
-	"path/filepath"
+	"fmt"
 	"strings"
 	"testing"
 	"time"
 
-	"cpa-usage-keeper/internal/config"
-	"cpa-usage-keeper/internal/entities"
-	"cpa-usage-keeper/internal/poller"
-	"cpa-usage-keeper/internal/repository"
+	"sub2api-usage-keeper/internal/config"
+	"sub2api-usage-keeper/internal/poller"
+	"sub2api-usage-keeper/internal/sub2api"
+
 	"github.com/gin-gonic/gin"
 	"github.com/sirupsen/logrus"
+	"gorm.io/driver/sqlite"
+	"gorm.io/gorm"
 )
 
 func TestAppCloseClosesDatabase(t *testing.T) {
+	installSub2APITestRepository(t)
 	app, err := NewWithConfig(testAppConfig(t))
 	if err != nil {
 		t.Fatalf("NewWithConfig returned error: %v", err)
@@ -36,20 +38,15 @@ func TestAppCloseClosesDatabase(t *testing.T) {
 	}
 }
 
-func TestNewWithConfigBuildsRedisDrainAndRouter(t *testing.T) {
+func TestNewWithConfigBuildsSub2APIDashboardAndRouter(t *testing.T) {
+	installSub2APITestRepository(t)
 	app, err := NewWithConfig(testAppConfig(t))
 	if err != nil {
 		t.Fatalf("NewWithConfig returned error: %v", err)
 	}
 	defer app.Close()
-	if app.Poller == nil {
-		t.Fatal("expected poller status provider to be initialized")
-	}
-	if app.RedisPull == nil {
-		t.Fatal("expected redis pull runner to be initialized")
-	}
-	if app.RedisProcess == nil {
-		t.Fatal("expected redis process runner to be initialized")
+	if app.Sub2APIRepository == nil {
+		t.Fatal("expected sub2api repository to be initialized")
 	}
 	if app.Router == nil {
 		t.Fatal("expected router to be initialized")
@@ -60,59 +57,13 @@ func TestNewWithConfigBuildsRedisDrainAndRouter(t *testing.T) {
 	if app.BackupMaintenance == nil {
 		t.Fatal("expected database backup runner to be initialized")
 	}
-	if app.MetadataSync == nil {
-		t.Fatal("expected metadata sync runner to be initialized")
-	}
-}
-
-func TestNewWithConfigAggregatesExistingOverviewStatsBeforeRunnersStart(t *testing.T) {
-	dbPath := filepath.Join(t.TempDir(), "app-startup-overview-catchup.db")
-	seedDB, err := repository.OpenDatabase(config.Config{SQLitePath: dbPath})
-	if err != nil {
-		t.Fatalf("OpenDatabase returned error: %v", err)
-	}
-	if _, _, err := repository.InsertUsageEvents(seedDB, []entities.UsageEvent{
-		{EventKey: "legacy-event", APIGroupKey: "provider-a", Model: "claude-sonnet", Timestamp: time.Date(2026, 4, 16, 10, 10, 0, 0, time.UTC), TotalTokens: 150},
-	}); err != nil {
-		t.Fatalf("InsertUsageEvents returned error: %v", err)
-	}
-	seedSQL, err := seedDB.DB()
-	if err != nil {
-		t.Fatalf("load seed sql db: %v", err)
-	}
-	if err := seedSQL.Close(); err != nil {
-		t.Fatalf("close seed db: %v", err)
-	}
-
-	logDir := t.TempDir()
-
-	cfg := testAppConfig(t)
-	cfg.SQLitePath = dbPath
-	cfg.LogFileEnabled = true
-	cfg.LogDir = logDir
-	app, err := NewWithConfig(cfg)
-	if err != nil {
-		t.Fatalf("NewWithConfig returned error: %v", err)
-	}
-	defer app.Close()
-
-	var checkpoint entities.UsageOverviewAggregationCheckpoint
-	if err := app.DB.Where("name = ?", "overview").First(&checkpoint).Error; err != nil {
-		t.Fatalf("load overview checkpoint returned error: %v", err)
-	}
-	if checkpoint.LastAggregatedUsageEventID == 0 {
-		t.Fatalf("expected startup catch-up to aggregate legacy usage events, got checkpoint %+v", checkpoint)
-	}
-	logContent := readAppLogFile(t, logDir)
-	if !strings.Contains(logContent, "starting usage overview aggregation catch-up") {
-		t.Fatalf("expected startup catch-up start log, got %s", logContent)
-	}
-	if !strings.Contains(logContent, "completed usage overview aggregation catch-up") {
-		t.Fatalf("expected startup catch-up completion log, got %s", logContent)
+	if app.Maintenance == nil {
+		t.Fatal("expected maintenance runner to be initialized")
 	}
 }
 
 func TestNewWithConfigSkipsBackupRunnerWhenDisabled(t *testing.T) {
+	installSub2APITestRepository(t)
 	cfg := testAppConfig(t)
 	cfg.BackupEnabled = false
 	app, err := NewWithConfig(cfg)
@@ -125,62 +76,32 @@ func TestNewWithConfigSkipsBackupRunnerWhenDisabled(t *testing.T) {
 	}
 }
 
-func TestNewWithConfigSelectsRedisDrain(t *testing.T) {
-	app, err := NewWithConfig(testAppConfig(t))
-	if err != nil {
-		t.Fatalf("NewWithConfig returned error: %v", err)
+func TestNewWithConfigRequiresSub2APIRepository(t *testing.T) {
+	previous := openSub2APIRepository
+	openSub2APIRepository = func(string) (*sub2api.Repository, error) {
+		return nil, fmt.Errorf("open sub2api postgres: dial failed")
 	}
-	defer app.Close()
-	if _, ok := app.Poller.(*poller.RedisDrain); !ok {
-		t.Fatalf("expected redis status provider to use redis drain, got %T", app.Poller)
+	t.Cleanup(func() { openSub2APIRepository = previous })
+
+	cfg := testAppConfig(t)
+	cfg.BackupEnabled = false
+	_, err := NewWithConfig(cfg)
+	if err == nil {
+		t.Fatalf("expected error because Sub2API repository cannot be opened")
 	}
-	if _, ok := app.RedisPull.(*poller.RedisPullRunner); !ok {
-		t.Fatalf("expected redis pull runner, got %T", app.RedisPull)
-	}
-	if _, ok := app.RedisProcess.(*poller.RedisProcessRunner); !ok {
-		t.Fatalf("expected redis process runner, got %T", app.RedisProcess)
-	}
-	if app.Maintenance == nil {
-		t.Fatal("expected maintenance cleanup runner to be initialized")
+	if !strings.Contains(err.Error(), "open sub2api postgres") {
+		t.Fatalf("unexpected error: %v", err)
 	}
 }
 
-func TestNewWithConfigCreatesIndependentMaintenanceRunner(t *testing.T) {
-	app, err := NewWithConfig(testAppConfig(t))
-	if err != nil {
-		t.Fatalf("NewWithConfig returned error: %v", err)
-	}
-	defer app.Close()
-	if app.Poller == nil {
-		t.Fatal("expected sync status provider to be initialized")
-	}
-	if app.RedisPull == nil {
-		t.Fatal("expected independent redis pull runner to be initialized")
-	}
-	if app.RedisProcess == nil {
-		t.Fatal("expected independent redis process runner to be initialized")
-	}
-	if app.Maintenance == nil {
-		t.Fatal("expected independent maintenance runner to be initialized")
-	}
-}
-
-func TestRunStartsPollerAndMaintenanceIndependently(t *testing.T) {
+func TestRunStartsMaintenanceOnly(t *testing.T) {
 	cfg := testAppConfig(t)
 	cfg.AppPort = "invalid-port"
-	pullStarted := make(chan struct{})
-	processStarted := make(chan struct{})
 	maintenanceStarted := make(chan struct{})
-	metadataStarted := make(chan struct{})
 	backupStarted := make(chan struct{})
 	maintenance := NewStorageCleanupRunner(&maintenanceSyncStub{})
 	maintenance.sleep = func(context.Context, time.Duration) bool {
 		close(maintenanceStarted)
-		return false
-	}
-	metadataRunner := NewMetadataSyncRunner(&metadataSyncStub{}, time.Second)
-	metadataRunner.sleep = func(context.Context, time.Duration) bool {
-		close(metadataStarted)
 		return false
 	}
 	backupRunner := NewDatabaseBackupRunner(&databaseBackupWriterStub{}, nil, time.Second, 0)
@@ -193,25 +114,12 @@ func TestRunStartsPollerAndMaintenanceIndependently(t *testing.T) {
 		Config:            &cfg,
 		Router:            gin.New(),
 		Poller:            statusProvider,
-		RedisPull:         &appRunStub{started: pullStarted},
-		RedisProcess:      &appRunStub{started: processStarted},
 		Maintenance:       maintenance,
-		MetadataSync:      metadataRunner,
 		BackupMaintenance: backupRunner,
 	}
 
 	if err := app.Run(); err == nil {
 		t.Fatal("expected Run to return an error for invalid port")
-	}
-	select {
-	case <-pullStarted:
-	case <-time.After(time.Second):
-		t.Fatal("expected redis pull runner to start")
-	}
-	select {
-	case <-processStarted:
-	case <-time.After(time.Second):
-		t.Fatal("expected redis process runner to start")
 	}
 	select {
 	case <-statusProvider.started:
@@ -222,11 +130,6 @@ func TestRunStartsPollerAndMaintenanceIndependently(t *testing.T) {
 	case <-maintenanceStarted:
 	case <-time.After(time.Second):
 		t.Fatal("expected maintenance runner to start")
-	}
-	select {
-	case <-metadataStarted:
-	case <-time.After(time.Second):
-		t.Fatal("expected metadata sync runner to start")
 	}
 	select {
 	case <-backupStarted:
@@ -285,6 +188,19 @@ func (s *appRunStub) SyncNow(context.Context) error {
 	return nil
 }
 
+func installSub2APITestRepository(t *testing.T) {
+	t.Helper()
+	previous := openSub2APIRepository
+	openSub2APIRepository = func(string) (*sub2api.Repository, error) {
+		db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
+		if err != nil {
+			return nil, err
+		}
+		return sub2api.NewRepository(db), nil
+	}
+	t.Cleanup(func() { openSub2APIRepository = previous })
+}
+
 func captureAppInfoLogs(t *testing.T) *bytes.Buffer {
 	t.Helper()
 	var logs bytes.Buffer
@@ -302,32 +218,22 @@ func captureAppInfoLogs(t *testing.T) *bytes.Buffer {
 	return &logs
 }
 
-func readAppLogFile(t *testing.T, logDir string) string {
-	t.Helper()
-	path := filepath.Join(logDir, "cpa-usage-keeper-"+time.Now().Format("2006-01-02")+".log")
-	content, err := os.ReadFile(path)
-	if err != nil {
-		t.Fatalf("read app log file: %v", err)
-	}
-	return string(content)
-}
-
 func testAppConfig(t *testing.T) config.Config {
 	t.Helper()
 	return config.Config{
-		AppPort:                "8080",
-		CPABaseURL:             "https://cpa.example.com",
-		CPAManagementKey:       "secret",
-		RedisQueueIdleInterval: time.Second,
-		RedisQueueErrorBackoff: 10 * time.Second,
-		MetadataSyncInterval:   30 * time.Second,
-		SQLitePath:             t.TempDir() + "/app.db",
-		BackupEnabled:          true,
-		BackupDir:              t.TempDir() + "/backups",
-		BackupRetentionDays:    7,
-		RequestTimeout:         5 * time.Second,
-		LogLevel:               "info",
-		LogFileEnabled:         false,
-		LogRetentionDays:       7,
+		AppPort:              "8080",
+		Sub2APIDatabaseURL:   "postgres://sub2api:pw@sub2api-postgres:5432/sub2api?sslmode=disable",
+		QuotaRefreshInterval: 5 * time.Minute,
+		PublicMode:          true,
+		SQLitePath:           t.TempDir() + "/app.db",
+		BackupEnabled:        true,
+		BackupDir:            t.TempDir() + "/backups",
+		BackupInterval:       24 * time.Hour,
+		BackupRetentionDays:  7,
+		RequestTimeout:       5 * time.Second,
+		LogLevel:             "info",
+		LogFileEnabled:       false,
+		LogRetentionDays:     7,
+		AuthSessionTTL:       time.Hour,
 	}
 }

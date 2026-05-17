@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"time"
 
-	"cpa-usage-keeper/internal/timeutil"
+	"sub2api-usage-keeper/internal/timeutil"
 	"github.com/sirupsen/logrus"
 	"gorm.io/gorm"
 )

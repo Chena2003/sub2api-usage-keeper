@@ -4,7 +4,7 @@ import (
 	"context"
 	"net/http"
 
-	"cpa-usage-keeper/internal/updatecheck"
+	"sub2api-usage-keeper/internal/updatecheck"
 	"github.com/gin-gonic/gin"
 )
 

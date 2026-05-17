@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"cpa-usage-keeper/internal/entities"
+	"sub2api-usage-keeper/internal/entities"
 
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"

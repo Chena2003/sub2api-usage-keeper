@@ -3,8 +3,8 @@ package quota
 import (
 	"context"
 
-	"cpa-usage-keeper/internal/cpa/dto/apicall"
-	"cpa-usage-keeper/internal/entities"
+	"sub2api-usage-keeper/internal/cpa/dto/apicall"
+	"sub2api-usage-keeper/internal/entities"
 )
 
 type ManagementAPICaller interface {

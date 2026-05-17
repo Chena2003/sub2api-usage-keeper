@@ -9,7 +9,7 @@ import (
 	"strings"
 	"testing"
 
-	"cpa-usage-keeper/internal/quota"
+	"sub2api-usage-keeper/internal/quota"
 )
 
 type quotaProviderStub struct {

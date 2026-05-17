@@ -10,16 +10,10 @@ import (
 	"strings"
 	"time"
 
-	"cpa-usage-keeper/internal/cpa"
 	"github.com/joho/godotenv"
 )
 
-const (
-	DefaultTimeZone               = "Asia/Shanghai"
-	RedisQueueKeyDefault          = cpa.ManagementUsageQueueKey
-	RedisQueueErrorBackoffDefault = 10 * time.Second
-	MetadataSyncIntervalDefault   = 30 * time.Second
-)
+const DefaultTimeZone = "Asia/Shanghai"
 
 var (
 	DefaultWorkDir      = filepath.Join(".", "data")
@@ -42,24 +36,22 @@ type Config struct {
 	TLSCertFile string
 	// TLSKeyFile 是 HTTPS 私钥文件路径。
 	TLSKeyFile string
-	// CPABaseURL 是 CPA 服务基础地址。
-	CPABaseURL string
-	// CPAManagementKey 是访问 CPA 管理数据的密钥。
-	CPAManagementKey string
-	// RedisQueueAddr 是 CPA management data stream 的 TCP 地址，空值时按 CPA_BASE_URL 推导。
-	RedisQueueAddr string
-	// RedisQueueTLS 控制是否使用 TLS 连接 Redis 队列。
-	RedisQueueTLS bool
-	// RedisQueueKey 是 CPA usage 队列名。
-	RedisQueueKey string
-	// RedisQueueBatchSize 是单次 Redis LPOP 最多拉取的消息数。
-	RedisQueueBatchSize int
-	// RedisQueueIdleInterval 是 Redis 队列为空时的下一次检查间隔。
+	// Sub2APIDatabaseURL 是 Sub2API PostgreSQL 数据库连接地址。
+	Sub2APIDatabaseURL string
+	CPABaseURL             string
+	CPAManagementKey       string
+	RedisQueueAddr         string
+	RedisQueueTLS          bool
+	RedisQueueKey          string
+	RedisQueueBatchSize    int
 	RedisQueueIdleInterval time.Duration
-	// RedisQueueErrorBackoff 是 Redis 临时错误后的固定退避间隔。
 	RedisQueueErrorBackoff time.Duration
-	// MetadataSyncInterval 是 auth files 和 provider metadata 的固定刷新间隔。
-	MetadataSyncInterval time.Duration
+	MetadataSyncInterval   time.Duration
+	TLSSkipVerify          bool
+	// QuotaRefreshInterval 是刷新 Sub2API quota 数据的间隔。
+	QuotaRefreshInterval time.Duration
+	// PublicMode 控制是否启用公开访问模式。
+	PublicMode bool
 	// WorkDir 是应用工作目录，数据库、日志和备份默认从这里派生。
 	WorkDir string
 	// SQLitePath 是 SQLite 数据库文件路径。
@@ -72,10 +64,8 @@ type Config struct {
 	BackupInterval time.Duration
 	// BackupRetentionDays 是备份文件保留天数。
 	BackupRetentionDays int
-	// RequestTimeout 是访问 CPA HTTP 和 Redis TCP 的超时时间。
+	// RequestTimeout 是访问外部服务的超时时间。
 	RequestTimeout time.Duration
-	// TLSSkipVerify 控制是否跳过 CPA HTTPS 和 Redis 队列 TLS 的证书验证。
-	TLSSkipVerify bool
 	// LogLevel 是应用日志级别。
 	LogLevel string
 	// LogFileEnabled 控制是否写入持久化日志文件。
@@ -117,20 +107,17 @@ func Load(options LoadOptions) (*Config, error) {
 		return nil, err
 	}
 
-	redisQueueBatchSize, err := getInt("REDIS_QUEUE_BATCH_SIZE", 1000)
+	quotaRefreshInterval, err := getDuration("QUOTA_REFRESH_INTERVAL", 5*time.Minute)
 	if err != nil {
 		return nil, err
 	}
-	if redisQueueBatchSize <= 0 {
-		return nil, fmt.Errorf("REDIS_QUEUE_BATCH_SIZE must be positive")
+	if quotaRefreshInterval <= 0 {
+		return nil, fmt.Errorf("QUOTA_REFRESH_INTERVAL must be positive")
 	}
 
-	redisQueueIdleInterval, err := getDuration("REDIS_QUEUE_IDLE_INTERVAL", time.Second)
+	publicMode, err := getBool("PUBLIC_MODE", true)
 	if err != nil {
 		return nil, err
-	}
-	if redisQueueIdleInterval <= 0 {
-		return nil, fmt.Errorf("REDIS_QUEUE_IDLE_INTERVAL must be positive")
 	}
 
 	requestTimeout, err := getDuration("REQUEST_TIMEOUT", 30*time.Second)
@@ -188,16 +175,6 @@ func Load(options LoadOptions) (*Config, error) {
 		return nil, err
 	}
 
-	tlsSkipVerify, err := getBool("TLS_SKIP_VERIFY", false)
-	if err != nil {
-		return nil, err
-	}
-
-	redisQueueTLS, err := getBool("REDIS_QUEUE_TLS", false)
-	if err != nil {
-		return nil, err
-	}
-
 	appBasePath, err := normalizeBasePath(strings.TrimSpace(os.Getenv("APP_BASE_PATH")))
 	if err != nil {
 		return nil, fmt.Errorf("APP_BASE_PATH is invalid: %w", err)
@@ -206,41 +183,31 @@ func Load(options LoadOptions) (*Config, error) {
 	workDir := getString("WORK_DIR", DefaultWorkDir)
 
 	cfg := &Config{
-		AppPort:                getString("APP_PORT", "8080"),
-		AppBasePath:            appBasePath,
-		TLSEnabled:             tlsEnabled,
-		TLSCertFile:            strings.TrimSpace(os.Getenv("TLS_CERT_FILE")),
-		TLSKeyFile:             strings.TrimSpace(os.Getenv("TLS_KEY_FILE")),
-		CPABaseURL:             strings.TrimSpace(os.Getenv("CPA_BASE_URL")),
-		CPAManagementKey:       strings.TrimSpace(os.Getenv("CPA_MANAGEMENT_KEY")),
-		RedisQueueAddr:         strings.TrimSpace(os.Getenv("REDIS_QUEUE_ADDR")),
-		RedisQueueTLS:          redisQueueTLS,
-		RedisQueueKey:          RedisQueueKeyDefault,
-		RedisQueueBatchSize:    redisQueueBatchSize,
-		RedisQueueIdleInterval: redisQueueIdleInterval,
-		RedisQueueErrorBackoff: RedisQueueErrorBackoffDefault,
-		MetadataSyncInterval:   MetadataSyncIntervalDefault,
-		WorkDir:                workDir,
-		SQLitePath:             filepath.Join(workDir, workDirDatabaseName),
-		BackupEnabled:          backupEnabled,
-		BackupDir:              filepath.Join(workDir, workDirBackupsName),
-		BackupInterval:         backupInterval,
-		BackupRetentionDays:    backupRetentionDays,
-		RequestTimeout:         requestTimeout,
-		TLSSkipVerify:          tlsSkipVerify,
-		LogLevel:               getString("LOG_LEVEL", "info"),
-		LogFileEnabled:         logFileEnabled,
-		LogDir:                 filepath.Join(workDir, workDirLogsName),
-		LogRetentionDays:       logRetentionDays,
-		AuthEnabled:            authEnabled,
-		LoginPassword:          strings.TrimSpace(os.Getenv("LOGIN_PASSWORD")),
-		AuthSessionTTL:         authSessionTTL,
+		AppPort:              getString("APP_PORT", "8080"),
+		AppBasePath:          appBasePath,
+		TLSEnabled:           tlsEnabled,
+		TLSCertFile:          strings.TrimSpace(os.Getenv("TLS_CERT_FILE")),
+		TLSKeyFile:           strings.TrimSpace(os.Getenv("TLS_KEY_FILE")),
+		Sub2APIDatabaseURL:   strings.TrimSpace(os.Getenv("SUB2API_DATABASE_URL")),
+		QuotaRefreshInterval: quotaRefreshInterval,
+		PublicMode:           publicMode,
+		WorkDir:              workDir,
+		SQLitePath:           filepath.Join(workDir, workDirDatabaseName),
+		BackupEnabled:        backupEnabled,
+		BackupDir:            filepath.Join(workDir, workDirBackupsName),
+		BackupInterval:       backupInterval,
+		BackupRetentionDays:  backupRetentionDays,
+		RequestTimeout:       requestTimeout,
+		LogLevel:             getString("LOG_LEVEL", "info"),
+		LogFileEnabled:       logFileEnabled,
+		LogDir:               filepath.Join(workDir, workDirLogsName),
+		LogRetentionDays:     logRetentionDays,
+		AuthEnabled:          authEnabled,
+		LoginPassword:        strings.TrimSpace(os.Getenv("LOGIN_PASSWORD")),
+		AuthSessionTTL:       authSessionTTL,
 	}
-	if cfg.CPABaseURL == "" {
-		return nil, fmt.Errorf("CPA_BASE_URL is required")
-	}
-	if cfg.CPAManagementKey == "" {
-		return nil, fmt.Errorf("CPA_MANAGEMENT_KEY is required")
+	if cfg.Sub2APIDatabaseURL == "" {
+		return nil, fmt.Errorf("SUB2API_DATABASE_URL is required")
 	}
 	if cfg.AuthEnabled && cfg.LoginPassword == "" {
 		return nil, fmt.Errorf("LOGIN_PASSWORD is required when AUTH_ENABLED is true")

@@ -3,7 +3,7 @@ package api
 import (
 	"strings"
 
-	"cpa-usage-keeper/internal/entities"
+	"sub2api-usage-keeper/internal/entities"
 )
 
 type usageIdentityResolver struct {

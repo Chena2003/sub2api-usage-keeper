@@ -6,7 +6,7 @@ import (
 	"strings"
 	"time"
 
-	"cpa-usage-keeper/internal/timeutil"
+	"sub2api-usage-keeper/internal/timeutil"
 )
 
 func NormalizeQuotaRows(output ProviderOutput) []QuotaRow {

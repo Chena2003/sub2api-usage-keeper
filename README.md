@@ -1,77 +1,47 @@
-# CPA Usage Keeper
+# Sub2API Usage Keeper
 
 [English README](./README.en.md)
 
-`CPA Usage Keeper` 是一个独立的 CPA 用量持久化与可视化服务。
-
-它依赖 [CLIProxyAPI（CPA）](https://github.com/router-for-me/CLIProxyAPI) 作为后端 CPA 数据来源，目标是在 CPA 之上补充持久化存储与统计分析能力。服务会从 CPA Redis usage 队列消费事件并写入 SQLite，定时拉取 CPA metadata，暴露聚合 API，并提供内置 Web Dashboard 用于查看 usage、pricing、request health 和 model/API 维度的统计信息。
-
-<p float="left">
-  <img src="https://images.bitskyline.com/i/2026/05/3lgvpz.png" width="49%" />
-  <img src="https://images.bitskyline.com/i/2026/05/3lgenc.png" width="49%" />
-</p>
+Sub2API Usage Keeper 是一个独立 sidecar dashboard，用于展示 Sub2API 上游账号状态、脱敏后的 quota/账号元数据，以及总体调用统计。
 
 ## 功能特性
 
-- CPA usage 数据持久化到 SQLite
-- usage 聚合 API 与 pricing API
-- 内置 React Dashboard
+- 读取现有 Sub2API PostgreSQL 数据库中的账号与 usage 聚合数据
+- 展示总账号、可用账号、请求量、Token 消耗、成本和模型排行
+- 展示所有上游账号的状态、计划、reset 时间和近 7 天用量
+- 浏览器 API 不返回 Sub2API 原始 credentials
+- 本地 SQLite 存储 dashboard 自有数据、日志和备份
 - 可选密码登录保护
-- SQLite 数据库本地备份与保留策略
-- Linux systemd 服务文件
 - Docker / Docker Compose 部署
 
-## 项目结构
+## Docker 接入现有 Sub2API
 
-```text
-cmd/server/              应用入口
-internal/api/            HTTP 路由与处理器
-internal/app/            应用装配与启动
-internal/auth/           内存 session 鉴权
-internal/backup/         SQLite 数据库备份管理
-internal/config/         环境配置加载
-internal/cpa/            CPA 客户端与类型定义
-internal/entities/       GORM 数据模型
-internal/logging/        日志初始化与保留策略
-internal/poller/         后台队列消费与 metadata 同步
-internal/quota/          quota 缓存、刷新与查询服务
-internal/redact/         前端展示字段脱敏
-internal/repository/     SQLite 访问与聚合逻辑
-internal/service/        usage、pricing 与身份数据服务
-internal/timeutil/       项目时区与时间工具
-internal/updatecheck/    GitHub Release 更新检查
-deploy/                  systemd、Docker 与部署资源
-web/                     React + TypeScript 前端
+1. 确保 dashboard 容器和 `sub2api-postgres` 在同一个 Docker network。
+2. 尽可能为 `SUB2API_DATABASE_URL` 配置只读 PostgreSQL 用户。
+3. 默认将 dashboard 绑定到 `127.0.0.1:8082`，再通过 Caddy、Nginx 或 Cloudflare 暴露给用户。
+
+```bash
+cp .env.example .env
+vim .env
+docker build -t sub2api-usage-keeper:latest .
+docker compose -f docker-compose.example.yml up -d
 ```
 
 ## 配置
 
-复制配置模板：
-
-```bash
-cp .env.example .env
-```
-
 | 变量 | 必填 | 默认值 | 说明 |
 | --- | --- | --- | --- |
-| `CPA_BASE_URL` | 是 | - | CPA 服务地址 |
-| `CPA_MANAGEMENT_KEY` | 是 | - | CPA management key |
+| `SUB2API_DATABASE_URL` | 是 | - | Sub2API PostgreSQL 连接地址，例如 `postgres://sub2api:password@sub2api-postgres:5432/sub2api?sslmode=disable` |
 | `AUTH_ENABLED` | 否 | `false` | 是否启用登录保护 |
-| `LOGIN_PASSWORD` | 鉴权启用时必填 | - | 登录密码 |
+| `LOGIN_PASSWORD` | 鉴权启用时必填 | - | Dashboard 登录密码 |
 | `AUTH_SESSION_TTL` | 否 | `168h` | Session 生命周期 |
 | `APP_PORT` | 否 | `8080` | HTTP 监听端口 |
-| `TLS_ENABLED` | 否 | `false` | 是否启用 HTTPS/TLS |
-| `TLS_CERT_FILE` | 启用 TLS 时必填 | - | HTTPS 证书文件路径 |
-| `TLS_KEY_FILE` | 启用 TLS 时必填 | - | HTTPS 私钥文件路径 |
-| `APP_BASE_PATH` | 否 | 根路径 | 子路径部署前缀，例如 `/cpa`；留空表示 `/` |
-| `TZ` | 否 | `Asia/Shanghai` | 项目业务时区，影响 Today、按天聚合、定时任务和日志时间 |
-| `REDIS_QUEUE_ADDR` | 否 | `CPA_BASE_URL` 主机名 + `8317` | CPA Redis/RESP TCP 地址；留空时会使用 `CPA_BASE_URL` 的主机名和默认端口 `8317`，且当 `CPA_BASE_URL` 为 https 时自动启用 TLS；非默认端口时填写 `host:port` |
-| `REDIS_QUEUE_TLS` | 否 | `false` | 是否使用 TLS 连接 Redis 队列；仅在 `REDIS_QUEUE_ADDR` 留空且 `CPA_BASE_URL` 为 https 时自动启用；如果显式设置了 `REDIS_QUEUE_ADDR`，需手动设为 `true` |
-| `REDIS_QUEUE_BATCH_SIZE` | 否 | `1000` | 每次最多拉取的队列记录数 |
-| `REDIS_QUEUE_IDLE_INTERVAL` | 否 | `1s` | 队列为空时的检查间隔 |
-| `REQUEST_TIMEOUT` | 否 | `30s` | CPA 请求超时 |
-| `TLS_SKIP_VERIFY` | 否 | `false` | 跳过 CPA HTTPS 和 Redis 队列 TLS 的证书验证；仅在使用自签名证书时启用 |
-| `WORK_DIR` | 否 | `./data` | 应用工作目录；数据库、日志和备份默认分别写入 `app.db`、`logs/`、`backups/` |
+| `APP_BASE_PATH` | 否 | 根路径 | 子路径部署前缀，例如 `/usage`；留空表示 `/` |
+| `TZ` | 否 | `Asia/Shanghai` | 项目时区 |
+| `WORK_DIR` | 否 | `./data` | 应用工作目录；数据库、日志和备份默认写在这里 |
+| `PUBLIC_MODE` | 否 | `true` | 启用面向用户展示的公开 dashboard 模式 |
+| `QUOTA_REFRESH_INTERVAL` | 否 | `5m` | quota/status 刷新间隔 |
+| `REQUEST_TIMEOUT` | 否 | `30s` | 外部请求超时 |
 | `LOG_LEVEL` | 否 | `info` | 日志级别 |
 | `LOG_FILE_ENABLED` | 否 | `true` | 是否写入持久化日志文件 |
 | `LOG_RETENTION_DAYS` | 否 | `7` | 日志保留天数；`0` 表示不自动清理 |
@@ -79,17 +49,16 @@ cp .env.example .env
 | `BACKUP_INTERVAL` | 否 | `24h` | 数据库备份间隔 |
 | `BACKUP_RETENTION_DAYS` | 否 | `7` | 备份保留天数 |
 
-`APP_BASE_PATH` 必须为空或以 `/` 开头；例如 `/cpa`，`/cpa/` 会规范为 `/cpa`。
+## 安全说明
 
-启用 HTTPS 时，把 `TLS_ENABLED=true`，并填写 `TLS_CERT_FILE` 和 `TLS_KEY_FILE`；如果路径是相对路径，会按 `.env` 所在目录解析。
+浏览器 API 不会返回 Sub2API 账号 credentials。账号 email、access token、refresh token、ID token、API key、password、session key 以及 token/secret 类字段会从响应中移除；当前仅暴露允许展示的 credential key，例如 `plan_type` 和 `model_mapping`。
 
-安全与数据说明：
+生产部署建议：
 
-- SQLite 数据库备份会保存应用数据库中的原始数据，备份文件不做加密。
-- 面向浏览器的 API 会对 key-like source/lookup 字段做脱敏或稳定公开标识映射，但不会修改数据库原始值。
-- 公开部署建议开启 `AUTH_ENABLED=true`，并在反向代理层配置 HTTPS。
-- 登录 session 存在服务进程内存中，服务重启后已登录 session 会失效。
-- Redis inbox 原始消息会自动清理：成功数据保留到当天结束后清理，失败数据保留 7 天。
+- 使用只读 PostgreSQL 用户连接 Sub2API 数据库。
+- 开启 `AUTH_ENABLED=true`。
+- 在反向代理层配置 HTTPS。
+- 仅将容器端口绑定到 `127.0.0.1`，不要直接公开到公网。
 
 ## 本地开发
 
@@ -98,44 +67,23 @@ cp .env.example .env
 - Go 1.22+
 - Node.js 22+
 - npm
-- 已运行的 [CLIProxyAPI（CPA）](https://github.com/router-for-me/CLIProxyAPI)
+- 可访问的 Sub2API PostgreSQL 数据库
 
-### 本地启动
-
-1. 复制本地配置：
+### 启动
 
 ```bash
 cp .env.example .env
-```
-
-2. 启动后端：
-
-```bash
 go run ./cmd/server/main.go
 ```
 
-3. 在另一个终端安装前端依赖并启动开发服务器：
+前端开发服务器：
 
 ```bash
 npm --prefix ./web ci
 npm --prefix ./web run dev -- --host 127.0.0.1
 ```
 
-4. 构建前端生产产物：
-
-```bash
-npm --prefix ./web run build
-```
-
-### 测试
-
-运行完整的本地验证基线：
-
-```bash
-make verify
-```
-
-也可以单独运行各项检查：
+## 验证
 
 ```bash
 go test ./cmd/... ./internal/...
@@ -145,147 +93,8 @@ npm --prefix ./web run typecheck
 npm --prefix ./web run build
 ```
 
-## Linux 二进制运行
-
-### 下载
-
-在 [Releases](https://github.com/Willxup/cpa-usage-keeper/releases/latest) 下载对应架构的 Linux 二进制包，或使用命令行下载：
+也可以运行：
 
 ```bash
-curl -L -o cpa-usage-keeper.tar.gz "<替换为 Linux 二进制包下载地址>"
-mkdir -p cpa-usage-keeper
-tar -xzf cpa-usage-keeper.tar.gz -C cpa-usage-keeper --strip-components=1
-cd cpa-usage-keeper
-```
-
-请在 Releases 页面复制 `linux_amd64` 或 `linux_arm64` 包的下载地址，并替换上面命令中的占位符。
-
-### 配置
-
-复制配置模板并编辑，具体配置项参考上方“配置”章节：
-
-```bash
-cp .env.example .env
-vim .env
-```
-
-### 直接运行
-
-```bash
-./cpa-usage-keeper
-```
-
-### systemd 常驻运行
-
-Linux 二进制包内置 `cpa-usage-keeper.service`，可直接注册为 `systemd` 服务。启动后进程由 systemd 托管，关闭 SSH 或终端不会结束进程。
-
-`systemd` 的 `WorkingDirectory` 需要绝对路径。下面的 `sed` 命令会把当前目录自动写入 service 文件：
-
-```bash
-sudo cp cpa-usage-keeper.service /etc/systemd/system/cpa-usage-keeper.service # 复制 service 文件到 systemd 目录
-sudo sed -i "s|__CPA_USAGE_KEEPER_DIR__|$(pwd)|g" /etc/systemd/system/cpa-usage-keeper.service # 写入当前目录作为 WorkingDirectory
-sudo systemctl daemon-reload # 重新加载 systemd 配置
-sudo systemctl enable --now cpa-usage-keeper # 设置开机自启并立即启动服务
-```
-
-常用命令：
-
-```bash
-sudo systemctl status cpa-usage-keeper # 查看服务状态
-sudo journalctl -u cpa-usage-keeper -f # 实时查看服务日志
-sudo systemctl restart cpa-usage-keeper # 重启服务
-```
-
-## Docker
-
-如果 CPA 已在宿主机运行：
-
-```bash
-# TZ 设置容器时区，日志时间会按该时区显示。
-docker run -d \
-  --name cpa-usage-keeper \
-  --add-host=host.docker.internal:host-gateway \
-  -p 8080:8080 \
-  -v "$(pwd)/keeper/data:/data" \
-  -e TZ=Asia/Shanghai \
-  -e CPA_BASE_URL=http://host.docker.internal:8317 \
-  -e CPA_MANAGEMENT_KEY=replace-with-your-management-key \
-  -e REDIS_QUEUE_ADDR=host.docker.internal:8317 \
-  -e AUTH_ENABLED=true \
-  -e LOGIN_PASSWORD=replace-with-your-login-password \
-  ghcr.io/willxup/cpa-usage-keeper:latest
-```
-
-`/data` 用于保存 SQLite 数据库、备份文件和日志文件，请挂载到持久化目录。
-
-## Docker Compose
-
-仓库提供了一个最简 `docker-compose.yaml` 示例，用于同时部署 CPA 和 CPA Usage Keeper：
-
-```yaml
-services:
-  cli-proxy-api:
-    image: eceasy/cli-proxy-api:latest
-    container_name: cli-proxy-api
-    restart: unless-stopped
-    ports:
-      - "8317:8317"
-      - "1455:1455"
-    volumes:
-      - ./cpa/config.yaml:/CLIProxyAPI/config.yaml
-      - ./cpa/auths:/root/.cli-proxy-api
-      - ./cpa/logs:/CLIProxyAPI/logs
-    networks:
-      - cpa-network
-
-  cpa-usage-keeper:
-    image: ghcr.io/willxup/cpa-usage-keeper:latest
-    container_name: cpa-usage-keeper
-    restart: unless-stopped
-    depends_on:
-      - cli-proxy-api
-    ports:
-      - "8080:8080"
-    environment:
-      TZ: Asia/Shanghai # 设置容器时区，日志时间会按该时区显示。
-      CPA_BASE_URL: http://cli-proxy-api:8317
-      CPA_MANAGEMENT_KEY: replace-with-your-management-key
-      REDIS_QUEUE_ADDR: cli-proxy-api:8317
-      AUTH_ENABLED: true
-      LOGIN_PASSWORD: replace-with-your-login-password
-    volumes:
-      - ./keeper:/data
-    networks:
-      - cpa-network
-
-networks:
-  cpa-network:
-    driver: bridge
-```
-
-启动：
-
-```bash
-docker compose up -d
-```
-
-停止：
-
-```bash
-docker compose down
-```
-
-CPA 文件放在 `./cpa`，CPA Usage Keeper 数据放在 `./keeper`。
-
-## 子路径反代
-
-部署到 `/cpa` 时设置 `APP_BASE_PATH=/cpa`，并在反向代理中保留该前缀：
-
-```nginx
-location /cpa/ {
-    proxy_pass http://127.0.0.1:8080;
-    proxy_set_header Host $host;
-    proxy_set_header X-Forwarded-Proto $scheme;
-    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-}
+make verify
 ```

@@ -7,9 +7,9 @@ import (
 	"strings"
 	"time"
 
-	"cpa-usage-keeper/internal/entities"
-	"cpa-usage-keeper/internal/repository/dto"
-	"cpa-usage-keeper/internal/timeutil"
+	"sub2api-usage-keeper/internal/entities"
+	"sub2api-usage-keeper/internal/repository/dto"
+	"sub2api-usage-keeper/internal/timeutil"
 )
 
 type RedisQueue interface {

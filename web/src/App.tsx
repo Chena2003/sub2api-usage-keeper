@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import './index.css';
 import { ApiError, getSession, login } from './lib/api';
 import { LoginPage } from './pages/LoginPage';
-import { UsagePage } from './pages/UsagePage';
+import { Sub2ApiDashboardPage } from './pages/Sub2ApiDashboardPage';
 
 type AuthState = 'checking' | 'authenticated' | 'unauthenticated';
 
@@ -50,7 +50,7 @@ function App() {
     return <LoginPage loading={submitting} error={loginError} onSubmit={handleLogin} />;
   }
 
-  return <UsagePage onAuthRequired={() => setAuthState('unauthenticated')} />;
+  return <Sub2ApiDashboardPage />;
 }
 
 export default App;

@@ -4,8 +4,8 @@ import (
 	"net/http"
 	"strings"
 
-	"cpa-usage-keeper/internal/service"
-	servicedto "cpa-usage-keeper/internal/service/dto"
+	"sub2api-usage-keeper/internal/service"
+	servicedto "sub2api-usage-keeper/internal/service/dto"
 	"github.com/gin-gonic/gin"
 )
 

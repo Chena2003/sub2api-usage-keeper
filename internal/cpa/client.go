@@ -13,9 +13,9 @@ import (
 	"strings"
 	"time"
 
-	"cpa-usage-keeper/internal/cpa/dto/apicall"
-	"cpa-usage-keeper/internal/cpa/dto/providerconfig"
-	"cpa-usage-keeper/internal/cpa/dto/response"
+	"sub2api-usage-keeper/internal/cpa/dto/apicall"
+	"sub2api-usage-keeper/internal/cpa/dto/providerconfig"
+	"sub2api-usage-keeper/internal/cpa/dto/response"
 )
 
 type Client struct {

@@ -4,11 +4,11 @@ import (
 	"net/http"
 	"time"
 
-	"cpa-usage-keeper/internal/redact"
-	repodto "cpa-usage-keeper/internal/repository/dto"
-	"cpa-usage-keeper/internal/service"
-	servicedto "cpa-usage-keeper/internal/service/dto"
-	"cpa-usage-keeper/internal/timeutil"
+	"sub2api-usage-keeper/internal/redact"
+	repodto "sub2api-usage-keeper/internal/repository/dto"
+	"sub2api-usage-keeper/internal/service"
+	servicedto "sub2api-usage-keeper/internal/service/dto"
+	"sub2api-usage-keeper/internal/timeutil"
 	"github.com/gin-gonic/gin"
 )
 

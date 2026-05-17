@@ -4,8 +4,8 @@ import (
 	"testing"
 	"time"
 
-	"cpa-usage-keeper/internal/quota"
-	"cpa-usage-keeper/internal/timeutil"
+	"sub2api-usage-keeper/internal/quota"
+	"sub2api-usage-keeper/internal/timeutil"
 )
 
 func TestNormalizeClaudeQuotaRows(t *testing.T) {

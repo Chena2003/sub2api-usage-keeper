@@ -3,10 +3,10 @@ package response
 import (
 	"encoding/json"
 
-	"cpa-usage-keeper/internal/cpa/dto/authfiles"
-	"cpa-usage-keeper/internal/cpa/dto/cpaapikeys"
-	"cpa-usage-keeper/internal/cpa/dto/models"
-	"cpa-usage-keeper/internal/cpa/dto/providerconfig"
+	"sub2api-usage-keeper/internal/cpa/dto/authfiles"
+	"sub2api-usage-keeper/internal/cpa/dto/cpaapikeys"
+	"sub2api-usage-keeper/internal/cpa/dto/models"
+	"sub2api-usage-keeper/internal/cpa/dto/providerconfig"
 )
 
 // ManagementAPIKeysResult 是 FetchManagementAPIKeys 返回的 HTTP 包装，保留状态码、原始响应体和解析后的 DTO。

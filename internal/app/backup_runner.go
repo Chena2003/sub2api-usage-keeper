@@ -8,7 +8,7 @@ import (
 	"sync"
 	"time"
 
-	"cpa-usage-keeper/internal/backup"
+	"sub2api-usage-keeper/internal/backup"
 	"github.com/sirupsen/logrus"
 )
 

@@ -7,9 +7,9 @@ import (
 	"strings"
 	"unicode"
 
-	"cpa-usage-keeper/internal/entities"
-	"cpa-usage-keeper/internal/service"
-	"cpa-usage-keeper/internal/timeutil"
+	"sub2api-usage-keeper/internal/entities"
+	"sub2api-usage-keeper/internal/service"
+	"sub2api-usage-keeper/internal/timeutil"
 
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"

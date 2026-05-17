@@ -5,8 +5,8 @@ import (
 	"testing"
 	"time"
 
-	"cpa-usage-keeper/internal/entities"
-	"cpa-usage-keeper/internal/timeutil"
+	"sub2api-usage-keeper/internal/entities"
+	"sub2api-usage-keeper/internal/timeutil"
 	"gorm.io/gorm"
 )
 

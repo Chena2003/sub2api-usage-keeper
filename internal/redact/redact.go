@@ -6,7 +6,7 @@ import (
 	"strings"
 	"unicode/utf8"
 
-	"cpa-usage-keeper/internal/repository/dto"
+	"sub2api-usage-keeper/internal/repository/dto"
 )
 
 const apiAliasPrefix = "redacted_api_"

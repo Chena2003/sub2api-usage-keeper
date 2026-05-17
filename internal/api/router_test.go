@@ -8,8 +8,8 @@ import (
 	"testing/fstest"
 	"time"
 
-	"cpa-usage-keeper/internal/poller"
-	"cpa-usage-keeper/internal/version"
+	"sub2api-usage-keeper/internal/poller"
+	"sub2api-usage-keeper/internal/version"
 	"github.com/gin-gonic/gin"
 )
 

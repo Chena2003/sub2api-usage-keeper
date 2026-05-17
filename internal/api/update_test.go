@@ -7,7 +7,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"cpa-usage-keeper/internal/updatecheck"
+	"sub2api-usage-keeper/internal/updatecheck"
 	"github.com/gin-gonic/gin"
 )
 

@@ -5,7 +5,7 @@ import (
 	"log"
 	"os"
 
-	"cpa-usage-keeper/internal/app"
+	"sub2api-usage-keeper/internal/app"
 )
 
 func main() {

@@ -11,8 +11,8 @@ import (
 	"testing"
 	"time"
 
-	"cpa-usage-keeper/internal/cpa/dto/apicall"
-	"cpa-usage-keeper/internal/cpa/dto/response"
+	"sub2api-usage-keeper/internal/cpa/dto/apicall"
+	"sub2api-usage-keeper/internal/cpa/dto/response"
 )
 
 func TestFetchManagementAPIKeysSendsBearerTokenAndParsesKeys(t *testing.T) {

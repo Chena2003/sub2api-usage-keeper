@@ -5,9 +5,9 @@ import (
 	"strconv"
 	"strings"
 
-	"cpa-usage-keeper/internal/repository"
-	repodto "cpa-usage-keeper/internal/repository/dto"
-	servicedto "cpa-usage-keeper/internal/service/dto"
+	"sub2api-usage-keeper/internal/repository"
+	repodto "sub2api-usage-keeper/internal/repository/dto"
+	servicedto "sub2api-usage-keeper/internal/service/dto"
 	"gorm.io/gorm"
 )
 

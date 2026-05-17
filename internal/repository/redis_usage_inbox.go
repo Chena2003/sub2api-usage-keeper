@@ -1,15 +1,15 @@
 package repository
 
 import (
-	"cpa-usage-keeper/internal/repository/dto"
+	"sub2api-usage-keeper/internal/repository/dto"
 	"crypto/sha256"
 	"fmt"
 	"strings"
 	"time"
 	"unicode/utf8"
 
-	"cpa-usage-keeper/internal/entities"
-	"cpa-usage-keeper/internal/timeutil"
+	"sub2api-usage-keeper/internal/entities"
+	"sub2api-usage-keeper/internal/timeutil"
 	"gorm.io/gorm"
 )
 

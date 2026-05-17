@@ -3,7 +3,7 @@ package repository
 import (
 	"testing"
 
-	"cpa-usage-keeper/internal/entities"
+	"sub2api-usage-keeper/internal/entities"
 )
 
 func TestInsertBatchSizeUsesModelColumnCount(t *testing.T) {

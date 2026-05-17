@@ -3,7 +3,7 @@ package test
 import (
 	"testing"
 
-	"cpa-usage-keeper/internal/quota"
+	"sub2api-usage-keeper/internal/quota"
 )
 
 func TestDefaultProviderConfigsContainsSevenAPICallTemplates(t *testing.T) {

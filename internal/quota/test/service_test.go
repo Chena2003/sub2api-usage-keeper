@@ -8,11 +8,11 @@ import (
 	"testing"
 	"time"
 
-	"cpa-usage-keeper/internal/config"
-	"cpa-usage-keeper/internal/cpa/dto/apicall"
-	"cpa-usage-keeper/internal/entities"
-	"cpa-usage-keeper/internal/quota"
-	"cpa-usage-keeper/internal/repository"
+	"sub2api-usage-keeper/internal/config"
+	"sub2api-usage-keeper/internal/cpa/dto/apicall"
+	"sub2api-usage-keeper/internal/entities"
+	"sub2api-usage-keeper/internal/quota"
+	"sub2api-usage-keeper/internal/repository"
 
 	"gorm.io/gorm"
 )

@@ -4,7 +4,7 @@ import (
 	"context"
 	"strings"
 
-	"cpa-usage-keeper/internal/cpa/dto/apicall"
+	"sub2api-usage-keeper/internal/cpa/dto/apicall"
 )
 
 type codexProvider struct {

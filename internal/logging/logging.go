@@ -11,7 +11,7 @@ import (
 	"sync"
 	"time"
 
-	"cpa-usage-keeper/internal/config"
+	"sub2api-usage-keeper/internal/config"
 	"github.com/gin-gonic/gin"
 	"github.com/sirupsen/logrus"
 )

@@ -10,7 +10,7 @@ import (
 	"strings"
 	"time"
 
-	"cpa-usage-keeper/internal/version"
+	"sub2api-usage-keeper/internal/version"
 )
 
 const (

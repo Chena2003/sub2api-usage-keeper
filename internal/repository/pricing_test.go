@@ -1,13 +1,13 @@
 package repository
 
 import (
-	"cpa-usage-keeper/internal/repository/dto"
+	"sub2api-usage-keeper/internal/repository/dto"
 	"path/filepath"
 	"testing"
 	"time"
 
-	"cpa-usage-keeper/internal/config"
-	"cpa-usage-keeper/internal/entities"
+	"sub2api-usage-keeper/internal/config"
+	"sub2api-usage-keeper/internal/entities"
 	"gorm.io/gorm"
 )
 

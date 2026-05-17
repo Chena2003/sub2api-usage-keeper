@@ -3,15 +3,15 @@ package repository
 import (
 	"bytes"
 	"context"
-	"cpa-usage-keeper/internal/repository/dto"
+	"sub2api-usage-keeper/internal/repository/dto"
 	"fmt"
 	"path/filepath"
 	"strings"
 	"testing"
 	"time"
 
-	"cpa-usage-keeper/internal/config"
-	"cpa-usage-keeper/internal/entities"
+	"sub2api-usage-keeper/internal/config"
+	"sub2api-usage-keeper/internal/entities"
 	"github.com/sirupsen/logrus"
 	"gorm.io/gorm"
 )

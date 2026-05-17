@@ -5,7 +5,7 @@ import (
 	"net/http"
 	"strings"
 
-	"cpa-usage-keeper/internal/quota"
+	"sub2api-usage-keeper/internal/quota"
 	"github.com/gin-gonic/gin"
 )
 

@@ -1,14 +1,14 @@
 package repository
 
 import (
-	"cpa-usage-keeper/internal/repository/dto"
+	"sub2api-usage-keeper/internal/repository/dto"
 	"crypto/sha256"
 	"fmt"
 	"strings"
 	"testing"
 	"time"
 
-	"cpa-usage-keeper/internal/entities"
+	"sub2api-usage-keeper/internal/entities"
 )
 
 func TestInsertRedisUsageInboxMessagesPersistsPendingRows(t *testing.T) {

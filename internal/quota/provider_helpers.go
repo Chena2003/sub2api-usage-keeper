@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"strings"
 
-	"cpa-usage-keeper/internal/cpa/dto/apicall"
+	"sub2api-usage-keeper/internal/cpa/dto/apicall"
 )
 
 func mergeHeaders(base map[string]string, overrides map[string]string) map[string]string {

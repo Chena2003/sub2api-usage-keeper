@@ -1,8 +1,8 @@
 package api
 
 import (
-	"cpa-usage-keeper/internal/entities"
-	"cpa-usage-keeper/internal/service"
+	"sub2api-usage-keeper/internal/entities"
+	"sub2api-usage-keeper/internal/service"
 	"github.com/gin-gonic/gin"
 )
 

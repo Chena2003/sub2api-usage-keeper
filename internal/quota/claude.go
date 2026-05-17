@@ -3,7 +3,7 @@ package quota
 import (
 	"context"
 
-	"cpa-usage-keeper/internal/cpa/dto/apicall"
+	"sub2api-usage-keeper/internal/cpa/dto/apicall"
 )
 
 type claudeProvider struct {

@@ -4,7 +4,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"cpa-usage-keeper/internal/entities"
+	"sub2api-usage-keeper/internal/entities"
 )
 
 func TestOpenDatabaseUsageIdentityMigrationsAreIdempotent(t *testing.T) {

@@ -4,7 +4,7 @@ import (
 	"strings"
 	"time"
 
-	"cpa-usage-keeper/internal/cpa/dto/authfiles"
+	"sub2api-usage-keeper/internal/cpa/dto/authfiles"
 )
 
 func resolveAuthFileProjectID(file authfiles.AuthFile) *string {

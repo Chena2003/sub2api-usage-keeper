@@ -11,12 +11,12 @@ import (
 	"strings"
 	"time"
 
-	"cpa-usage-keeper/internal/poller"
-	"cpa-usage-keeper/internal/quota"
-	"cpa-usage-keeper/internal/service"
-	"cpa-usage-keeper/internal/timeutil"
-	"cpa-usage-keeper/internal/updatecheck"
-	"cpa-usage-keeper/internal/version"
+	"sub2api-usage-keeper/internal/poller"
+	"sub2api-usage-keeper/internal/quota"
+	"sub2api-usage-keeper/internal/service"
+	"sub2api-usage-keeper/internal/timeutil"
+	"sub2api-usage-keeper/internal/updatecheck"
+	"sub2api-usage-keeper/internal/version"
 	"github.com/gin-gonic/gin"
 )
 
@@ -33,9 +33,10 @@ type QuotaProvider interface {
 }
 
 type OptionalProviders struct {
-	UsageIdentity service.UsageIdentityProvider
-	Quota         QuotaProvider
-	CPAAPIKeys    service.CPAAPIKeyProvider
+	UsageIdentity    service.UsageIdentityProvider
+	Quota            QuotaProvider
+	CPAAPIKeys       service.CPAAPIKeyProvider
+	Sub2APIDashboard Sub2APIDashboardProvider
 }
 
 func NewRouter(
@@ -69,10 +70,12 @@ func NewRouter(
 	var usageIdentityProvider service.UsageIdentityProvider
 	var quotaProvider QuotaProvider
 	var cpaAPIKeyProvider service.CPAAPIKeyProvider
+	var sub2apiDashboardProvider Sub2APIDashboardProvider
 	if len(optionalProviders) > 0 {
 		usageIdentityProvider = optionalProviders[0].UsageIdentity
 		quotaProvider = optionalProviders[0].Quota
 		cpaAPIKeyProvider = optionalProviders[0].CPAAPIKeys
+		sub2apiDashboardProvider = optionalProviders[0].Sub2APIDashboard
 	}
 
 	protected := apiV1.Group("")
@@ -86,6 +89,7 @@ func NewRouter(
 	registerCPAAPIKeyRoutes(protected, cpaAPIKeyProvider)
 	registerPricingRoutes(protected, pricingProvider)
 	registerQuotaRoutes(protected, quotaProvider)
+	registerSub2APIDashboardRoutes(protected, sub2apiDashboardProvider)
 
 	if staticFS != nil {
 		if indexFile, err := staticFS.Open("index.html"); err == nil {

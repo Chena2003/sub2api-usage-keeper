@@ -1,6 +1,6 @@
 package service
 
-import "cpa-usage-keeper/internal/repository/dto"
+import "sub2api-usage-keeper/internal/repository/dto"
 
 func normalizeTokens(tokens dto.TokenStats) dto.TokenStats {
 	if tokens.TotalTokens == 0 {

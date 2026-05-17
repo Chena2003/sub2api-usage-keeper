@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	servicedto "cpa-usage-keeper/internal/service/dto"
+	servicedto "sub2api-usage-keeper/internal/service/dto"
 	"github.com/sirupsen/logrus"
 )
 

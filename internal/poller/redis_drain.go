@@ -7,8 +7,8 @@ import (
 	"sync"
 	"time"
 
-	servicedto "cpa-usage-keeper/internal/service/dto"
-	"cpa-usage-keeper/internal/timeutil"
+	servicedto "sub2api-usage-keeper/internal/service/dto"
+	"sub2api-usage-keeper/internal/timeutil"
 	"github.com/sirupsen/logrus"
 )
 

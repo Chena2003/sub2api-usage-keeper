@@ -5,10 +5,10 @@ import (
 	"strconv"
 	"time"
 
-	"cpa-usage-keeper/internal/redact"
-	"cpa-usage-keeper/internal/service"
-	servicedto "cpa-usage-keeper/internal/service/dto"
-	"cpa-usage-keeper/internal/timeutil"
+	"sub2api-usage-keeper/internal/redact"
+	"sub2api-usage-keeper/internal/service"
+	servicedto "sub2api-usage-keeper/internal/service/dto"
+	"sub2api-usage-keeper/internal/timeutil"
 	"github.com/gin-gonic/gin"
 )
 
