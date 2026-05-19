@@ -145,6 +145,13 @@ type RefreshPageDataOptions = {
   refreshActiveTab: () => Promise<void>;
 };
 
+type RefreshAutoRefreshTabOptions = {
+  activeTab: UsageTab;
+  loadEvents: () => Promise<void>;
+  loadUsage: () => Promise<void>;
+  refreshSub2API: () => Promise<void>;
+};
+
 type OverviewAutoRefreshDocument = Pick<Document, 'visibilityState' | 'addEventListener' | 'removeEventListener'>;
 
 type OverviewAutoRefreshOptions = {
@@ -156,6 +163,23 @@ type OverviewAutoRefreshOptions = {
 
 export const refreshPageData = async ({ refreshActiveTab }: RefreshPageDataOptions) => {
   await refreshActiveTab();
+};
+
+export const refreshAutoRefreshTabData = async ({
+  activeTab,
+  loadEvents,
+  loadUsage,
+  refreshSub2API,
+}: RefreshAutoRefreshTabOptions) => {
+  if (activeTab === 'events') {
+    await Promise.all([loadEvents(), refreshSub2API()]);
+    return;
+  }
+  if (activeTab === 'overview' || activeTab === 'ranking' || activeTab === 'quotas') {
+    await refreshSub2API();
+    return;
+  }
+  await loadUsage();
 };
 
 export const getOverviewDisplayLoading = ({ loading, hasUsage }: { loading: boolean; hasUsage: boolean }) => loading && !hasUsage;
@@ -992,15 +1016,7 @@ export function UsagePage({ onAuthRequired }: { onAuthRequired?: () => void }) {
   }, [activeTab, loadAnalysis, loadApiKeySettings, loadEventFilterOptions, loadEvents, loadPricing, loadUsage, refreshSub2API]);
 
   const refreshAutoRefreshTab = useCallback(async () => {
-    if (activeTab === 'events') {
-      await Promise.all([loadEvents(), refreshSub2API()]);
-      return;
-    }
-    if (activeTab === 'ranking' || activeTab === 'quotas') {
-      await refreshSub2API();
-      return;
-    }
-    await loadUsage();
+    await refreshAutoRefreshTabData({ activeTab, loadEvents, loadUsage, refreshSub2API });
   }, [activeTab, loadEvents, loadUsage, refreshSub2API]);
 
   const autoRefreshEnabled = shouldAutoRefreshUsageTab({

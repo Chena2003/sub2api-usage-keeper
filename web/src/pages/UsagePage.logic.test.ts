@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { buildCustomDateRangeQuery, getCustomDateRangeBounds, getOverviewChartEndMs, getOverviewDisplayLoading, getOverviewHourWindowHours, getPreferredOverviewChartPeriod, getTimeRangeOptions, getUsageTabOptions, isCustomDateWithinBounds, openDateInputPicker, refreshPageData, sanitizeRequestEventFilters, scheduleOverviewAutoRefresh, shouldAutoRefreshUsageTab, shouldShowApiKeyFilter, shouldShowRangeControls, shouldShowUpdateCheckButton, getUpdateCheckToastDuration } from './UsagePage';
+import { buildCustomDateRangeQuery, getCustomDateRangeBounds, getOverviewChartEndMs, getOverviewDisplayLoading, getOverviewHourWindowHours, getPreferredOverviewChartPeriod, getTimeRangeOptions, getUsageTabOptions, isCustomDateWithinBounds, openDateInputPicker, refreshAutoRefreshTabData, refreshPageData, sanitizeRequestEventFilters, scheduleOverviewAutoRefresh, shouldAutoRefreshUsageTab, shouldShowApiKeyFilter, shouldShowRangeControls, shouldShowUpdateCheckButton, getUpdateCheckToastDuration } from './UsagePage';
 import { filterUsageByWindow, type UsageFilterWindow } from '@/utils/usage';
 import type { UsageSnapshot } from '@/lib/types';
 
@@ -205,6 +205,20 @@ describe('UsagePage Overview auto-refresh', () => {
     testDocument.dispatchEvent(new Event('visibilitychange'));
 
     expect(refreshOverview).not.toHaveBeenCalled();
+  });
+});
+
+describe('UsagePage active tab auto-refresh callback', () => {
+  it('refreshes Sub2API dashboard data for the Overview tab', async () => {
+    const loadEvents = vi.fn().mockResolvedValue(undefined);
+    const loadUsage = vi.fn().mockResolvedValue(undefined);
+    const refreshSub2API = vi.fn().mockResolvedValue(undefined);
+
+    await refreshAutoRefreshTabData({ activeTab: 'overview', loadEvents, loadUsage, refreshSub2API });
+
+    expect(refreshSub2API).toHaveBeenCalledTimes(1);
+    expect(loadUsage).not.toHaveBeenCalled();
+    expect(loadEvents).not.toHaveBeenCalled();
   });
 });
 
