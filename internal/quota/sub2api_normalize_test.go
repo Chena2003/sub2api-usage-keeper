@@ -159,16 +159,16 @@ func TestNormalizeSub2APIAccountUsageTotals(t *testing.T) {
 
 func TestNormalizeSub2APIRankingsComputesShares(t *testing.T) {
 	rows := []sub2api.RankingRow{
-		{Name: "user-a", TotalRequests: 2, InputTokens: 10, OutputTokens: 10, ActualCost: 0.2},
-		{Name: "user-b", TotalRequests: 1, InputTokens: 5, CacheCreationTokens: 5, ActualCost: 0.1},
+		{Name: "gpt-4o", TotalRequests: 2, InputTokens: 10, OutputTokens: 10, ActualCost: 0.2},
+		{Name: "claude-sonnet-4", TotalRequests: 1, InputTokens: 5, CacheCreationTokens: 5, ActualCost: 0.1},
 	}
 
-	rankings := NormalizeSub2APIRankings("user", rows)
+	rankings := NormalizeSub2APIRankings("model", rows)
 
 	if len(rankings) != 2 {
 		t.Fatalf("len(rankings) = %d, want 2", len(rankings))
 	}
-	if rankings[0].Dimension != "user" || rankings[0].Name != "user-a" || rankings[0].TotalTokens != 20 || rankings[0].Share != float64(20)/float64(30) {
+	if rankings[0].Dimension != "model" || rankings[0].Name != "gpt-4o" || rankings[0].TotalTokens != 20 || rankings[0].Share != float64(20)/float64(30) {
 		t.Fatalf("first ranking = %#v", rankings[0])
 	}
 	if rankings[1].CacheTokens != 5 || rankings[1].Share != float64(10)/float64(30) {
@@ -184,6 +184,50 @@ func TestNormalizeSub2APIRankingsUsesZeroShareWhenTotalIsZero(t *testing.T) {
 	}
 	if rankings[0].Share != 0 {
 		t.Fatalf("Share = %f, want 0", rankings[0].Share)
+	}
+}
+
+func TestNormalizeSub2APIRankingsMasksUserIdentifiers(t *testing.T) {
+	rankings := NormalizeSub2APIRankings("user", []sub2api.RankingRow{{Name: "user@example.com", TotalRequests: 1, InputTokens: 10}})
+
+	if len(rankings) != 1 {
+		t.Fatalf("len(rankings) = %d, want 1", len(rankings))
+	}
+	if rankings[0].Name == "" {
+		t.Fatal("Name is empty, want masked display value")
+	}
+	if rankings[0].Name == "user@example.com" {
+		t.Fatalf("Name leaked raw user identifier: %#v", rankings[0])
+	}
+
+	body, err := json.Marshal(rankings)
+	if err != nil {
+		t.Fatalf("marshal rankings: %v", err)
+	}
+	if strings.Contains(string(body), "user@example.com") {
+		t.Fatalf("serialized rankings leaked raw user identifier: %s", body)
+	}
+}
+
+func TestNormalizeSub2APIEventsMasksUserIdentifiers(t *testing.T) {
+	events := NormalizeSub2APIEvents([]sub2api.UsageEventRow{{User: "user@example.com"}})
+
+	if len(events) != 1 {
+		t.Fatalf("len(events) = %d, want 1", len(events))
+	}
+	if events[0].User == "" {
+		t.Fatal("User is empty, want masked display value")
+	}
+	if events[0].User == "user@example.com" {
+		t.Fatalf("User leaked raw user identifier: %#v", events[0])
+	}
+
+	body, err := json.Marshal(events)
+	if err != nil {
+		t.Fatalf("marshal events: %v", err)
+	}
+	if strings.Contains(string(body), "user@example.com") {
+		t.Fatalf("serialized events leaked raw user identifier: %s", body)
 	}
 }
 
@@ -214,7 +258,7 @@ func TestNormalizeSub2APIEventsMapsUsageEventRows(t *testing.T) {
 		t.Fatalf("len(events) = %d, want 1", len(events))
 	}
 	event := events[0]
-	if event.ID != 9 || !event.CreatedAt.Equal(createdAt) || event.User != "user-a" || event.APIKey != "key-a" || event.Model != "gpt-4o" || event.RequestedModel != "gpt-4" || event.UpstreamModel != "upstream-gpt-4o" || event.AccountID != 7 || event.AccountName != "openai #7" || event.Status != "success" {
+	if event.ID != 9 || !event.CreatedAt.Equal(createdAt) || event.User == "" || event.User == "user-a" || event.APIKey != "key-a" || event.Model != "gpt-4o" || event.RequestedModel != "gpt-4" || event.UpstreamModel != "upstream-gpt-4o" || event.AccountID != 7 || event.AccountName != "openai #7" || event.Status != "success" {
 		t.Fatalf("event identity fields = %#v", event)
 	}
 	if event.InputTokens != 10 || event.OutputTokens != 5 || event.CacheTokens != 5 || event.TotalTokens != 20 || event.ActualCost != 0.12 || event.DurationMS != 456 {

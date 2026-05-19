@@ -1,6 +1,7 @@
 package quota
 
 import (
+	"crypto/sha256"
 	"encoding/json"
 	"fmt"
 	"sort"
@@ -195,6 +196,15 @@ func accountUsageTokens(usage *sub2api.AccountUsageRow) int64 {
 	return usage.TotalTokens()
 }
 
+func maskedSub2APIUser(value string) string {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return "unknown user"
+	}
+	digest := sha256.Sum256([]byte(strings.ToLower(value)))
+	return fmt.Sprintf("user-%x", digest[:4])
+}
+
 func NormalizeSub2APIRankings(dimension string, rows []sub2api.RankingRow) []Sub2APIRankingRow {
 	var totalTokens int64
 	for _, row := range rows {
@@ -209,9 +219,13 @@ func NormalizeSub2APIRankings(dimension string, rows []sub2api.RankingRow) []Sub
 		if totalTokens > 0 {
 			share = float64(rowTokens) / float64(totalTokens)
 		}
+		name := row.Name
+		if dimension == "user" {
+			name = maskedSub2APIUser(row.Name)
+		}
 		rankings = append(rankings, Sub2APIRankingRow{
 			Dimension:     dimension,
-			Name:          row.Name,
+			Name:          name,
 			TotalRequests: row.TotalRequests,
 			InputTokens:   row.InputTokens,
 			OutputTokens:  row.OutputTokens,
@@ -231,7 +245,7 @@ func NormalizeSub2APIEvents(rows []sub2api.UsageEventRow) []Sub2APIEvent {
 		events = append(events, Sub2APIEvent{
 			ID:             row.ID,
 			CreatedAt:      row.CreatedAt,
-			User:           row.User,
+			User:           maskedSub2APIUser(row.User),
 			APIKey:         row.APIKey,
 			Model:          row.Model,
 			RequestedModel: row.RequestedModel,
