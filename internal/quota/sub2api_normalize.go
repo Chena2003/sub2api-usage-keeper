@@ -43,6 +43,8 @@ func NormalizeSub2APIAccount(row sub2api.AccountRow, usage *sub2api.AccountUsage
 		LastUsedAt:          row.LastUsedAt,
 		CredentialKeys:      publicCredentialKeys(row.Credentials),
 		Usage:               normalizeSub2APIAccountUsage(usage),
+		FiveHourWindow:      buildFiveHourWindow(row, usage),
+		WeeklyWindow:        buildUnknownQuotaWindow(),
 	}
 }
 
@@ -143,4 +145,107 @@ func normalizeSub2APIAccountUsage(usage *sub2api.AccountUsageRow) Sub2APIAccount
 		ActualCost:        usage.ActualCost,
 		AverageDurationMS: usage.AverageDurationMS,
 	}
+}
+
+func buildFiveHourWindow(row sub2api.AccountRow, usage *sub2api.AccountUsageRow) Sub2APIQuotaWindow {
+	window := Sub2APIQuotaWindow{
+		Consumed: accountUsageTokens(usage),
+		Status:   normalizeWindowStatus(row.SessionWindowStatus),
+	}
+	if row.SessionWindowStart != nil {
+		window.WindowStart = row.SessionWindowStart
+	}
+	if row.SessionWindowEnd != nil {
+		window.WindowEnd = row.SessionWindowEnd
+		window.RefreshAt = row.SessionWindowEnd
+	}
+	if row.RateLimitResetAt != nil {
+		window.RefreshAt = row.RateLimitResetAt
+	}
+	if row.RateLimitedAt != nil {
+		window.Status = "rate_limited"
+	}
+	return window
+}
+
+func buildUnknownQuotaWindow() Sub2APIQuotaWindow {
+	return Sub2APIQuotaWindow{Status: "unknown"}
+}
+
+func normalizeWindowStatus(value string) string {
+	normalized := strings.TrimSpace(strings.ToLower(value))
+	switch normalized {
+	case "", "unknown":
+		return "unknown"
+	case "active", "normal", "ok":
+		return "active"
+	case "limited", "rate_limited":
+		return "rate_limited"
+	case "exhausted":
+		return "exhausted"
+	default:
+		return normalized
+	}
+}
+
+func accountUsageTokens(usage *sub2api.AccountUsageRow) int64 {
+	if usage == nil {
+		return 0
+	}
+	return usage.TotalTokens()
+}
+
+func NormalizeSub2APIRankings(dimension string, rows []sub2api.RankingRow) []Sub2APIRankingRow {
+	var totalTokens int64
+	for _, row := range rows {
+		totalTokens += row.TotalTokens()
+	}
+
+	rankings := make([]Sub2APIRankingRow, 0, len(rows))
+	for _, row := range rows {
+		cacheTokens := row.CacheCreationTokens + row.CacheReadTokens
+		rowTokens := row.TotalTokens()
+		share := 0.0
+		if totalTokens > 0 {
+			share = float64(rowTokens) / float64(totalTokens)
+		}
+		rankings = append(rankings, Sub2APIRankingRow{
+			Dimension:     dimension,
+			Name:          row.Name,
+			TotalRequests: row.TotalRequests,
+			InputTokens:   row.InputTokens,
+			OutputTokens:  row.OutputTokens,
+			CacheTokens:   cacheTokens,
+			TotalTokens:   rowTokens,
+			ActualCost:    row.ActualCost,
+			Share:         share,
+		})
+	}
+	return rankings
+}
+
+func NormalizeSub2APIEvents(rows []sub2api.UsageEventRow) []Sub2APIEvent {
+	events := make([]Sub2APIEvent, 0, len(rows))
+	for _, row := range rows {
+		cacheTokens := row.CacheCreationTokens + row.CacheReadTokens
+		events = append(events, Sub2APIEvent{
+			ID:             row.ID,
+			CreatedAt:      row.CreatedAt,
+			User:           row.User,
+			APIKey:         row.APIKey,
+			Model:          row.Model,
+			RequestedModel: row.RequestedModel,
+			UpstreamModel:  row.UpstreamModel,
+			AccountID:      row.AccountID,
+			AccountName:    row.AccountName,
+			Status:         row.Status,
+			InputTokens:    row.InputTokens,
+			OutputTokens:   row.OutputTokens,
+			CacheTokens:    cacheTokens,
+			TotalTokens:    row.TotalTokens(),
+			ActualCost:     row.ActualCost,
+			DurationMS:     row.DurationMS,
+		})
+	}
+	return events
 }
