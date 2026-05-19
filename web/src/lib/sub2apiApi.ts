@@ -1,9 +1,18 @@
 import { ApiError, apiPath } from './api'
-import type { Sub2ApiAccount, Sub2ApiModelUsage, Sub2ApiOverview, Sub2ApiTimeseriesPoint } from './sub2apiTypes'
+import type {
+  Sub2ApiAccount,
+  Sub2ApiEventsResponse,
+  Sub2ApiModelUsage,
+  Sub2ApiOverview,
+  Sub2ApiRanking,
+  Sub2ApiRankingDimension,
+  Sub2ApiTimeseriesPoint,
+} from './sub2apiTypes'
 
 type AccountsResponse = { accounts: Sub2ApiAccount[] }
 type TimeseriesResponse = { points: Sub2ApiTimeseriesPoint[] }
 type ModelsResponse = { models: Sub2ApiModelUsage[] }
+type RankingsResponse = { rankings: Sub2ApiRanking[] }
 
 export function sub2apiEndpoint(path: string): string {
   const normalized = path.startsWith('/') ? path : `/${path}`
@@ -35,4 +44,35 @@ export async function fetchSub2ApiTimeseries(hours = 24): Promise<Sub2ApiTimeser
 export async function fetchSub2ApiModels(days = 7, limit = 20): Promise<Sub2ApiModelUsage[]> {
   const body = await getJson<ModelsResponse>(`/models?days=${days}&limit=${limit}`)
   return body.models
+}
+
+export async function fetchSub2ApiRankings(
+  dimension: Sub2ApiRankingDimension = 'user',
+  days = 7,
+  limit = 20,
+): Promise<Sub2ApiRanking[]> {
+  const params = new URLSearchParams({
+    dimension,
+    days: String(days),
+    limit: String(limit),
+  })
+  const body = await getJson<RankingsResponse>(`/rankings?${params.toString()}`)
+  return body.rankings
+}
+
+export async function fetchSub2ApiAccountQuotas(days = 7): Promise<Sub2ApiAccount[]> {
+  const params = new URLSearchParams({ days: String(days) })
+  const body = await getJson<AccountsResponse>(`/account-quotas?${params.toString()}`)
+  return body.accounts
+}
+
+export function fetchSub2ApiEvents({
+  page = 1,
+  limit = 100,
+}: { page?: number; limit?: number } = {}): Promise<Sub2ApiEventsResponse> {
+  const params = new URLSearchParams({
+    page: String(page),
+    limit: String(limit),
+  })
+  return getJson<Sub2ApiEventsResponse>(`/events?${params.toString()}`)
 }
