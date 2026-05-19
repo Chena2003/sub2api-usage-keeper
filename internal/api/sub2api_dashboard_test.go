@@ -218,7 +218,7 @@ func TestSub2APINilProviderReturnsInternalError(t *testing.T) {
 	if resp.Code != http.StatusInternalServerError {
 		t.Fatalf("expected status 500, got %d", resp.Code)
 	}
-	if body := resp.Body.String(); !strings.Contains(body, `"error":"sub2api dashboard provider is not configured"`) {
+	if body := resp.Body.String(); !strings.Contains(body, `"error":"internal server error"`) {
 		t.Fatalf("unexpected response body: %s", body)
 	}
 }

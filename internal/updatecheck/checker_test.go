@@ -65,7 +65,7 @@ func TestIsStableVersion(t *testing.T) {
 
 func TestCheckerUsesLatestRelease(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path != "/repos/Willxup/sub2api-usage-keeper/releases/latest" {
+		if r.URL.Path != "/repos/Chena2003/sub2api-usage-keeper/releases/latest" {
 			t.Fatalf("unexpected path %s", r.URL.Path)
 		}
 		w.Header().Set("Content-Type", "application/json")
@@ -93,9 +93,9 @@ func TestCheckerUsesLatestRelease(t *testing.T) {
 func TestCheckerFallsBackToTags(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
-		case "/repos/Willxup/sub2api-usage-keeper/releases/latest":
+		case "/repos/Chena2003/sub2api-usage-keeper/releases/latest":
 			http.NotFound(w, r)
-		case "/repos/Willxup/sub2api-usage-keeper/tags":
+		case "/repos/Chena2003/sub2api-usage-keeper/tags":
 			w.Header().Set("Content-Type", "application/json")
 			_, _ = w.Write([]byte(`[{"name":"v1.2.5"},{"name":"v1.2.3"},{"name":"test"}]`))
 		default:
