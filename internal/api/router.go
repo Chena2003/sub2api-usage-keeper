@@ -11,13 +11,13 @@ import (
 	"strings"
 	"time"
 
+	"github.com/gin-gonic/gin"
 	"sub2api-usage-keeper/internal/poller"
 	"sub2api-usage-keeper/internal/quota"
 	"sub2api-usage-keeper/internal/service"
 	"sub2api-usage-keeper/internal/timeutil"
 	"sub2api-usage-keeper/internal/updatecheck"
 	"sub2api-usage-keeper/internal/version"
-	"github.com/gin-gonic/gin"
 )
 
 const appBasePathPlaceholder = "__APP_BASE_PATH__"
@@ -78,18 +78,20 @@ func NewRouter(
 		sub2apiDashboardProvider = optionalProviders[0].Sub2APIDashboard
 	}
 
-	protected := apiV1.Group("")
-	protected.Use(authHandler.middleware())
-	registerStatusRoutes(protected, statusProvider)
-	registerUpdateRoutes(protected, nil)
-	registerUsageOverviewRoute(protected, usageProvider)
-	registerUsageAnalysisRoute(protected, usageProvider, cpaAPIKeyProvider)
-	registerUsageEventsRoute(protected, usageProvider, usageIdentityProvider)
-	registerUsageIdentityRoutes(protected, usageIdentityProvider)
-	registerCPAAPIKeyRoutes(protected, cpaAPIKeyProvider)
-	registerPricingRoutes(protected, pricingProvider)
-	registerQuotaRoutes(protected, quotaProvider)
-	registerSub2APIDashboardRoutes(protected, sub2apiDashboardProvider)
+	dashboardRoutes := apiV1.Group("")
+	if authConfig.Enabled {
+		dashboardRoutes.Use(authHandler.middleware())
+	}
+	registerStatusRoutes(dashboardRoutes, statusProvider)
+	registerUpdateRoutes(dashboardRoutes, nil)
+	registerUsageOverviewRoute(dashboardRoutes, usageProvider)
+	registerUsageAnalysisRoute(dashboardRoutes, usageProvider, cpaAPIKeyProvider)
+	registerUsageEventsRoute(dashboardRoutes, usageProvider, usageIdentityProvider)
+	registerUsageIdentityRoutes(dashboardRoutes, usageIdentityProvider)
+	registerCPAAPIKeyRoutes(dashboardRoutes, cpaAPIKeyProvider)
+	registerPricingRoutes(dashboardRoutes, pricingProvider)
+	registerQuotaRoutes(dashboardRoutes, quotaProvider)
+	registerSub2APIDashboardRoutes(dashboardRoutes, sub2apiDashboardProvider)
 
 	if staticFS != nil {
 		if indexFile, err := staticFS.Open("index.html"); err == nil {

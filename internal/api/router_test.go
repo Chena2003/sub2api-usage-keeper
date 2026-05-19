@@ -10,6 +10,7 @@ import (
 
 	"sub2api-usage-keeper/internal/poller"
 	"sub2api-usage-keeper/internal/version"
+
 	"github.com/gin-gonic/gin"
 )
 
@@ -124,6 +125,23 @@ func TestStatusReturnsEmptyStateWithoutProvider(t *testing.T) {
 	}
 	if body := resp.Body.String(); !contains(body, `"running":false`) || !contains(body, `"sync_running":false`) || !contains(body, `"timezone":`) {
 		t.Fatalf("unexpected response body: %s", body)
+	}
+}
+
+func TestNewRouterExposesSub2APIDashboardWhenAuthDisabled(t *testing.T) {
+	router := NewRouter(nil, nil, nil, nil, AuthConfig{Enabled: false}, NewAuthHandler(AuthConfig{Enabled: true}, nil), "", OptionalProviders{
+		Sub2APIDashboard: &fakeSub2APIDashboardProvider{},
+	})
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/sub2api/overview", nil)
+	resp := httptest.NewRecorder()
+
+	router.ServeHTTP(resp, req)
+
+	if resp.Code != http.StatusOK {
+		t.Fatalf("expected status 200, got %d with body %s", resp.Code, resp.Body.String())
+	}
+	if body := resp.Body.String(); !contains(body, `"totalRequests":10`) {
+		t.Fatalf("expected totalRequests 10, got %s", body)
 	}
 }
 
