@@ -1,7 +1,10 @@
+import { readFileSync } from 'node:fs';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { buildCustomDateRangeQuery, getCustomDateRangeBounds, getOverviewChartEndMs, getOverviewDisplayLoading, getOverviewHourWindowHours, getPreferredOverviewChartPeriod, getTimeRangeOptions, getUsageTabOptions, isCustomDateWithinBounds, openDateInputPicker, refreshPageData, sanitizeRequestEventFilters, scheduleOverviewAutoRefresh, shouldAutoRefreshUsageTab, shouldShowApiKeyFilter, shouldShowRangeControls, shouldShowUpdateCheckButton, getUpdateCheckToastDuration } from './UsagePage';
 import { filterUsageByWindow, type UsageFilterWindow } from '@/utils/usage';
 import type { UsageSnapshot } from '@/lib/types';
+
+const usagePageSource = readFileSync(new URL('./UsagePage.tsx', import.meta.url), 'utf8');
 
 const usage: UsageSnapshot = {
   total_requests: 2,
@@ -458,5 +461,12 @@ describe('UsagePage refresh action', () => {
 
     expect(refreshCalls).toBe(1);
     expect(syncCalls).toBe(0);
+  });
+});
+
+describe('UsagePage settings tab content', () => {
+  it('keeps the existing service health card in Settings', () => {
+    expect(usagePageSource).toContain('ServiceHealthCard');
+    expect(usagePageSource).toContain('<ServiceHealthCard\n                  usage={usage}\n                  loading={overviewDisplayLoading}\n                />');
   });
 });

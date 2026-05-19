@@ -26,6 +26,7 @@ import { useThemeStore } from '@/stores';
 import {
   ApiKeySettingsCard,
   PriceSettingsCard,
+  ServiceHealthCard,
   useUsageData,
   usePricingData,
   useSparklines,
@@ -1453,6 +1454,10 @@ export function UsagePage({ onAuthRequired }: { onAuthRequired?: () => void }) {
                   modelPrices={modelPrices}
                   onPricesChange={setModelPrices}
                   loading={pricingLoading}
+                />
+                <ServiceHealthCard
+                  usage={usage}
+                  loading={overviewDisplayLoading}
                 />
               </div>
             )}
