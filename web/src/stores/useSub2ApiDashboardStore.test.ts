@@ -199,6 +199,23 @@ describe('useSub2ApiDashboardStore', () => {
     expect(useSub2ApiDashboardStore.getState().rankings).toEqual([ranking])
   })
 
+  it('preserves the selected ranking dimension during refresh', async () => {
+    mockedFetchSub2ApiAccounts.mockResolvedValue([account])
+    mockedFetchSub2ApiOverview.mockResolvedValue(overview)
+    mockedFetchSub2ApiTimeseries.mockResolvedValue([point])
+    mockedFetchSub2ApiModels.mockResolvedValue([model])
+    mockedFetchSub2ApiRankings.mockResolvedValue([ranking])
+    mockedFetchSub2ApiEvents.mockResolvedValue(eventsResponse)
+    mockedFetchSub2ApiAccountQuotas.mockResolvedValue([quotaAccount])
+    useSub2ApiDashboardStore.setState({ rankingDimension: 'api_key' })
+
+    await useSub2ApiDashboardStore.getState().refresh()
+
+    expect(mockedFetchSub2ApiRankings).toHaveBeenCalledWith('api_key')
+    expect(mockedFetchSub2ApiRankings).not.toHaveBeenCalledWith('user')
+    expect(useSub2ApiDashboardStore.getState().rankingDimension).toBe('api_key')
+  })
+
   it('loads events with requested pagination and updates state', async () => {
     mockedFetchSub2ApiEvents.mockResolvedValue(eventsResponse)
 

@@ -35,7 +35,7 @@ type Sub2ApiDashboardState = {
   loadAccountQuotas: (days?: number) => Promise<void>
 }
 
-export const useSub2ApiDashboardStore = create<Sub2ApiDashboardState>((set) => ({
+export const useSub2ApiDashboardStore = create<Sub2ApiDashboardState>((set, get) => ({
   accounts: [],
   overview: null,
   points: [],
@@ -47,6 +47,7 @@ export const useSub2ApiDashboardStore = create<Sub2ApiDashboardState>((set) => (
   loading: false,
   error: null,
   refresh: async () => {
+    const { rankingDimension } = get()
     set({ loading: true, error: null })
     try {
       const [accounts, overview, points, models, rankings, events, quotaAccounts] = await Promise.all([
@@ -54,11 +55,11 @@ export const useSub2ApiDashboardStore = create<Sub2ApiDashboardState>((set) => (
         fetchSub2ApiOverview(7),
         fetchSub2ApiTimeseries(24),
         fetchSub2ApiModels(7, 20),
-        fetchSub2ApiRankings('user'),
+        fetchSub2ApiRankings(rankingDimension),
         fetchSub2ApiEvents({ page: 1, limit: 100 }),
         fetchSub2ApiAccountQuotas(7),
       ])
-      set({ accounts, overview, points, models, rankings, events, quotaAccounts, rankingDimension: 'user', loading: false })
+      set({ accounts, overview, points, models, rankings, events, quotaAccounts, rankingDimension, loading: false })
     } catch (error) {
       set({ error: error instanceof Error ? error.message : 'Unknown error', loading: false })
     }
