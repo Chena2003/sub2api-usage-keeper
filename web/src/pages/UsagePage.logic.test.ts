@@ -448,6 +448,17 @@ describe('UsagePage refresh action', () => {
     expect(refreshCalls).toBe(1);
     expect(syncCalls).toBe(0);
   });
+
+  it('routes Overview manual and header refresh through Sub2API refresh instead of legacy usage loading', () => {
+    const refreshActiveTabSource = usagePageSource.match(/const refreshActiveTab = useCallback\(async \(\) => \{[\s\S]*?\n  \}, \[activeTab/)?.[0] ?? '';
+    const overviewRefreshIndex = refreshActiveTabSource.indexOf("activeTab === 'overview'");
+    const refreshSub2APIIndex = refreshActiveTabSource.indexOf('await refreshSub2API()', overviewRefreshIndex);
+    const loadUsageFallbackIndex = refreshActiveTabSource.indexOf('await loadUsage()');
+
+    expect(overviewRefreshIndex).toBeGreaterThanOrEqual(0);
+    expect(refreshSub2APIIndex).toBeGreaterThan(overviewRefreshIndex);
+    expect(refreshSub2APIIndex).toBeLessThan(loadUsageFallbackIndex);
+  });
 });
 
 describe('UsagePage settings tab content', () => {

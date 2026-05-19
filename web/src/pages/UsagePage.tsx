@@ -759,6 +759,10 @@ export function UsagePage({ onAuthRequired }: { onAuthRequired?: () => void }) {
   }, []);
 
   const refreshActiveTab = useCallback(async () => {
+    if (activeTab === 'overview') {
+      await refreshSub2API();
+      return;
+    }
     if (activeTab === 'events') {
       await refreshSub2API();
       return;
