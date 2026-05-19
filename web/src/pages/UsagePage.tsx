@@ -14,8 +14,8 @@ import {
   Legend,
   Filler
 } from 'chart.js';
-import { ApiError, fetchAnalysis, fetchCpaApiKeyOptions, fetchCpaApiKeys, fetchStatus, fetchUpdateCheck, fetchUsageEventModelFilterOptions, fetchUsageEventSourceFilterOptions, fetchUsageEvents, updateCpaApiKeyAlias } from '@/lib/api';
-import type { AnalysisResponse, CpaApiKeyOption, CpaApiKeySettingsItem, StatusResponse, UsageEvent, UsageSourceFilterOption } from '@/lib/types';
+import { ApiError, fetchAnalysis, fetchCpaApiKeyOptions, fetchCpaApiKeys, fetchStatus, fetchUpdateCheck, updateCpaApiKeyAlias } from '@/lib/api';
+import type { AnalysisResponse, CpaApiKeyOption, CpaApiKeySettingsItem, StatusResponse } from '@/lib/types';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { LanguageSwitcher } from '@/components/ui/LanguageSwitcher';
 import { Select } from '@/components/ui/Select';
@@ -103,9 +103,6 @@ const USAGE_TAB_LABEL_KEYS: Record<UsageTab, string> = {
 };
 const DEFAULT_USAGE_TAB: UsageTab = 'overview';
 const USAGE_TAB_STORAGE_KEY = 'cli-proxy-usage-tab-v1';
-const REQUEST_EVENTS_PAGE_SIZES = [20, 50, 100, 500, 1000] as const;
-const REQUEST_EVENTS_DEFAULT_PAGE_SIZE = 100;
-const ALL_REQUEST_EVENTS_FILTER = '__all__';
 const OVERVIEW_AUTO_REFRESH_INTERVAL_MS = 10_000;
 
 export const shouldShowRangeControls = (tab: UsageTab) => tab !== 'settings';
@@ -116,30 +113,9 @@ export const shouldShowUpdateCheckButton = (status: Pick<StatusResponse, 'update
 
 export const getUpdateCheckToastDuration = (kind: 'success' | 'info' | 'error') => (kind === 'error' ? 6_000 : 4_000);
 
-export const shouldAutoRefreshUsageTab = ({
-  activeTab,
-  eventsPage,
-}: {
-  activeTab: UsageTab;
-  eventsPage: number;
-  authFilePage: number;
-  aiProviderPage: number;
-}) => {
-  if (activeTab === 'overview' || activeTab === 'ranking' || activeTab === 'quotas') return true;
-  if (activeTab === 'events') return eventsPage === 1;
-  return false;
-};
-
-type RequestEventFilterState = {
-  model: string;
-  source: string;
-  result: string;
-};
-
-type RequestEventFilterOptionsState = {
-  models: string[];
-  sources: UsageSourceFilterOption[];
-};
+export const shouldAutoRefreshUsageTab = ({ activeTab }: { activeTab: UsageTab }) => (
+  activeTab === 'overview' || activeTab === 'events' || activeTab === 'ranking' || activeTab === 'quotas'
+);
 
 type RefreshPageDataOptions = {
   refreshActiveTab: () => Promise<void>;
@@ -147,7 +123,6 @@ type RefreshPageDataOptions = {
 
 type RefreshAutoRefreshTabOptions = {
   activeTab: UsageTab;
-  loadEvents: () => Promise<void>;
   loadUsage: () => Promise<void>;
   refreshSub2API: () => Promise<void>;
 };
@@ -167,15 +142,10 @@ export const refreshPageData = async ({ refreshActiveTab }: RefreshPageDataOptio
 
 export const refreshAutoRefreshTabData = async ({
   activeTab,
-  loadEvents,
   loadUsage,
   refreshSub2API,
 }: RefreshAutoRefreshTabOptions) => {
-  if (activeTab === 'events') {
-    await Promise.all([loadEvents(), refreshSub2API()]);
-    return;
-  }
-  if (activeTab === 'overview' || activeTab === 'ranking' || activeTab === 'quotas') {
+  if (activeTab === 'events' || activeTab === 'overview' || activeTab === 'ranking' || activeTab === 'quotas') {
     await refreshSub2API();
     return;
   }
@@ -235,23 +205,6 @@ export const scheduleOverviewAutoRefresh = ({
     stopTimer();
     targetDocument.removeEventListener('visibilitychange', handleVisibilityChange);
   };
-};
-
-export const sanitizeRequestEventFilters = (
-  filters: RequestEventFilterState,
-  options: RequestEventFilterOptionsState,
-): RequestEventFilterState => {
-  const model = filters.model === ALL_REQUEST_EVENTS_FILTER || options.models.includes(filters.model)
-    ? filters.model
-    : ALL_REQUEST_EVENTS_FILTER;
-  const source = filters.source === ALL_REQUEST_EVENTS_FILTER || options.sources.some((option) => option.value === filters.source)
-    ? filters.source
-    : ALL_REQUEST_EVENTS_FILTER;
-  const result = filters.result === 'success' || filters.result === 'failed'
-    ? filters.result
-    : ALL_REQUEST_EVENTS_FILTER;
-
-  return { model, source, result };
 };
 
 const isUsageTimeRange = (value: unknown): value is UsageTimeRange =>
@@ -524,20 +477,6 @@ export function UsagePage({ onAuthRequired }: { onAuthRequired?: () => void }) {
   const updateCheckNoticeTimerRef = useRef<ReturnType<typeof window.setTimeout> | null>(null);
   const [customRangeError, setCustomRangeError] = useState('');
   const [customRangeHint, setCustomRangeHint] = useState('');
-  const [eventsLoading, setEventsLoading] = useState(false);
-  const [eventsError, setEventsError] = useState('');
-  const [eventsData, setEventsData] = useState<UsageEvent[]>([]);
-  const [eventsPage, setEventsPage] = useState(1);
-  const [eventsPageSize, setEventsPageSize] = useState<number>(REQUEST_EVENTS_DEFAULT_PAGE_SIZE);
-  const [eventsTotalCount, setEventsTotalCount] = useState(0);
-  const [eventsTotalPages, setEventsTotalPages] = useState(0);
-  const [eventsModelOptions, setEventsModelOptions] = useState<string[]>([]);
-  const [eventsSourceOptions, setEventsSourceOptions] = useState<UsageSourceFilterOption[]>([]);
-  const [eventsModelFilter, setEventsModelFilter] = useState(ALL_REQUEST_EVENTS_FILTER);
-  const [eventsSourceFilter, setEventsSourceFilter] = useState(ALL_REQUEST_EVENTS_FILTER);
-  const [eventsResultFilter, setEventsResultFilter] = useState(ALL_REQUEST_EVENTS_FILTER);
-  const eventsRequestControllerRef = useRef<AbortController | null>(null);
-  const eventsFilterOptionsRequestControllerRef = useRef<AbortController | null>(null);
   const [manualRefreshLoading, setManualRefreshLoading] = useState(false);
   const sub2apiOverview = useSub2ApiDashboardStore((state) => state.overview);
   const sub2apiPoints = useSub2ApiDashboardStore((state) => state.points);
@@ -808,10 +747,6 @@ export function UsagePage({ onAuthRequired }: { onAuthRequired?: () => void }) {
   }, [activeTab]);
 
   useEffect(() => {
-    setEventsPage(1);
-  }, [customTimeRange.end, customTimeRange.start, selectedApiKeyId, timeRange]);
-
-  useEffect(() => {
     if (timeRange !== 'custom') return;
     if (customTimeRange.start && customTimeRange.end) return;
     const anchorMs = lastRefreshedAt?.getTime() ?? Date.now();
@@ -873,131 +808,9 @@ export function UsagePage({ onAuthRequired }: { onAuthRequired?: () => void }) {
     }
   }, []);
 
-  const getEventQueryWindow = useCallback(() => {
-    const query = buildUsageRangeQuery({ range: timeRange, customStart: customTimeRange.start, customEnd: customTimeRange.end });
-    return { valid: query.valid, start: query.start, end: query.end };
-  }, [customTimeRange.end, customTimeRange.start, timeRange]);
-
-  const loadEventFilterOptions = useCallback(async () => {
-    eventsFilterOptionsRequestControllerRef.current?.abort();
-    const controller = new AbortController();
-    eventsFilterOptionsRequestControllerRef.current = controller;
-
-    try {
-      const [modelResponse, sourceResponse] = await Promise.all([
-        fetchUsageEventModelFilterOptions(controller.signal),
-        fetchUsageEventSourceFilterOptions(controller.signal),
-      ]);
-      if (eventsFilterOptionsRequestControllerRef.current !== controller) {
-        return;
-      }
-      setEventsModelOptions(modelResponse.models ?? []);
-      setEventsSourceOptions(sourceResponse.sources ?? []);
-    } catch (error) {
-      if (controller.signal.aborted) {
-        return;
-      }
-      if (eventsFilterOptionsRequestControllerRef.current === controller) {
-        setEventsModelOptions([]);
-        setEventsSourceOptions([]);
-      }
-      if (error instanceof ApiError && error.status === 401) {
-        onAuthRequired?.();
-      }
-    } finally {
-      if (eventsFilterOptionsRequestControllerRef.current === controller) {
-        eventsFilterOptionsRequestControllerRef.current = null;
-      }
-    }
-  }, [onAuthRequired]);
-
-  const loadEvents = useCallback(async () => {
-    const queryWindow = getEventQueryWindow();
-    if (!queryWindow.valid) {
-      eventsRequestControllerRef.current?.abort();
-      eventsRequestControllerRef.current = null;
-      setEventsData([]);
-      setEventsTotalCount(0);
-      setEventsTotalPages(0);
-      setEventsError('');
-      setEventsLoading(false);
-      return;
-    }
-
-    eventsRequestControllerRef.current?.abort();
-    const controller = new AbortController();
-    eventsRequestControllerRef.current = controller;
-
-    setEventsLoading(true);
-    setEventsError('');
-    try {
-      const response = await fetchUsageEvents(timeRange, queryWindow.start, queryWindow.end, controller.signal, {
-        page: eventsPage,
-        pageSize: eventsPageSize,
-        model: eventsModelFilter === ALL_REQUEST_EVENTS_FILTER ? undefined : eventsModelFilter,
-        source: eventsSourceFilter === ALL_REQUEST_EVENTS_FILTER ? undefined : eventsSourceFilter,
-        result: eventsResultFilter === ALL_REQUEST_EVENTS_FILTER ? undefined : eventsResultFilter,
-        apiKeyId: selectedApiKeyId,
-      });
-      if (eventsRequestControllerRef.current !== controller) {
-        return;
-      }
-      if (response.total_pages > 0 && eventsPage > response.total_pages) {
-        setEventsPage(response.total_pages);
-        return;
-      }
-      setEventsData(response.events);
-      setEventsTotalCount(response.total_count);
-      setEventsTotalPages(response.total_pages);
-    } catch (error) {
-      if (controller.signal.aborted) {
-        return;
-      }
-      if (eventsRequestControllerRef.current === controller) {
-        setEventsData([]);
-        setEventsTotalCount(0);
-        setEventsTotalPages(0);
-      }
-      if (error instanceof ApiError && error.status === 401) {
-        onAuthRequired?.();
-        return;
-      }
-      setEventsError(error instanceof Error ? error.message : 'Failed to load usage events');
-    } finally {
-      if (eventsRequestControllerRef.current === controller) {
-        setEventsLoading(false);
-        eventsRequestControllerRef.current = null;
-      }
-    }
-  }, [eventsModelFilter, eventsPage, eventsPageSize, eventsResultFilter, eventsSourceFilter, getEventQueryWindow, onAuthRequired, selectedApiKeyId, timeRange]);
-
-  const resetEventsPage = useCallback(() => {
-    setEventsPage(1);
-  }, []);
-
-  const handleEventsPageSizeChange = useCallback((pageSize: number) => {
-    setEventsPageSize(pageSize);
-    resetEventsPage();
-  }, [resetEventsPage]);
-
-  const handleEventsModelFilterChange = useCallback((model: string) => {
-    setEventsModelFilter(model);
-    resetEventsPage();
-  }, [resetEventsPage]);
-
-  const handleEventsSourceFilterChange = useCallback((source: string) => {
-    setEventsSourceFilter(source);
-    resetEventsPage();
-  }, [resetEventsPage]);
-
-  const handleEventsResultFilterChange = useCallback((result: string) => {
-    setEventsResultFilter(result);
-    resetEventsPage();
-  }, [resetEventsPage]);
-
   const refreshActiveTab = useCallback(async () => {
     if (activeTab === 'events') {
-      await Promise.all([loadEventFilterOptions(), loadEvents(), refreshSub2API()]);
+      await refreshSub2API();
       return;
     }
     if (activeTab === 'ranking' || activeTab === 'quotas') {
@@ -1013,18 +826,13 @@ export function UsagePage({ onAuthRequired }: { onAuthRequired?: () => void }) {
       return;
     }
     await loadUsage();
-  }, [activeTab, loadAnalysis, loadApiKeySettings, loadEventFilterOptions, loadEvents, loadPricing, loadUsage, refreshSub2API]);
+  }, [activeTab, loadApiKeySettings, loadPricing, loadUsage, refreshSub2API]);
 
   const refreshAutoRefreshTab = useCallback(async () => {
-    await refreshAutoRefreshTabData({ activeTab, loadEvents, loadUsage, refreshSub2API });
-  }, [activeTab, loadEvents, loadUsage, refreshSub2API]);
+    await refreshAutoRefreshTabData({ activeTab, loadUsage, refreshSub2API });
+  }, [activeTab, loadUsage, refreshSub2API]);
 
-  const autoRefreshEnabled = shouldAutoRefreshUsageTab({
-    activeTab,
-    eventsPage,
-    authFilePage: 1,
-    aiProviderPage: 1,
-  });
+  const autoRefreshEnabled = shouldAutoRefreshUsageTab({ activeTab });
 
   const handleManualRefresh = useCallback(async () => {
     setManualRefreshLoading(true);
@@ -1088,27 +896,10 @@ export function UsagePage({ onAuthRequired }: { onAuthRequired?: () => void }) {
   useHeaderRefresh(refreshActiveTab);
 
   useEffect(() => {
-    void refreshSub2API();
-  }, [refreshSub2API]);
-
-  useEffect(() => {
-    if (activeTab !== 'events') {
-      eventsRequestControllerRef.current?.abort();
-      eventsRequestControllerRef.current = null;
-      eventsFilterOptionsRequestControllerRef.current?.abort();
-      eventsFilterOptionsRequestControllerRef.current = null;
-      setEventsLoading(false);
-      return;
+    if (activeTab === 'events' || activeTab === 'overview' || activeTab === 'ranking' || activeTab === 'quotas') {
+      void refreshSub2API();
     }
-    void loadEventFilterOptions();
-    void loadEvents();
-    return () => {
-      eventsRequestControllerRef.current?.abort();
-      eventsRequestControllerRef.current = null;
-      eventsFilterOptionsRequestControllerRef.current?.abort();
-      eventsFilterOptionsRequestControllerRef.current = null;
-    };
-  }, [activeTab, loadEventFilterOptions, loadEvents]);
+  }, [activeTab, refreshSub2API]);
 
   useEffect(() => {
     if (activeTab !== 'analysis') {
@@ -1137,33 +928,6 @@ export function UsagePage({ onAuthRequired }: { onAuthRequired?: () => void }) {
       apiKeySettingsRequestControllerRef.current = null;
     };
   }, [activeTab, loadApiKeySettings]);
-
-  useEffect(() => {
-    const next = sanitizeRequestEventFilters(
-      {
-        model: eventsModelFilter,
-        source: eventsSourceFilter,
-        result: eventsResultFilter,
-      },
-      {
-        models: eventsModelOptions,
-        sources: eventsSourceOptions,
-      },
-    );
-
-    if (next.model !== eventsModelFilter) {
-      setEventsModelFilter(next.model);
-    }
-    if (next.source !== eventsSourceFilter) {
-      setEventsSourceFilter(next.source);
-    }
-    if (next.result !== eventsResultFilter) {
-      setEventsResultFilter(next.result);
-    }
-    if (next.model !== eventsModelFilter || next.source !== eventsSourceFilter || next.result !== eventsResultFilter) {
-      resetEventsPage();
-    }
-  }, [eventsModelFilter, eventsModelOptions, eventsResultFilter, eventsSourceFilter, eventsSourceOptions, resetEventsPage]);
 
   const lastSyncAt = useMemo(() => {
     if (!status?.last_run_at) return null;

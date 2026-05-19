@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { buildCustomDateRangeQuery, getCustomDateRangeBounds, getOverviewChartEndMs, getOverviewDisplayLoading, getOverviewHourWindowHours, getPreferredOverviewChartPeriod, getTimeRangeOptions, getUsageTabOptions, isCustomDateWithinBounds, openDateInputPicker, refreshAutoRefreshTabData, refreshPageData, sanitizeRequestEventFilters, scheduleOverviewAutoRefresh, shouldAutoRefreshUsageTab, shouldShowApiKeyFilter, shouldShowRangeControls, shouldShowUpdateCheckButton, getUpdateCheckToastDuration } from './UsagePage';
+import { buildCustomDateRangeQuery, getCustomDateRangeBounds, getOverviewChartEndMs, getOverviewDisplayLoading, getOverviewHourWindowHours, getPreferredOverviewChartPeriod, getTimeRangeOptions, getUsageTabOptions, isCustomDateWithinBounds, openDateInputPicker, refreshAutoRefreshTabData, refreshPageData, scheduleOverviewAutoRefresh, shouldAutoRefreshUsageTab, shouldShowApiKeyFilter, shouldShowRangeControls, shouldShowUpdateCheckButton, getUpdateCheckToastDuration } from './UsagePage';
 import { filterUsageByWindow, type UsageFilterWindow } from '@/utils/usage';
 import type { UsageSnapshot } from '@/lib/types';
 
@@ -210,30 +210,34 @@ describe('UsagePage Overview auto-refresh', () => {
 
 describe('UsagePage active tab auto-refresh callback', () => {
   it('refreshes Sub2API dashboard data for the Overview tab', async () => {
-    const loadEvents = vi.fn().mockResolvedValue(undefined);
     const loadUsage = vi.fn().mockResolvedValue(undefined);
     const refreshSub2API = vi.fn().mockResolvedValue(undefined);
 
-    await refreshAutoRefreshTabData({ activeTab: 'overview', loadEvents, loadUsage, refreshSub2API });
+    await refreshAutoRefreshTabData({ activeTab: 'overview', loadUsage, refreshSub2API });
 
     expect(refreshSub2API).toHaveBeenCalledTimes(1);
     expect(loadUsage).not.toHaveBeenCalled();
-    expect(loadEvents).not.toHaveBeenCalled();
+  });
+
+  it('refreshes only Sub2API dashboard data for the Events tab', async () => {
+    const loadUsage = vi.fn().mockResolvedValue(undefined);
+    const refreshSub2API = vi.fn().mockResolvedValue(undefined);
+
+    await refreshAutoRefreshTabData({ activeTab: 'events', loadUsage, refreshSub2API });
+
+    expect(refreshSub2API).toHaveBeenCalledTimes(1);
+    expect(loadUsage).not.toHaveBeenCalled();
   });
 });
 
 describe('UsagePage active tab auto-refresh guard', () => {
-  it('allows Request Events auto-refresh only on the first page', () => {
-    expect(shouldAutoRefreshUsageTab({ activeTab: 'events', eventsPage: 1, authFilePage: 1, aiProviderPage: 1 })).toBe(true);
-    expect(shouldAutoRefreshUsageTab({ activeTab: 'events', eventsPage: 2, authFilePage: 1, aiProviderPage: 1 })).toBe(false);
-  });
-
-  it('keeps Overview, Ranking, and Quotas auto-refresh enabled and does not auto-refresh other tabs', () => {
-    expect(shouldAutoRefreshUsageTab({ activeTab: 'overview', eventsPage: 2, authFilePage: 2, aiProviderPage: 2 })).toBe(true);
-    expect(shouldAutoRefreshUsageTab({ activeTab: 'ranking', eventsPage: 2, authFilePage: 2, aiProviderPage: 2 })).toBe(true);
-    expect(shouldAutoRefreshUsageTab({ activeTab: 'quotas', eventsPage: 2, authFilePage: 2, aiProviderPage: 2 })).toBe(true);
-    expect(shouldAutoRefreshUsageTab({ activeTab: 'analysis', eventsPage: 1, authFilePage: 1, aiProviderPage: 1 })).toBe(false);
-    expect(shouldAutoRefreshUsageTab({ activeTab: 'settings', eventsPage: 1, authFilePage: 1, aiProviderPage: 1 })).toBe(false);
+  it('keeps Sub2API dashboard tabs auto-refresh enabled and does not auto-refresh other tabs', () => {
+    expect(shouldAutoRefreshUsageTab({ activeTab: 'overview' })).toBe(true);
+    expect(shouldAutoRefreshUsageTab({ activeTab: 'events' })).toBe(true);
+    expect(shouldAutoRefreshUsageTab({ activeTab: 'ranking' })).toBe(true);
+    expect(shouldAutoRefreshUsageTab({ activeTab: 'quotas' })).toBe(true);
+    expect(shouldAutoRefreshUsageTab({ activeTab: 'analysis' })).toBe(false);
+    expect(shouldAutoRefreshUsageTab({ activeTab: 'settings' })).toBe(false);
   });
 });
 
@@ -250,48 +254,6 @@ describe('UsagePage range filtering bug', () => {
 
     expect(expected.total_requests).toBe(1);
     expect(actual.total_requests).toBe(expected.total_requests);
-  });
-});
-
-describe('UsagePage request event filters', () => {
-  it('clears model and source filters that are no longer available', () => {
-    const next = sanitizeRequestEventFilters(
-      {
-        model: 'claude-opus',
-        source: 'authidx-source-b',
-        result: 'failed',
-      },
-      {
-        models: ['claude-sonnet'],
-        sources: [{ value: 'authidx-source-a', label: 'authidx-source-a' }],
-      },
-    );
-
-    expect(next).toEqual({
-      model: '__all__',
-      source: '__all__',
-      result: 'failed',
-    });
-  });
-
-  it('keeps source filters that are still available after refreshing options', () => {
-    const next = sanitizeRequestEventFilters(
-      {
-        model: 'claude-sonnet',
-        source: 'authidx-source-a',
-        result: 'success',
-      },
-      {
-        models: ['claude-sonnet'],
-        sources: [{ value: 'authidx-source-a', label: 'authidx-source-a' }],
-      },
-    );
-
-    expect(next).toEqual({
-      model: 'claude-sonnet',
-      source: 'authidx-source-a',
-      result: 'success',
-    });
   });
 });
 
