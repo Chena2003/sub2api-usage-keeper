@@ -24,24 +24,15 @@ import { useMediaQuery } from '@/hooks/useMediaQuery';
 import { useHeaderRefresh } from '@/hooks/useHeaderRefresh';
 import { useThemeStore } from '@/stores';
 import {
-  StatCards,
-  UsageChart,
-  ChartLineSelector,
-  AnalysisPanel,
   ApiKeySettingsCard,
   PriceSettingsCard,
-  AuthFileCredentialsSection,
-  AiProviderCredentialsSection,
-  RequestEventsDetailsCard,
-  TokenBreakdownChart,
-  CostTrendChart,
-  ServiceHealthCard,
   useUsageData,
   usePricingData,
   useSparklines,
-  useChartData,
-  useCredentialsTabData
+  useChartData
 } from '@/components/usage';
+import { AccountQuotasCard, RequestEventsPanel, Sub2ApiOverviewPanel, TokenRankingCard } from '@/components/sub2api';
+import { useSub2ApiDashboardStore } from '@/stores/useSub2ApiDashboardStore';
 import { buildUsageRangeQuery } from '@/utils/usage/rangeQuery';
 import {
   getModelNamesFromUsage,
@@ -98,14 +89,15 @@ const THEME_OPTIONS: ReadonlyArray<{ value: Theme; labelKey: string }> = [
   { value: 'dark', labelKey: 'usage_stats.theme_dark' },
   { value: 'auto', labelKey: 'usage_stats.theme_auto' }
 ];
-const USAGE_TAB_OPTIONS = ['overview', 'analysis', 'events', 'credentials', 'settings'] as const;
+const USAGE_TAB_OPTIONS = ['overview', 'analysis', 'events', 'ranking', 'quotas', 'settings'] as const;
 type UsageTab = (typeof USAGE_TAB_OPTIONS)[number];
 type Translate = (key: string) => string;
 const USAGE_TAB_LABEL_KEYS: Record<UsageTab, string> = {
   overview: 'usage_stats.tab_overview',
   analysis: 'usage_stats.tab_analysis',
   events: 'usage_stats.tab_events',
-  credentials: 'usage_stats.tab_credentials',
+  ranking: 'usage_stats.tab_ranking',
+  quotas: 'usage_stats.tab_quotas',
   settings: 'usage_stats.tab_settings',
 };
 const DEFAULT_USAGE_TAB: UsageTab = 'overview';
@@ -115,7 +107,7 @@ const REQUEST_EVENTS_DEFAULT_PAGE_SIZE = 100;
 const ALL_REQUEST_EVENTS_FILTER = '__all__';
 const OVERVIEW_AUTO_REFRESH_INTERVAL_MS = 10_000;
 
-export const shouldShowRangeControls = (tab: UsageTab) => tab !== 'settings' && tab !== 'credentials';
+export const shouldShowRangeControls = (tab: UsageTab) => tab !== 'settings';
 
 export const shouldShowApiKeyFilter = (tab: UsageTab) => shouldShowRangeControls(tab);
 
@@ -126,17 +118,14 @@ export const getUpdateCheckToastDuration = (kind: 'success' | 'info' | 'error') 
 export const shouldAutoRefreshUsageTab = ({
   activeTab,
   eventsPage,
-  authFilePage,
-  aiProviderPage,
 }: {
   activeTab: UsageTab;
   eventsPage: number;
   authFilePage: number;
   aiProviderPage: number;
 }) => {
-  if (activeTab === 'overview') return true;
+  if (activeTab === 'overview' || activeTab === 'ranking' || activeTab === 'quotas') return true;
   if (activeTab === 'events') return eventsPage === 1;
-  if (activeTab === 'credentials') return authFilePage === 1 && aiProviderPage === 1;
   return false;
 };
 
@@ -525,11 +514,15 @@ export function UsagePage({ onAuthRequired }: { onAuthRequired?: () => void }) {
   const eventsRequestControllerRef = useRef<AbortController | null>(null);
   const eventsFilterOptionsRequestControllerRef = useRef<AbortController | null>(null);
   const [manualRefreshLoading, setManualRefreshLoading] = useState(false);
-  const credentialsData = useCredentialsTabData({
-    enabled: activeTab === 'credentials',
-    onAuthRequired,
-  });
-  const refreshCredentials = credentialsData.refresh;
+  const sub2apiOverview = useSub2ApiDashboardStore((state) => state.overview);
+  const sub2apiPoints = useSub2ApiDashboardStore((state) => state.points);
+  const sub2apiModels = useSub2ApiDashboardStore((state) => state.models);
+  const sub2apiRankings = useSub2ApiDashboardStore((state) => state.rankings);
+  const sub2apiEvents = useSub2ApiDashboardStore((state) => state.events);
+  const sub2apiQuotaAccounts = useSub2ApiDashboardStore((state) => state.quotaAccounts);
+  const rankingDimension = useSub2ApiDashboardStore((state) => state.rankingDimension);
+  const refreshSub2API = useSub2ApiDashboardStore((state) => state.refresh);
+  const loadRankings = useSub2ApiDashboardStore((state) => state.loadRankings);
   const [analysisLoading, setAnalysisLoading] = useState(false);
   const [analysisError, setAnalysisError] = useState('');
   const [analysisData, setAnalysisData] = useState<AnalysisResponse | null>(null);
@@ -979,15 +972,15 @@ export function UsagePage({ onAuthRequired }: { onAuthRequired?: () => void }) {
 
   const refreshActiveTab = useCallback(async () => {
     if (activeTab === 'events') {
-      await Promise.all([loadEventFilterOptions(), loadEvents()]);
+      await Promise.all([loadEventFilterOptions(), loadEvents(), refreshSub2API()]);
       return;
     }
-    if (activeTab === 'credentials') {
-      await refreshCredentials();
+    if (activeTab === 'ranking' || activeTab === 'quotas') {
+      await refreshSub2API();
       return;
     }
     if (activeTab === 'analysis') {
-      await loadAnalysis();
+      await refreshSub2API();
       return;
     }
     if (activeTab === 'settings') {
@@ -995,25 +988,25 @@ export function UsagePage({ onAuthRequired }: { onAuthRequired?: () => void }) {
       return;
     }
     await loadUsage();
-  }, [activeTab, loadAnalysis, loadApiKeySettings, loadEventFilterOptions, loadEvents, loadPricing, loadUsage, refreshCredentials]);
+  }, [activeTab, loadAnalysis, loadApiKeySettings, loadEventFilterOptions, loadEvents, loadPricing, loadUsage, refreshSub2API]);
 
   const refreshAutoRefreshTab = useCallback(async () => {
     if (activeTab === 'events') {
-      await loadEvents();
+      await Promise.all([loadEvents(), refreshSub2API()]);
       return;
     }
-    if (activeTab === 'credentials') {
-      await refreshCredentials();
+    if (activeTab === 'ranking' || activeTab === 'quotas') {
+      await refreshSub2API();
       return;
     }
     await loadUsage();
-  }, [activeTab, loadEvents, loadUsage, refreshCredentials]);
+  }, [activeTab, loadEvents, loadUsage, refreshSub2API]);
 
   const autoRefreshEnabled = shouldAutoRefreshUsageTab({
     activeTab,
     eventsPage,
-    authFilePage: credentialsData.authFilePage,
-    aiProviderPage: credentialsData.aiProviderPage,
+    authFilePage: 1,
+    aiProviderPage: 1,
   });
 
   const handleManualRefresh = useCallback(async () => {
@@ -1076,6 +1069,10 @@ export function UsagePage({ onAuthRequired }: { onAuthRequired?: () => void }) {
   }), [autoRefreshEnabled, refreshAutoRefreshTab]);
 
   useHeaderRefresh(refreshActiveTab);
+
+  useEffect(() => {
+    void refreshSub2API();
+  }, [refreshSub2API]);
 
   useEffect(() => {
     if (activeTab !== 'events') {
@@ -1437,138 +1434,11 @@ export function UsagePage({ onAuthRequired }: { onAuthRequired?: () => void }) {
             {activeTab === 'settings' && apiKeySettingsError && <div className={styles.errorBox}>{apiKeySettingsError}</div>}
             {!(activeTab === 'overview' ? error : activeTab === 'settings' ? (pricingError || apiKeySettingsError) : '') && statusError && <div className={styles.errorBox}>{statusError}</div>}
 
-            {activeTab === 'overview' && (
-              <>
-                <StatCards
-                  usage={usage}
-                  loading={overviewDisplayLoading}
-                  sparklines={{
-                    requests: requestsSparkline,
-                    tokens: tokensSparkline,
-                    rpm: rpmSparkline,
-                    tpm: tpmSparkline,
-                    cost: costSparkline
-                  }}
-                />
-
-                <ServiceHealthCard usage={usage} loading={overviewDisplayLoading} />
-
-                <TokenBreakdownChart
-                  usage={usage}
-                  loading={overviewDisplayLoading}
-                  isDark={isDark}
-                  isMobile={isMobile}
-                  hourWindowHours={hourWindowHours}
-                  endMs={filterWindowEndMs}
-                  includeFinalHourBucket={includeFinalHourBucket}
-                  preferredPeriod={preferredOverviewChartPeriod}
-                />
-
-                <CostTrendChart
-                  usage={usage}
-                  loading={overviewDisplayLoading}
-                  isDark={isDark}
-                  isMobile={isMobile}
-                  hourWindowHours={hourWindowHours}
-                  endMs={filterWindowEndMs}
-                  includeFinalHourBucket={includeFinalHourBucket}
-                  preferredPeriod={preferredOverviewChartPeriod}
-                />
-
-                <ChartLineSelector
-                  chartLines={chartLines}
-                  modelNames={overviewModelNames}
-                  maxLines={MAX_CHART_LINES}
-                  onChange={handleChartLinesChange}
-                />
-
-                <div className={styles.chartsGrid}>
-                  <UsageChart
-                    title={t('usage_stats.requests_trend')}
-                    period={requestsPeriod}
-                    chartData={requestsChartData}
-                    chartOptions={requestsChartOptions}
-                    loading={overviewDisplayLoading}
-                    isMobile={isMobile}
-                    emptyText={t('usage_stats.no_data')}
-                  />
-                  <UsageChart
-                    title={t('usage_stats.tokens_trend')}
-                    period={tokensPeriod}
-                    chartData={tokensChartData}
-                    chartOptions={tokensChartOptions}
-                    loading={overviewDisplayLoading}
-                    isMobile={isMobile}
-                    emptyText={t('usage_stats.no_data')}
-                  />
-                </div>
-              </>
-            )}
-
-            {activeTab === 'analysis' && (
-              <>
-                {analysisError && <div className={styles.errorBox}>{analysisError}</div>}
-                <AnalysisPanel analysis={analysisData} loading={analysisLoading} isDark={isDark} isMobile={isMobile} />
-              </>
-            )}
-
-            {activeTab === 'events' && (
-              <>
-                {eventsError && <div className={styles.errorBox}>{eventsError}</div>}
-                <RequestEventsDetailsCard
-                  events={eventsData}
-                  loading={eventsLoading}
-                  page={eventsPage}
-                  pageSize={eventsPageSize}
-                  pageSizeOptions={REQUEST_EVENTS_PAGE_SIZES}
-                  totalCount={eventsTotalCount}
-                  totalPages={eventsTotalPages}
-                  modelOptions={eventsModelOptions}
-                  sourceOptions={eventsSourceOptions}
-                  modelFilter={eventsModelFilter}
-                  sourceFilter={eventsSourceFilter}
-                  resultFilter={eventsResultFilter}
-                  modelPrices={modelPrices}
-                  onPageChange={setEventsPage}
-                  onPageSizeChange={handleEventsPageSizeChange}
-                  onModelFilterChange={handleEventsModelFilterChange}
-                  onSourceFilterChange={handleEventsSourceFilterChange}
-                  onResultFilterChange={handleEventsResultFilterChange}
-                />
-              </>
-            )}
-
-            {activeTab === 'credentials' && (
-              <>
-                {credentialsData.error && <div className={styles.errorBox}>{credentialsData.error}</div>}
-                <div className={styles.credentialsSections}>
-                  <AuthFileCredentialsSection
-                    rows={credentialsData.authFileRows}
-                    total={credentialsData.authFileTotal}
-                    page={credentialsData.authFilePage}
-                    totalPages={credentialsData.authFileTotalPages}
-                    pageSize={credentialsData.authFilePageSize}
-                    loading={credentialsData.loading}
-                    quotaRefreshing={credentialsData.quotaRefreshing}
-                    quotaRefreshError={credentialsData.quotaRefreshError}
-                    onPageChange={credentialsData.setAuthFilePage}
-                    onPageSizeChange={credentialsData.setAuthFilePageSize}
-                    onRefreshQuota={credentialsData.refreshQuotaForCurrentAuthFilePage}
-                    onRefreshQuotaForAuthIndex={credentialsData.refreshQuotaForAuthIndex}
-                  />
-                  <AiProviderCredentialsSection
-                    rows={credentialsData.aiProviderRows}
-                    total={credentialsData.aiProviderTotal}
-                    page={credentialsData.aiProviderPage}
-                    totalPages={credentialsData.aiProviderTotalPages}
-                    pageSize={credentialsData.aiProviderPageSize}
-                    loading={credentialsData.loading}
-                    onPageChange={credentialsData.setAiProviderPage}
-                    onPageSizeChange={credentialsData.setAiProviderPageSize}
-                  />
-                </div>
-              </>
-            )}
+            {activeTab === 'overview' && <Sub2ApiOverviewPanel overview={sub2apiOverview} points={sub2apiPoints} models={sub2apiModels} quotaAccounts={sub2apiQuotaAccounts} />}
+            {activeTab === 'analysis' && <Sub2ApiOverviewPanel overview={sub2apiOverview} points={sub2apiPoints} models={sub2apiModels} quotaAccounts={sub2apiQuotaAccounts} />}
+            {activeTab === 'events' && <RequestEventsPanel events={sub2apiEvents} />}
+            {activeTab === 'ranking' && <TokenRankingCard rankings={sub2apiRankings} dimension={rankingDimension} onDimensionChange={loadRankings} />}
+            {activeTab === 'quotas' && <AccountQuotasCard accounts={sub2apiQuotaAccounts} />}
 
             {activeTab === 'settings' && (
               <div className={styles.settingsSections}>

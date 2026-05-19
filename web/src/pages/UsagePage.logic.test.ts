@@ -211,14 +211,10 @@ describe('UsagePage active tab auto-refresh guard', () => {
     expect(shouldAutoRefreshUsageTab({ activeTab: 'events', eventsPage: 2, authFilePage: 1, aiProviderPage: 1 })).toBe(false);
   });
 
-  it('allows Credentials auto-refresh only when both lists are on the first page', () => {
-    expect(shouldAutoRefreshUsageTab({ activeTab: 'credentials', eventsPage: 1, authFilePage: 1, aiProviderPage: 1 })).toBe(true);
-    expect(shouldAutoRefreshUsageTab({ activeTab: 'credentials', eventsPage: 1, authFilePage: 2, aiProviderPage: 1 })).toBe(false);
-    expect(shouldAutoRefreshUsageTab({ activeTab: 'credentials', eventsPage: 1, authFilePage: 1, aiProviderPage: 2 })).toBe(false);
-  });
-
-  it('keeps Overview auto-refresh enabled and does not auto-refresh other tabs', () => {
+  it('keeps Overview, Ranking, and Quotas auto-refresh enabled and does not auto-refresh other tabs', () => {
     expect(shouldAutoRefreshUsageTab({ activeTab: 'overview', eventsPage: 2, authFilePage: 2, aiProviderPage: 2 })).toBe(true);
+    expect(shouldAutoRefreshUsageTab({ activeTab: 'ranking', eventsPage: 2, authFilePage: 2, aiProviderPage: 2 })).toBe(true);
+    expect(shouldAutoRefreshUsageTab({ activeTab: 'quotas', eventsPage: 2, authFilePage: 2, aiProviderPage: 2 })).toBe(true);
     expect(shouldAutoRefreshUsageTab({ activeTab: 'analysis', eventsPage: 1, authFilePage: 1, aiProviderPage: 1 })).toBe(false);
     expect(shouldAutoRefreshUsageTab({ activeTab: 'settings', eventsPage: 1, authFilePage: 1, aiProviderPage: 1 })).toBe(false);
   });
@@ -286,7 +282,8 @@ for (const [tab, expected] of [
   ['overview', true],
   ['analysis', true],
   ['events', true],
-  ['credentials', false],
+  ['ranking', true],
+  ['quotas', true],
   ['settings', false],
 ] as const) {
   it(`returns ${expected} for ${tab} range controls visibility`, () => {
@@ -298,7 +295,8 @@ for (const [tab, expected] of [
   ['overview', true],
   ['analysis', true],
   ['events', true],
-  ['credentials', false],
+  ['ranking', true],
+  ['quotas', true],
   ['settings', false],
 ] as const) {
   it(`returns ${expected} for ${tab} API Key filter visibility`, () => {
@@ -430,9 +428,20 @@ describe('UsagePage tab labels', () => {
       'translated:usage_stats.tab_overview',
       'translated:usage_stats.tab_analysis',
       'translated:usage_stats.tab_events',
-      'translated:usage_stats.tab_credentials',
+      'translated:usage_stats.tab_ranking',
+      'translated:usage_stats.tab_quotas',
       'translated:usage_stats.tab_settings',
     ]);
+  });
+
+  it('includes Sub2API quota and ranking tabs', () => {
+    const options = getUsageTabOptions((key) => key);
+    expect(options.map((option) => option.value)).toEqual(['overview', 'analysis', 'events', 'ranking', 'quotas', 'settings']);
+  });
+
+  it('shows range controls for ranking and quotas tabs', () => {
+    expect(shouldShowRangeControls('ranking')).toBe(true);
+    expect(shouldShowRangeControls('quotas')).toBe(true);
   });
 });
 
