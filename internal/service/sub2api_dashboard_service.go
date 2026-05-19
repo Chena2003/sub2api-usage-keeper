@@ -15,6 +15,8 @@ type Sub2APIReader interface {
 	GetDailyOverview(context.Context, int) ([]sub2api.UsageOverviewRow, error)
 	GetHourlyOverview(context.Context, int) ([]sub2api.UsageOverviewRow, error)
 	GetModelUsage(context.Context, time.Time, int) ([]sub2api.ModelUsageRow, error)
+	GetEvents(context.Context, int, int) ([]sub2api.UsageEventRow, int64, error)
+	GetRankings(context.Context, string, time.Time, int) ([]sub2api.RankingRow, error)
 }
 
 type Sub2APIDashboardService struct {
@@ -57,6 +59,10 @@ func (s *Sub2APIDashboardService) Accounts(ctx context.Context, days int) ([]quo
 		result = append(result, quota.NormalizeSub2APIAccount(account, usage))
 	}
 	return result, nil
+}
+
+func (s *Sub2APIDashboardService) AccountQuotas(ctx context.Context, days int) ([]quota.Sub2APIAccountQuota, error) {
+	return s.Accounts(ctx, days)
 }
 
 func (s *Sub2APIDashboardService) Overview(ctx context.Context, days int) (quota.Sub2APIOverview, error) {
@@ -109,6 +115,37 @@ func (s *Sub2APIDashboardService) Models(ctx context.Context, days int, limit in
 	return s.reader.GetModelUsage(ctx, sinceDays(s.currentTime(), days), limit)
 }
 
+func (s *Sub2APIDashboardService) Rankings(ctx context.Context, dimension string, days int, limit int) ([]quota.Sub2APIRankingRow, error) {
+	if err := s.validate(); err != nil {
+		return nil, err
+	}
+	dimension = normalizeSub2APIRankingDimension(dimension)
+	limit = normalizeLimit(limit, 20)
+	rows, err := s.reader.GetRankings(ctx, dimension, sinceDays(s.currentTime(), days), limit)
+	if err != nil {
+		return nil, err
+	}
+	return quota.NormalizeSub2APIRankings(dimension, rows), nil
+}
+
+func (s *Sub2APIDashboardService) Events(ctx context.Context, page int, limit int) (quota.Sub2APIEventsResponse, error) {
+	if err := s.validate(); err != nil {
+		return quota.Sub2APIEventsResponse{}, err
+	}
+	page = normalizePage(page)
+	limit = normalizeLimit(limit, 100)
+	rows, total, err := s.reader.GetEvents(ctx, page, limit)
+	if err != nil {
+		return quota.Sub2APIEventsResponse{}, err
+	}
+	return quota.Sub2APIEventsResponse{
+		Events: quota.NormalizeSub2APIEvents(rows),
+		Total:  total,
+		Page:   page,
+		Limit:  limit,
+	}, nil
+}
+
 func (s *Sub2APIDashboardService) validate() error {
 	if s == nil {
 		return fmt.Errorf("sub2api dashboard service is nil")
@@ -142,4 +179,27 @@ func normalizeHours(hours int) int {
 		return 24
 	}
 	return hours
+}
+
+func normalizePage(page int) int {
+	if page <= 0 {
+		return 1
+	}
+	return page
+}
+
+func normalizeLimit(limit int, defaultValue int) int {
+	if limit <= 0 {
+		return defaultValue
+	}
+	return limit
+}
+
+func normalizeSub2APIRankingDimension(dimension string) string {
+	switch dimension {
+	case "api_key", "model", "account":
+		return dimension
+	default:
+		return "user"
+	}
 }

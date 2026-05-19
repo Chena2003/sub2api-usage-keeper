@@ -230,3 +230,97 @@ func (r *Repository) GetAccountUsage(ctx context.Context, since time.Time) ([]Ac
 	}
 	return rows, nil
 }
+
+func (r *Repository) GetRankings(ctx context.Context, dimension string, since time.Time, limit int) ([]RankingRow, error) {
+	if limit <= 0 {
+		limit = 20
+	}
+
+	column := rankingColumn(dimension)
+	db, err := r.database()
+	if err != nil {
+		return nil, fmt.Errorf("get sub2api rankings: %w", err)
+	}
+
+	var rows []RankingRow
+	query := fmt.Sprintf(`
+		SELECT
+			COALESCE(NULLIF(%s, ''), 'unknown') AS name,
+			COUNT(*) AS total_requests,
+			COALESCE(SUM(input_tokens), 0) AS input_tokens,
+			COALESCE(SUM(output_tokens), 0) AS output_tokens,
+			COALESCE(SUM(cache_creation_tokens), 0) AS cache_creation_tokens,
+			COALESCE(SUM(cache_read_tokens), 0) AS cache_read_tokens,
+			COALESCE(SUM(actual_cost), 0) AS actual_cost
+		FROM usage_logs
+		WHERE created_at >= ?
+		GROUP BY name
+		ORDER BY total_requests DESC
+		LIMIT ?
+	`, column)
+	err = db.WithContext(ctx).Raw(query, since, limit).Scan(&rows).Error
+	if err != nil {
+		return nil, fmt.Errorf("get sub2api rankings: %w", err)
+	}
+	return rows, nil
+}
+
+func (r *Repository) GetEvents(ctx context.Context, page int, limit int) ([]UsageEventRow, int64, error) {
+	if page <= 0 {
+		page = 1
+	}
+	if limit <= 0 {
+		limit = 100
+	}
+
+	db, err := r.database()
+	if err != nil {
+		return nil, 0, fmt.Errorf("get sub2api events: %w", err)
+	}
+
+	var total int64
+	if err := db.WithContext(ctx).Raw(`SELECT COUNT(*) FROM usage_logs`).Scan(&total).Error; err != nil {
+		return nil, 0, fmt.Errorf("get sub2api events: %w", err)
+	}
+
+	var rows []UsageEventRow
+	err = db.WithContext(ctx).Raw(`
+		SELECT
+			id,
+			created_at,
+			user_identifier,
+			api_key_label,
+			model,
+			requested_model,
+			upstream_model,
+			account_id,
+			account_name,
+			status,
+			input_tokens,
+			output_tokens,
+			cache_creation_tokens,
+			cache_read_tokens,
+			actual_cost,
+			duration_ms
+		FROM usage_logs
+		ORDER BY created_at DESC
+		LIMIT ? OFFSET ?
+	`, limit, (page-1)*limit).Scan(&rows).Error
+	if err != nil {
+		return nil, 0, fmt.Errorf("get sub2api events: %w", err)
+	}
+	return rows, total, nil
+}
+
+func rankingColumn(dimension string) string {
+	switch dimension {
+	case "api_key":
+		return "api_key_label"
+	case "model":
+		return "model"
+	case "account":
+		return "account_id::text"
+	default:
+		return "user_identifier"
+	}
+}

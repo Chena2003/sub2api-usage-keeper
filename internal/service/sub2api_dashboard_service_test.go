@@ -10,16 +10,24 @@ import (
 )
 
 type fakeSub2APIReader struct {
-	accounts          []sub2api.AccountRow
-	accountUsage      []sub2api.AccountUsageRow
-	dailyOverview     []sub2api.UsageOverviewRow
-	hourlyOverview    []sub2api.UsageOverviewRow
-	modelUsage        []sub2api.ModelUsageRow
-	lastDailyDays     int
-	lastHourlyHours   int
-	lastAccountSince  time.Time
-	lastModelSince    time.Time
-	lastModelLimit    int
+	accounts             []sub2api.AccountRow
+	accountUsage         []sub2api.AccountUsageRow
+	dailyOverview        []sub2api.UsageOverviewRow
+	hourlyOverview       []sub2api.UsageOverviewRow
+	modelUsage           []sub2api.ModelUsageRow
+	rankings             []sub2api.RankingRow
+	events               []sub2api.UsageEventRow
+	eventsTotal          int64
+	lastDailyDays        int
+	lastHourlyHours      int
+	lastAccountSince     time.Time
+	lastModelSince       time.Time
+	lastModelLimit       int
+	lastRankingDimension string
+	lastRankingSince     time.Time
+	lastRankingLimit     int
+	lastEventsPage       int
+	lastEventsLimit      int
 }
 
 func (f *fakeSub2APIReader) ListAccounts(context.Context) ([]sub2api.AccountRow, error) {
@@ -45,6 +53,19 @@ func (f *fakeSub2APIReader) GetModelUsage(_ context.Context, since time.Time, li
 	f.lastModelSince = since
 	f.lastModelLimit = limit
 	return f.modelUsage, nil
+}
+
+func (f *fakeSub2APIReader) GetRankings(_ context.Context, dimension string, since time.Time, limit int) ([]sub2api.RankingRow, error) {
+	f.lastRankingDimension = dimension
+	f.lastRankingSince = since
+	f.lastRankingLimit = limit
+	return f.rankings, nil
+}
+
+func (f *fakeSub2APIReader) GetEvents(_ context.Context, page int, limit int) ([]sub2api.UsageEventRow, int64, error) {
+	f.lastEventsPage = page
+	f.lastEventsLimit = limit
+	return f.events, f.eventsTotal, nil
 }
 
 func TestSub2APIDashboardAccountsMergeUsage(t *testing.T) {
@@ -174,6 +195,82 @@ func TestSub2APIDashboardModelsDefaultsToSevenDays(t *testing.T) {
 	}
 	if reader.lastModelLimit != 20 {
 		t.Fatalf("expected model usage limit 20, got %d", reader.lastModelLimit)
+	}
+}
+
+func TestSub2APIDashboardAccountQuotasDefaultsToSevenDays(t *testing.T) {
+	reader := &fakeSub2APIReader{}
+	fixedNow := time.Date(2026, time.May, 17, 12, 30, 0, 0, time.UTC)
+	service := NewSub2APIDashboardService(reader)
+	service.now = func() time.Time { return fixedNow }
+
+	_, err := service.AccountQuotas(context.Background(), 0)
+	if err != nil {
+		t.Fatalf("AccountQuotas returned error: %v", err)
+	}
+	if !reader.lastAccountSince.Equal(fixedNow.AddDate(0, 0, -7)) {
+		t.Fatalf("expected account usage since %v, got %v", fixedNow.AddDate(0, 0, -7), reader.lastAccountSince)
+	}
+}
+
+func TestSub2APIDashboardRankingsNormalizesDefaults(t *testing.T) {
+	reader := &fakeSub2APIReader{
+		rankings: []sub2api.RankingRow{{
+			Name:                "user@example.com",
+			TotalRequests:       2,
+			InputTokens:         10,
+			OutputTokens:        5,
+			CacheCreationTokens: 3,
+			CacheReadTokens:     2,
+		}},
+	}
+	fixedNow := time.Date(2026, time.May, 17, 12, 30, 0, 0, time.UTC)
+	service := NewSub2APIDashboardService(reader)
+	service.now = func() time.Time { return fixedNow }
+
+	rankings, err := service.Rankings(context.Background(), "", 0, 0)
+	if err != nil {
+		t.Fatalf("Rankings returned error: %v", err)
+	}
+	if reader.lastRankingDimension != "user" {
+		t.Fatalf("expected ranking dimension user, got %q", reader.lastRankingDimension)
+	}
+	if !reader.lastRankingSince.Equal(fixedNow.AddDate(0, 0, -7)) {
+		t.Fatalf("expected ranking since %v, got %v", fixedNow.AddDate(0, 0, -7), reader.lastRankingSince)
+	}
+	if reader.lastRankingLimit != 20 {
+		t.Fatalf("expected ranking limit 20, got %d", reader.lastRankingLimit)
+	}
+	if len(rankings) != 1 || rankings[0].Dimension != "user" || rankings[0].TotalTokens != 20 {
+		t.Fatalf("unexpected rankings: %#v", rankings)
+	}
+}
+
+func TestSub2APIDashboardEventsNormalizesDefaults(t *testing.T) {
+	reader := &fakeSub2APIReader{
+		events: []sub2api.UsageEventRow{{
+			ID:                  42,
+			User:                "user@example.com",
+			InputTokens:         10,
+			OutputTokens:        5,
+			CacheCreationTokens: 3,
+			CacheReadTokens:     2,
+		}},
+		eventsTotal: 5,
+	}
+
+	events, err := NewSub2APIDashboardService(reader).Events(context.Background(), 0, 0)
+	if err != nil {
+		t.Fatalf("Events returned error: %v", err)
+	}
+	if reader.lastEventsPage != 1 {
+		t.Fatalf("expected events page 1, got %d", reader.lastEventsPage)
+	}
+	if reader.lastEventsLimit != 100 {
+		t.Fatalf("expected events limit 100, got %d", reader.lastEventsLimit)
+	}
+	if events.Page != 1 || events.Limit != 100 || events.Total != 5 || len(events.Events) != 1 || events.Events[0].TotalTokens != 20 {
+		t.Fatalf("unexpected events response: %#v", events)
 	}
 }
 
