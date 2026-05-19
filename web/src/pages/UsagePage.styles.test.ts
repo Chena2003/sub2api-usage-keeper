@@ -37,7 +37,8 @@ describe('UsagePage toolbar styles', () => {
   })
 
   it('uses the Sub2API Overview panel for Overview and Analysis instead of old detail tables', () => {
-    expect(usagePageSource).toContain('fetchAnalysis')
+    expect(usagePageSource).not.toContain('fetchAnalysis')
+    expect(usagePageSource).not.toContain('loadAnalysis')
     expect(usagePageSource).toContain('import { AccountQuotasCard, RequestEventsPanel, Sub2ApiOverviewPanel, TokenRankingCard } from')
     expect(usagePageSource).toContain("{activeTab === 'overview' && <Sub2ApiOverviewPanel")
     expect(usagePageSource).toContain("{activeTab === 'analysis' && <Sub2ApiOverviewPanel")

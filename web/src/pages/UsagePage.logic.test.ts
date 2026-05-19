@@ -219,6 +219,16 @@ describe('UsagePage active tab auto-refresh callback', () => {
     expect(loadUsage).not.toHaveBeenCalled();
   });
 
+  it('refreshes only Sub2API dashboard data for the Analysis tab', async () => {
+    const loadUsage = vi.fn().mockResolvedValue(undefined);
+    const refreshSub2API = vi.fn().mockResolvedValue(undefined);
+
+    await refreshAutoRefreshTabData({ activeTab: 'analysis', loadUsage, refreshSub2API });
+
+    expect(refreshSub2API).toHaveBeenCalledTimes(1);
+    expect(loadUsage).not.toHaveBeenCalled();
+  });
+
   it('refreshes only Sub2API dashboard data for the Events tab', async () => {
     const loadUsage = vi.fn().mockResolvedValue(undefined);
     const refreshSub2API = vi.fn().mockResolvedValue(undefined);
@@ -236,7 +246,7 @@ describe('UsagePage active tab auto-refresh guard', () => {
     expect(shouldAutoRefreshUsageTab({ activeTab: 'events' })).toBe(true);
     expect(shouldAutoRefreshUsageTab({ activeTab: 'ranking' })).toBe(true);
     expect(shouldAutoRefreshUsageTab({ activeTab: 'quotas' })).toBe(true);
-    expect(shouldAutoRefreshUsageTab({ activeTab: 'analysis' })).toBe(false);
+    expect(shouldAutoRefreshUsageTab({ activeTab: 'analysis' })).toBe(true);
     expect(shouldAutoRefreshUsageTab({ activeTab: 'settings' })).toBe(false);
   });
 });
@@ -444,5 +454,13 @@ describe('UsagePage settings tab content', () => {
   it('keeps the existing service health card in Settings', () => {
     expect(usagePageSource).toContain('ServiceHealthCard');
     expect(usagePageSource).toContain('<ServiceHealthCard\n                  usage={usage}\n                  loading={overviewDisplayLoading}\n                />');
+  });
+});
+
+describe('UsagePage Analysis tab content', () => {
+  it('renders the Sub2API overview panel without the legacy analysis loader', () => {
+    expect(usagePageSource).toContain("activeTab === 'analysis' && <Sub2ApiOverviewPanel");
+    expect(usagePageSource).not.toContain('fetchAnalysis');
+    expect(usagePageSource).not.toContain('loadAnalysis');
   });
 });

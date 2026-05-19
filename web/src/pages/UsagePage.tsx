@@ -14,8 +14,8 @@ import {
   Legend,
   Filler
 } from 'chart.js';
-import { ApiError, fetchAnalysis, fetchCpaApiKeyOptions, fetchCpaApiKeys, fetchStatus, fetchUpdateCheck, updateCpaApiKeyAlias } from '@/lib/api';
-import type { AnalysisResponse, CpaApiKeyOption, CpaApiKeySettingsItem, StatusResponse } from '@/lib/types';
+import { ApiError, fetchCpaApiKeyOptions, fetchCpaApiKeys, fetchStatus, fetchUpdateCheck, updateCpaApiKeyAlias } from '@/lib/api';
+import type { CpaApiKeyOption, CpaApiKeySettingsItem, StatusResponse } from '@/lib/types';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { LanguageSwitcher } from '@/components/ui/LanguageSwitcher';
 import { Select } from '@/components/ui/Select';
@@ -114,7 +114,7 @@ export const shouldShowUpdateCheckButton = (status: Pick<StatusResponse, 'update
 export const getUpdateCheckToastDuration = (kind: 'success' | 'info' | 'error') => (kind === 'error' ? 6_000 : 4_000);
 
 export const shouldAutoRefreshUsageTab = ({ activeTab }: { activeTab: UsageTab }) => (
-  activeTab === 'overview' || activeTab === 'events' || activeTab === 'ranking' || activeTab === 'quotas'
+  activeTab === 'overview' || activeTab === 'analysis' || activeTab === 'events' || activeTab === 'ranking' || activeTab === 'quotas'
 );
 
 type RefreshPageDataOptions = {
@@ -145,7 +145,7 @@ export const refreshAutoRefreshTabData = async ({
   loadUsage,
   refreshSub2API,
 }: RefreshAutoRefreshTabOptions) => {
-  if (activeTab === 'events' || activeTab === 'overview' || activeTab === 'ranking' || activeTab === 'quotas') {
+  if (activeTab === 'overview' || activeTab === 'analysis' || activeTab === 'events' || activeTab === 'ranking' || activeTab === 'quotas') {
     await refreshSub2API();
     return;
   }
@@ -487,12 +487,6 @@ export function UsagePage({ onAuthRequired }: { onAuthRequired?: () => void }) {
   const rankingDimension = useSub2ApiDashboardStore((state) => state.rankingDimension);
   const refreshSub2API = useSub2ApiDashboardStore((state) => state.refresh);
   const loadRankings = useSub2ApiDashboardStore((state) => state.loadRankings);
-  const [analysisLoading, setAnalysisLoading] = useState(false);
-  const [analysisError, setAnalysisError] = useState('');
-  const [analysisData, setAnalysisData] = useState<AnalysisResponse | null>(null);
-  const [, setAnalysisLastRefreshedAt] = useState<Date | null>(null);
-  const analysisRequestControllerRef = useRef<AbortController | null>(null);
-
   const tabOptions = useMemo(() => getUsageTabOptions(t), [t]);
   const timeRangeOptions = useMemo(() => getTimeRangeOptions(t), [t]);
   const apiKeySelectOptions = useMemo(
@@ -629,50 +623,6 @@ export function UsagePage({ onAuthRequired }: { onAuthRequired?: () => void }) {
     }
   }, [onAuthRequired]);
 
-  const loadAnalysis = useCallback(async () => {
-    const queryWindow = buildUsageRangeQuery({ range: timeRange, customStart: customTimeRange.start, customEnd: customTimeRange.end });
-    if (!queryWindow.valid) {
-      analysisRequestControllerRef.current?.abort();
-      analysisRequestControllerRef.current = null;
-      setAnalysisData(null);
-      setAnalysisError('');
-      setAnalysisLoading(false);
-      return;
-    }
-
-    analysisRequestControllerRef.current?.abort();
-    const controller = new AbortController();
-    analysisRequestControllerRef.current = controller;
-
-    setAnalysisLoading(true);
-    setAnalysisError('');
-    setAnalysisData(null);
-    try {
-      const response = await fetchAnalysis(queryWindow.range, queryWindow.start, queryWindow.end, controller.signal, selectedApiKeyId);
-      if (analysisRequestControllerRef.current !== controller) {
-        return;
-      }
-      setAnalysisData(response);
-      setAnalysisLastRefreshedAt(new Date());
-    } catch (error) {
-      if (controller.signal.aborted) {
-        return;
-      }
-      if (analysisRequestControllerRef.current === controller) {
-        setAnalysisData(null);
-      }
-      if (error instanceof ApiError && error.status === 401) {
-        onAuthRequired?.();
-        return;
-      }
-      setAnalysisError(error instanceof Error ? error.message : 'Failed to load usage analysis');
-    } finally {
-      if (analysisRequestControllerRef.current === controller) {
-        setAnalysisLoading(false);
-        analysisRequestControllerRef.current = null;
-      }
-    }
-  }, [customTimeRange.end, customTimeRange.start, onAuthRequired, selectedApiKeyId, timeRange]);
   const hourWindowHours = useMemo(
     () => getOverviewHourWindowHours({ timeRange, filterWindow }),
     [filterWindow, timeRange]
@@ -896,24 +846,10 @@ export function UsagePage({ onAuthRequired }: { onAuthRequired?: () => void }) {
   useHeaderRefresh(refreshActiveTab);
 
   useEffect(() => {
-    if (activeTab === 'events' || activeTab === 'overview' || activeTab === 'ranking' || activeTab === 'quotas') {
+    if (activeTab === 'overview' || activeTab === 'analysis' || activeTab === 'events' || activeTab === 'ranking' || activeTab === 'quotas') {
       void refreshSub2API();
     }
   }, [activeTab, refreshSub2API]);
-
-  useEffect(() => {
-    if (activeTab !== 'analysis') {
-      analysisRequestControllerRef.current?.abort();
-      analysisRequestControllerRef.current = null;
-      setAnalysisLoading(false);
-      return;
-    }
-    void loadAnalysis();
-    return () => {
-      analysisRequestControllerRef.current?.abort();
-      analysisRequestControllerRef.current = null;
-    };
-  }, [activeTab, loadAnalysis]);
 
   useEffect(() => {
     if (activeTab !== 'settings') {
