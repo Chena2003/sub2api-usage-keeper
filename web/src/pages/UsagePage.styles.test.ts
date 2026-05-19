@@ -36,9 +36,12 @@ describe('UsagePage toolbar styles', () => {
     expect(usagePageStyles).not.toContain('.apiKeyFilterGroupHidden')
   })
 
-  it('uses the new Analysis panel and endpoint instead of the old detail tables', () => {
+  it('uses the Sub2API Overview panel for Overview and Analysis instead of old detail tables', () => {
     expect(usagePageSource).toContain('fetchAnalysis')
-    expect(usagePageSource).toContain('<AnalysisPanel')
+    expect(usagePageSource).toContain('import { AccountQuotasCard, RequestEventsPanel, Sub2ApiOverviewPanel, TokenRankingCard } from')
+    expect(usagePageSource).toContain("{activeTab === 'overview' && <Sub2ApiOverviewPanel")
+    expect(usagePageSource).toContain("{activeTab === 'analysis' && <Sub2ApiOverviewPanel")
+    expect(usagePageSource).not.toContain('<AnalysisPanel')
     expect(usagePageSource).not.toContain('fetchUsageAnalysis')
     expect(usagePageSource).not.toContain('<ApiDetailsCard')
     expect(usagePageSource).not.toContain('<ModelStatsCard')
@@ -47,12 +50,13 @@ describe('UsagePage toolbar styles', () => {
     expect(apiClientSource).toContain("apiPath('/usage/analysis')")
   })
 
-  it('renames the Analysis tab label and places it before Request Events', () => {
+  it('defines the Task 5 Sub2API tabs in order and keeps the Analysis label', () => {
     expect(i18nSource).toContain("tab_analysis: 'Analysis'")
     expect(i18nSource).not.toContain("tab_analysis: 'API & Models'")
     expect(i18nSource).not.toContain("tab_analysis: 'API 与模型'")
     expect(i18nSource).not.toContain("tab_analysis: 'API 與模型'")
-    expect(usagePageSource).toContain("const USAGE_TAB_OPTIONS = ['overview', 'analysis', 'events', 'credentials', 'settings'] as const")
+    expect(usagePageSource).toContain("const USAGE_TAB_OPTIONS = ['overview', 'analysis', 'events', 'ranking', 'quotas', 'settings'] as const")
+    expect(usagePageSource).not.toContain("'credentials'")
   })
 
   it('keeps mobile tab labels on one line without changing desktop tab sizing', () => {
@@ -263,18 +267,26 @@ describe('UsagePage toolbar styles', () => {
     expect(costTrendChartSource).not.toContain('className={styles.periodButtons}')
   })
 
-  it('places Chart Line Selection and trend cards below Cost Trend on Overview', () => {
+  it('renders each Task 5 tab with the intended Sub2API panel and keeps health in Settings', () => {
+    const overviewPanelIndex = usagePageSource.indexOf("{activeTab === 'overview' && <Sub2ApiOverviewPanel")
+    const analysisPanelIndex = usagePageSource.indexOf("{activeTab === 'analysis' && <Sub2ApiOverviewPanel")
+    const eventsPanelIndex = usagePageSource.indexOf("{activeTab === 'events' && <RequestEventsPanel")
+    const rankingCardIndex = usagePageSource.indexOf("{activeTab === 'ranking' && <TokenRankingCard")
+    const quotasCardIndex = usagePageSource.indexOf("{activeTab === 'quotas' && <AccountQuotasCard")
+    const settingsIndex = usagePageSource.indexOf("{activeTab === 'settings' && (")
+    const apiKeySettingsIndex = usagePageSource.indexOf('<ApiKeySettingsCard')
+    const priceSettingsIndex = usagePageSource.indexOf('<PriceSettingsCard')
     const serviceHealthIndex = usagePageSource.indexOf('<ServiceHealthCard')
-    const tokenBreakdownIndex = usagePageSource.indexOf('<TokenBreakdownChart')
-    const costTrendIndex = usagePageSource.indexOf('<CostTrendChart')
-    const chartLineSelectorIndex = usagePageSource.indexOf('<ChartLineSelector')
-    const chartsGridIndex = usagePageSource.indexOf('<div className={styles.chartsGrid}>')
 
-    expect(serviceHealthIndex).toBeGreaterThan(-1)
-    expect(tokenBreakdownIndex).toBeGreaterThan(serviceHealthIndex)
-    expect(costTrendIndex).toBeGreaterThan(tokenBreakdownIndex)
-    expect(chartLineSelectorIndex).toBeGreaterThan(costTrendIndex)
-    expect(chartsGridIndex).toBeGreaterThan(chartLineSelectorIndex)
+    expect(overviewPanelIndex).toBeGreaterThan(-1)
+    expect(analysisPanelIndex).toBeGreaterThan(overviewPanelIndex)
+    expect(eventsPanelIndex).toBeGreaterThan(analysisPanelIndex)
+    expect(rankingCardIndex).toBeGreaterThan(eventsPanelIndex)
+    expect(quotasCardIndex).toBeGreaterThan(rankingCardIndex)
+    expect(settingsIndex).toBeGreaterThan(quotasCardIndex)
+    expect(apiKeySettingsIndex).toBeGreaterThan(settingsIndex)
+    expect(priceSettingsIndex).toBeGreaterThan(apiKeySettingsIndex)
+    expect(serviceHealthIndex).toBeGreaterThan(priceSettingsIndex)
   })
 
   it('keeps chart line controls aligned with reusable pill controls', () => {
