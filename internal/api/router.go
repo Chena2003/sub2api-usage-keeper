@@ -79,9 +79,7 @@ func NewRouter(
 	}
 
 	dashboardRoutes := apiV1.Group("")
-	if authConfig.Enabled {
-		dashboardRoutes.Use(authHandler.middleware())
-	}
+	dashboardRoutes.Use(authHandler.middleware())
 	registerStatusRoutes(dashboardRoutes, statusProvider)
 	registerUpdateRoutes(dashboardRoutes, nil)
 	registerUsageOverviewRoute(dashboardRoutes, usageProvider)

@@ -129,7 +129,7 @@ func TestStatusReturnsEmptyStateWithoutProvider(t *testing.T) {
 }
 
 func TestNewRouterExposesSub2APIDashboardWhenAuthDisabled(t *testing.T) {
-	router := NewRouter(nil, nil, nil, nil, AuthConfig{Enabled: false}, NewAuthHandler(AuthConfig{Enabled: true}, nil), "", OptionalProviders{
+	router := NewRouter(nil, nil, nil, nil, AuthConfig{Enabled: false}, nil, "", OptionalProviders{
 		Sub2APIDashboard: &fakeSub2APIDashboardProvider{},
 	})
 	req := httptest.NewRequest(http.MethodGet, "/api/v1/sub2api/overview", nil)
