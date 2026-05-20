@@ -20,7 +20,6 @@ import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { LanguageSwitcher } from '@/components/ui/LanguageSwitcher';
 import { Select } from '@/components/ui/Select';
 import { IconRefreshCw } from '@/components/ui/icons';
-import { useMediaQuery } from '@/hooks/useMediaQuery';
 import { useHeaderRefresh } from '@/hooks/useHeaderRefresh';
 import { useThemeStore } from '@/stores';
 import {
@@ -28,16 +27,13 @@ import {
   PriceSettingsCard,
   ServiceHealthCard,
   useUsageData,
-  usePricingData,
-  useSparklines,
-  useChartData
+  usePricingData
 } from '@/components/usage';
 import { AccountQuotasCard, RequestEventsPanel, Sub2ApiOverviewPanel, TokenRankingCard } from '@/components/sub2api';
 import { useSub2ApiDashboardStore } from '@/stores/useSub2ApiDashboardStore';
 import { buildUsageRangeQuery } from '@/utils/usage/rangeQuery';
 import {
   getModelNamesFromUsage,
-  resolveUsageFilterWindow,
   sanitizeChartLines,
   type UsageFilterWindow,
   type UsageTimeRange
@@ -394,12 +390,6 @@ export const getPreferredOverviewChartPeriod = ({ windowMinutes }: { windowMinut
   windowMinutes !== undefined && windowMinutes > 24 * 60 ? 'day' : 'hour'
 );
 
-const toTimestampMs = (value: string | undefined): number | undefined => {
-  if (!value) return undefined;
-  const timestamp = Date.parse(value);
-  return Number.isFinite(timestamp) ? timestamp : undefined;
-};
-
 export const getOverviewChartEndMs = ({ timeRange, filterWindow, fallbackEndMs, resolvedRangeEndMs }: { timeRange: UsageTimeRange; filterWindow: UsageFilterWindow; fallbackEndMs: number; resolvedRangeEndMs?: number }) => {
   if (isTodayTimeRange(timeRange) && filterWindow.startMs !== undefined) {
     return filterWindow.startMs + 24 * 60 * 60 * 1000;
@@ -425,11 +415,8 @@ const loadUsageTab = (): UsageTab => {
 
 export function UsagePage({ onAuthRequired }: { onAuthRequired?: () => void }) {
   const { t } = useTranslation();
-  const isMobile = useMediaQuery('(max-width: 768px)');
   const theme = useThemeStore((state) => state.theme);
-  const resolvedTheme = useThemeStore((state) => state.resolvedTheme);
   const setTheme = useThemeStore((state) => state.setTheme);
-  const isDark = resolvedTheme === 'dark';
   const [activeTab, setActiveTab] = useState<UsageTab>(loadUsageTab);
   const [chartLines, setChartLines] = useState<string[]>(loadChartLines);
   const [timeRange, setTimeRange] = useState<UsageTimeRange>(loadTimeRange);
@@ -509,19 +496,6 @@ export function UsagePage({ onAuthRequired }: { onAuthRequired?: () => void }) {
     if (updateCheckNotice.kind === 'success') return styles.updateCheckToastSuccess;
     return styles.updateCheckToastInfo;
   })() : '';
-
-  const resolvedRangeStartMs = toTimestampMs(usage?.range_start);
-  const resolvedRangeEndMs = toTimestampMs(usage?.range_end);
-  const filterWindow = useMemo<UsageFilterWindow>(() => {
-    if (!usage) return {};
-    return resolveUsageFilterWindow(usage.usage, timeRange, {
-      nowMs: resolvedRangeEndMs ?? lastRefreshedAt?.getTime() ?? Date.now(),
-      customStart:
-        timeRange === 'custom' ? (resolvedRangeStartMs ?? parseCustomDateStart(customTimeRange.start)) : customTimeRange.start,
-      customEnd:
-        timeRange === 'custom' ? (resolvedRangeEndMs ?? parseCustomDateEnd(customTimeRange.end)) : customTimeRange.end
-    });
-  }, [customTimeRange.end, customTimeRange.start, lastRefreshedAt, resolvedRangeEndMs, resolvedRangeStartMs, timeRange, usage]);
 
   useEffect(() => {
     if (timeRange !== 'custom') {
@@ -623,20 +597,6 @@ export function UsagePage({ onAuthRequired }: { onAuthRequired?: () => void }) {
     }
   }, [onAuthRequired]);
 
-  const hourWindowHours = useMemo(
-    () => getOverviewHourWindowHours({ timeRange, filterWindow }),
-    [filterWindow, timeRange]
-  );
-  const filterWindowEndMs = getOverviewChartEndMs({
-    timeRange,
-    filterWindow,
-    fallbackEndMs: lastRefreshedAt?.getTime() ?? Date.now(),
-    resolvedRangeEndMs,
-  });
-  const includeFinalHourBucket = isTodayTimeRange(timeRange) || isYesterdayTimeRange(timeRange);
-  const preferredOverviewChartPeriod = getPreferredOverviewChartPeriod({
-    windowMinutes: filterWindow.windowMinutes,
-  });
   const isCustomRange = timeRange === 'custom';
   const customDateRangeBounds = useMemo(() => getCustomDateRangeBounds(Date.now(), status?.timezone), [status?.timezone]);
   const handleCustomDateInputKeyDown = useCallback((event: KeyboardEvent<HTMLInputElement>) => {
@@ -646,10 +606,6 @@ export function UsagePage({ onAuthRequired }: { onAuthRequired?: () => void }) {
   }, []);
   const handleCustomDateInputActivate = useCallback((event: SyntheticEvent<HTMLInputElement>) => {
     openDateInputPicker(event.currentTarget);
-  }, []);
-
-  const handleChartLinesChange = useCallback((lines: string[]) => {
-    setChartLines(normalizeChartLines(lines));
   }, []);
 
   useEffect(() => {
@@ -876,32 +832,6 @@ export function UsagePage({ onAuthRequired }: { onAuthRequired?: () => void }) {
   }, [status?.last_run_at]);
   // 只有需要时间范围的 tab 才渲染 Range 控件，避免 Credentials/Pricing 产生空白占位。
   const showRangeControls = shouldShowRangeControls(activeTab);
-  const {
-    requestsSparkline,
-    tokensSparkline,
-    rpmSparkline,
-    tpmSparkline,
-    costSparkline
-  } = useSparklines({ usage, loading });
-
-  const {
-    requestsPeriod,
-    tokensPeriod,
-    requestsChartData,
-    tokensChartData,
-    requestsChartOptions,
-    tokensChartOptions
-  } = useChartData({
-    usage,
-    chartLines,
-    isDark,
-    isMobile,
-    hourWindowHours,
-    endMs: filterWindowEndMs,
-    includeFinalHourBucket,
-    preferredPeriod: preferredOverviewChartPeriod,
-  });
-
   const overviewModelNames = useMemo(
     () => getModelNamesFromUsage(usage?.usage ?? null),
     [usage]

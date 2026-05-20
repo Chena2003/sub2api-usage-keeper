@@ -450,7 +450,7 @@ describe('UsagePage refresh action', () => {
   });
 
   it('routes Overview manual and header refresh through Sub2API refresh instead of legacy usage loading', () => {
-    const refreshActiveTabSource = usagePageSource.match(/const refreshActiveTab = useCallback\(async \(\) => \{[\s\S]*?\n  \}, \[activeTab/)?.[0] ?? '';
+    const refreshActiveTabSource = usagePageSource.match(/const refreshActiveTab = useCallback\(async \(\) => \{[\s\S]*?\n {2}\}, \[activeTab/)?.[0] ?? '';
     const overviewRefreshIndex = refreshActiveTabSource.indexOf("activeTab === 'overview'");
     const refreshSub2APIIndex = refreshActiveTabSource.indexOf('await refreshSub2API()', overviewRefreshIndex);
     const loadUsageFallbackIndex = refreshActiveTabSource.indexOf('await loadUsage()');
@@ -468,7 +468,7 @@ describe('UsagePage settings tab content', () => {
   });
 
   it('enables legacy usage data only while Settings renders the health card', () => {
-    const usageDataOptionsSource = usagePageSource.match(/useUsageData\(\{[\s\S]*?\n  \}\);/)?.[0] ?? '';
+    const usageDataOptionsSource = usagePageSource.match(/useUsageData\(\{[\s\S]*?\n {2}\}\);/)?.[0] ?? '';
 
     expect(usageDataOptionsSource).toContain("enabled: activeTab === 'settings'");
     expect(usageDataOptionsSource).not.toContain("enabled: activeTab === 'overview'");
