@@ -854,7 +854,7 @@ export function UsagePage({ onAuthRequired }: { onAuthRequired?: () => void }) {
       <div className={styles.pageFrame}>
         <header className={styles.topBar}>
           <div className={styles.brandBlock}>
-            <span className={styles.eyebrow}>CPA Usage Keeper</span>
+            <span className={styles.eyebrow}>Sub2API Usage Keeper</span>
           </div>
           <div className={styles.topBarActions}>
             <LanguageSwitcher />

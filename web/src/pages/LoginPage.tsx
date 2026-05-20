@@ -28,7 +28,7 @@ export function LoginPage({ loading = false, error = '', onSubmit }: LoginPagePr
           <LanguageSwitcher />
         </div>
         <div className={styles.brandBlock}>
-          <span className={styles.eyebrow}>CPA Usage Keeper</span>
+          <span className={styles.eyebrow}>Sub2API Usage Keeper</span>
           <h1 className={styles.title}>{t('auth.login_title')}</h1>
           <p className={styles.subtitle}>{t('auth.login_subtitle')}</p>
         </div>

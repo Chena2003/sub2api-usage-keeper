@@ -3,6 +3,8 @@ import { describe, expect, it } from 'vitest'
 
 const usagePageStyles = readFileSync(new URL('./UsagePage.module.scss', import.meta.url), 'utf8')
 const usagePageSource = readFileSync(new URL('./UsagePage.tsx', import.meta.url), 'utf8')
+const loginPageSource = readFileSync(new URL('./LoginPage.tsx', import.meta.url), 'utf8')
+const indexHtmlSource = readFileSync(new URL('../../index.html', import.meta.url), 'utf8')
 const requestEventsSource = readFileSync(new URL('../components/usage/RequestEventsDetailsCard.tsx', import.meta.url), 'utf8')
 const priceSettingsSource = readFileSync(new URL('../components/usage/PriceSettingsCard.tsx', import.meta.url), 'utf8')
 const chartLineSelectorSource = readFileSync(new URL('../components/usage/ChartLineSelector.tsx', import.meta.url), 'utf8')
@@ -17,6 +19,15 @@ const tokenBreakdownChartSource = readFileSync(new URL('../components/usage/Toke
 const costTrendChartSource = readFileSync(new URL('../components/usage/CostTrendChart.tsx', import.meta.url), 'utf8')
 
 describe('UsagePage toolbar styles', () => {
+  it('uses Sub2API Usage Keeper branding in the browser title and visible shell labels', () => {
+    expect(indexHtmlSource).toContain('<title>Sub2API Usage Keeper</title>')
+    expect(indexHtmlSource).not.toContain('CPA USAGE KEEPER')
+    expect(usagePageSource).toContain('Sub2API Usage Keeper')
+    expect(loginPageSource).toContain('Sub2API Usage Keeper')
+    expect(usagePageSource).not.toContain('CPA Usage Keeper')
+    expect(loginPageSource).not.toContain('CPA Usage Keeper')
+  })
+
   it('keeps visible range controls content-sized in narrow layouts', () => {
     expect(usagePageStyles).toMatch(/\.timeRangeGroup\s*\{[\s\S]*?width:\s*fit-content;/)
     expect(usagePageStyles).toMatch(/\.timeRangeSelectControl\s*\{[\s\S]*?flex:\s*0 0 164px;/)
