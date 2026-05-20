@@ -56,7 +56,9 @@ The browser API never returns Sub2API account credentials. Account emails, acces
 Production recommendations:
 
 - Use a read-only PostgreSQL user for the Sub2API database connection.
-- Enable `AUTH_ENABLED=true`.
+
+The default deployment is a no-password public dashboard (`AUTH_ENABLED=false`). Browser APIs expose statistics, account status, and rankings, but never return raw tokens, passwords, email addresses, or credential secret fields. If access control is required, put it at Cloudflare Access, Nginx Basic Auth, or another reverse-proxy layer.
+
 - Terminate HTTPS at your reverse proxy.
 - Bind the container port to `127.0.0.1` instead of exposing it directly to the internet.
 

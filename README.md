@@ -56,7 +56,9 @@ docker compose -f docker-compose.example.yml up -d
 生产部署建议：
 
 - 使用只读 PostgreSQL 用户连接 Sub2API 数据库。
-- 开启 `AUTH_ENABLED=true`。
+
+默认部署为无密码公开仪表盘（`AUTH_ENABLED=false`）。浏览器 API 会展示统计、账号状态和排行榜，但不会返回原始 token、密码、邮箱或 credential secret 字段。如果需要访问控制，建议在 Cloudflare Access、Nginx Basic Auth 或其他反代层实现。
+
 - 在反向代理层配置 HTTPS。
 - 仅将容器端口绑定到 `127.0.0.1`，不要直接公开到公网。
 
