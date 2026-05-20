@@ -466,6 +466,13 @@ describe('UsagePage settings tab content', () => {
     expect(usagePageSource).toContain('ServiceHealthCard');
     expect(usagePageSource).toContain('<ServiceHealthCard\n                  usage={usage}\n                  loading={overviewDisplayLoading}\n                />');
   });
+
+  it('enables legacy usage data only while Settings renders the health card', () => {
+    const usageDataOptionsSource = usagePageSource.match(/useUsageData\(\{[\s\S]*?\n  \}\);/)?.[0] ?? '';
+
+    expect(usageDataOptionsSource).toContain("enabled: activeTab === 'settings'");
+    expect(usageDataOptionsSource).not.toContain("enabled: activeTab === 'overview'");
+  });
 });
 
 describe('UsagePage Analysis tab content', () => {

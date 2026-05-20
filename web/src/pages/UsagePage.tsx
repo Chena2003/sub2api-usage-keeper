@@ -450,7 +450,7 @@ export function UsagePage({ onAuthRequired }: { onAuthRequired?: () => void }) {
     range: timeRange,
     customStart: customTimeRange.start,
     customEnd: customTimeRange.end,
-    enabled: activeTab === 'overview',
+    enabled: activeTab === 'settings',
     apiKeyId: selectedApiKeyId,
   });
   const {
