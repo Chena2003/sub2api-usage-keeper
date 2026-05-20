@@ -29,7 +29,7 @@ func registerSub2APIDashboardRoutes(router gin.IRoutes, provider Sub2APIDashboar
 			return
 		}
 
-		accounts, err := provider.Accounts(c.Request.Context(), sub2APIQueryInt(c, "days", 7))
+		accounts, err := provider.Accounts(c.Request.Context(), sub2APIDaysQuery(c))
 		if err != nil {
 			writeInternalError(c, "list sub2api accounts failed", err)
 			return
@@ -44,7 +44,7 @@ func registerSub2APIDashboardRoutes(router gin.IRoutes, provider Sub2APIDashboar
 			return
 		}
 
-		accounts, err := provider.AccountQuotas(c.Request.Context(), sub2APIQueryInt(c, "days", 7))
+		accounts, err := provider.AccountQuotas(c.Request.Context(), sub2APIDaysQuery(c))
 		if err != nil {
 			writeInternalError(c, "list sub2api account quotas failed", err)
 			return
@@ -59,7 +59,7 @@ func registerSub2APIDashboardRoutes(router gin.IRoutes, provider Sub2APIDashboar
 			return
 		}
 
-		overview, err := provider.Overview(c.Request.Context(), sub2APIQueryInt(c, "days", 7))
+		overview, err := provider.Overview(c.Request.Context(), sub2APIDaysQuery(c))
 		if err != nil {
 			writeInternalError(c, "get sub2api overview failed", err)
 			return
@@ -74,7 +74,7 @@ func registerSub2APIDashboardRoutes(router gin.IRoutes, provider Sub2APIDashboar
 			return
 		}
 
-		points, err := provider.Hourly(c.Request.Context(), sub2APIQueryInt(c, "hours", 24))
+		points, err := provider.Hourly(c.Request.Context(), sub2APIHoursQuery(c))
 		if err != nil {
 			writeInternalError(c, "get sub2api timeseries failed", err)
 			return
@@ -89,7 +89,7 @@ func registerSub2APIDashboardRoutes(router gin.IRoutes, provider Sub2APIDashboar
 			return
 		}
 
-		models, err := provider.Models(c.Request.Context(), sub2APIQueryInt(c, "days", 7), sub2APIQueryInt(c, "limit", 20))
+		models, err := provider.Models(c.Request.Context(), sub2APIDaysQuery(c), sub2APILimitQuery(c, 20))
 		if err != nil {
 			writeInternalError(c, "list sub2api models failed", err)
 			return
@@ -104,7 +104,7 @@ func registerSub2APIDashboardRoutes(router gin.IRoutes, provider Sub2APIDashboar
 			return
 		}
 
-		events, err := provider.Events(c.Request.Context(), sub2APIQueryInt(c, "page", 1), sub2APIQueryInt(c, "limit", 100))
+		events, err := provider.Events(c.Request.Context(), sub2APIPageQuery(c), sub2APILimitQuery(c, 100))
 		if err != nil {
 			writeInternalError(c, "list sub2api events failed", err)
 			return
@@ -119,7 +119,7 @@ func registerSub2APIDashboardRoutes(router gin.IRoutes, provider Sub2APIDashboar
 			return
 		}
 
-		rankings, err := provider.Rankings(c.Request.Context(), normalizeRankingDimension(c.Query("dimension")), sub2APIQueryInt(c, "days", 7), sub2APIQueryInt(c, "limit", 20))
+		rankings, err := provider.Rankings(c.Request.Context(), normalizeRankingDimension(c.Query("dimension")), sub2APIDaysQuery(c), sub2APILimitQuery(c, 20))
 		if err != nil {
 			writeInternalError(c, "list sub2api rankings failed", err)
 			return
@@ -127,6 +127,22 @@ func registerSub2APIDashboardRoutes(router gin.IRoutes, provider Sub2APIDashboar
 
 		c.JSON(http.StatusOK, gin.H{"rankings": rankings})
 	})
+}
+
+func sub2APIDaysQuery(c *gin.Context) int {
+	return sub2api.ClampDashboardDays(sub2APIQueryInt(c, "days", 7))
+}
+
+func sub2APIHoursQuery(c *gin.Context) int {
+	return sub2api.ClampDashboardHours(sub2APIQueryInt(c, "hours", 24))
+}
+
+func sub2APILimitQuery(c *gin.Context, defaultValue int) int {
+	return sub2api.ClampDashboardLimit(sub2APIQueryInt(c, "limit", defaultValue), defaultValue)
+}
+
+func sub2APIPageQuery(c *gin.Context) int {
+	return sub2api.ClampDashboardPage(sub2APIQueryInt(c, "page", 1))
 }
 
 func sub2APIQueryInt(c *gin.Context, name string, defaultValue int) int {

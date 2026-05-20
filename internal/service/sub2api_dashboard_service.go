@@ -112,7 +112,7 @@ func (s *Sub2APIDashboardService) Models(ctx context.Context, days int, limit in
 	if err := s.validate(); err != nil {
 		return nil, err
 	}
-	return s.reader.GetModelUsage(ctx, sinceDays(s.currentTime(), days), limit)
+	return s.reader.GetModelUsage(ctx, sinceDays(s.currentTime(), days), normalizeLimit(limit, 20))
 }
 
 func (s *Sub2APIDashboardService) Rankings(ctx context.Context, dimension string, days int, limit int) ([]quota.Sub2APIRankingRow, error) {
@@ -168,31 +168,19 @@ func sinceDays(now time.Time, days int) time.Time {
 }
 
 func normalizeDays(days int) int {
-	if days <= 0 {
-		return 7
-	}
-	return days
+	return sub2api.ClampDashboardDays(days)
 }
 
 func normalizeHours(hours int) int {
-	if hours <= 0 {
-		return 24
-	}
-	return hours
+	return sub2api.ClampDashboardHours(hours)
 }
 
 func normalizePage(page int) int {
-	if page <= 0 {
-		return 1
-	}
-	return page
+	return sub2api.ClampDashboardPage(page)
 }
 
 func normalizeLimit(limit int, defaultValue int) int {
-	if limit <= 0 {
-		return defaultValue
-	}
-	return limit
+	return sub2api.ClampDashboardLimit(limit, defaultValue)
 }
 
 func normalizeSub2APIRankingDimension(dimension string) string {

@@ -71,6 +71,42 @@ func TestAccountRowCredentialsNotSerialized(t *testing.T) {
 	}
 }
 
+func TestClampDashboardDays(t *testing.T) {
+	if got := ClampDashboardDays(9999); got != 90 {
+		t.Fatalf("ClampDashboardDays() = %d, want 90", got)
+	}
+	if got := ClampDashboardDays(0); got != 7 {
+		t.Fatalf("ClampDashboardDays() = %d, want 7", got)
+	}
+}
+
+func TestClampDashboardHours(t *testing.T) {
+	if got := ClampDashboardHours(9999); got != 168 {
+		t.Fatalf("ClampDashboardHours() = %d, want 168", got)
+	}
+	if got := ClampDashboardHours(0); got != 24 {
+		t.Fatalf("ClampDashboardHours() = %d, want 24", got)
+	}
+}
+
+func TestClampDashboardLimit(t *testing.T) {
+	if got := ClampDashboardLimit(9999, 20); got != 100 {
+		t.Fatalf("ClampDashboardLimit() = %d, want 100", got)
+	}
+	if got := ClampDashboardLimit(0, 20); got != 20 {
+		t.Fatalf("ClampDashboardLimit() = %d, want 20", got)
+	}
+}
+
+func TestClampDashboardPage(t *testing.T) {
+	if got := ClampDashboardPage(9999); got != 1000 {
+		t.Fatalf("ClampDashboardPage() = %d, want 1000", got)
+	}
+	if got := ClampDashboardPage(0); got != 1 {
+		t.Fatalf("ClampDashboardPage() = %d, want 1", got)
+	}
+}
+
 func TestRepositoryNilDatabaseReturnsError(t *testing.T) {
 	_, err := NewRepository(nil).ListAccounts(context.Background())
 	if err == nil {

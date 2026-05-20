@@ -9,6 +9,13 @@ import (
 	"gorm.io/gorm"
 )
 
+const (
+	MaxDashboardDays  = 90
+	MaxDashboardHours = 168
+	MaxDashboardLimit = 100
+	MaxDashboardPage  = 1000
+)
+
 type Repository struct {
 	db *gorm.DB
 }
@@ -43,6 +50,32 @@ func (r *Repository) database() (*gorm.DB, error) {
 		return nil, fmt.Errorf("sub2api repository database is nil")
 	}
 	return r.db, nil
+}
+
+func ClampDashboardDays(days int) int {
+	return clampPositive(days, 7, MaxDashboardDays)
+}
+
+func ClampDashboardHours(hours int) int {
+	return clampPositive(hours, 24, MaxDashboardHours)
+}
+
+func ClampDashboardLimit(limit int, defaultValue int) int {
+	return clampPositive(limit, defaultValue, MaxDashboardLimit)
+}
+
+func ClampDashboardPage(page int) int {
+	return clampPositive(page, 1, MaxDashboardPage)
+}
+
+func clampPositive(value int, defaultValue int, maximum int) int {
+	if value <= 0 {
+		return defaultValue
+	}
+	if value > maximum {
+		return maximum
+	}
+	return value
 }
 
 func (r *Repository) Close() error {
@@ -97,9 +130,7 @@ func (r *Repository) ListAccounts(ctx context.Context) ([]AccountRow, error) {
 }
 
 func (r *Repository) GetDailyOverview(ctx context.Context, days int) ([]UsageOverviewRow, error) {
-	if days <= 0 {
-		days = 7
-	}
+	days = ClampDashboardDays(days)
 
 	db, err := r.database()
 	if err != nil {
@@ -131,9 +162,7 @@ func (r *Repository) GetDailyOverview(ctx context.Context, days int) ([]UsageOve
 }
 
 func (r *Repository) GetHourlyOverview(ctx context.Context, hours int) ([]UsageOverviewRow, error) {
-	if hours <= 0 {
-		hours = 24
-	}
+	hours = ClampDashboardHours(hours)
 
 	db, err := r.database()
 	if err != nil {
@@ -165,9 +194,7 @@ func (r *Repository) GetHourlyOverview(ctx context.Context, hours int) ([]UsageO
 }
 
 func (r *Repository) GetModelUsage(ctx context.Context, since time.Time, limit int) ([]ModelUsageRow, error) {
-	if limit <= 0 || limit > 50 {
-		limit = 20
-	}
+	limit = ClampDashboardLimit(limit, 20)
 
 	db, err := r.database()
 	if err != nil {
@@ -232,9 +259,7 @@ func (r *Repository) GetAccountUsage(ctx context.Context, since time.Time) ([]Ac
 }
 
 func (r *Repository) GetRankings(ctx context.Context, dimension string, since time.Time, limit int) ([]RankingRow, error) {
-	if limit <= 0 {
-		limit = 20
-	}
+	limit = ClampDashboardLimit(limit, 20)
 
 	column := rankingColumn(dimension)
 	db, err := r.database()
@@ -266,12 +291,8 @@ func (r *Repository) GetRankings(ctx context.Context, dimension string, since ti
 }
 
 func (r *Repository) GetEvents(ctx context.Context, page int, limit int) ([]UsageEventRow, int64, error) {
-	if page <= 0 {
-		page = 1
-	}
-	if limit <= 0 {
-		limit = 100
-	}
+	page = ClampDashboardPage(page)
+	limit = ClampDashboardLimit(limit, 100)
 
 	db, err := r.database()
 	if err != nil {

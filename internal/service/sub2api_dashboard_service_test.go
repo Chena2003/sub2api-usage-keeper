@@ -274,6 +274,64 @@ func TestSub2APIDashboardEventsNormalizesDefaults(t *testing.T) {
 	}
 }
 
+func TestSub2APIDashboardClampsMaximums(t *testing.T) {
+	reader := &fakeSub2APIReader{}
+	fixedNow := time.Date(2026, time.May, 17, 12, 30, 0, 0, time.UTC)
+	service := NewSub2APIDashboardService(reader)
+	service.now = func() time.Time { return fixedNow }
+
+	if _, err := service.AccountQuotas(context.Background(), 9999); err != nil {
+		t.Fatalf("AccountQuotas returned error: %v", err)
+	}
+	if !reader.lastAccountSince.Equal(fixedNow.AddDate(0, 0, -90)) {
+		t.Fatalf("expected account usage since %v, got %v", fixedNow.AddDate(0, 0, -90), reader.lastAccountSince)
+	}
+
+	if _, err := service.Overview(context.Background(), 9999); err != nil {
+		t.Fatalf("Overview returned error: %v", err)
+	}
+	if reader.lastDailyDays != 90 {
+		t.Fatalf("expected daily overview days 90, got %d", reader.lastDailyDays)
+	}
+
+	if _, err := service.Hourly(context.Background(), 9999); err != nil {
+		t.Fatalf("Hourly returned error: %v", err)
+	}
+	if reader.lastHourlyHours != 168 {
+		t.Fatalf("expected hourly overview hours 168, got %d", reader.lastHourlyHours)
+	}
+
+	if _, err := service.Models(context.Background(), 9999, 9999); err != nil {
+		t.Fatalf("Models returned error: %v", err)
+	}
+	if !reader.lastModelSince.Equal(fixedNow.AddDate(0, 0, -90)) {
+		t.Fatalf("expected model usage since %v, got %v", fixedNow.AddDate(0, 0, -90), reader.lastModelSince)
+	}
+	if reader.lastModelLimit != 100 {
+		t.Fatalf("expected model limit 100, got %d", reader.lastModelLimit)
+	}
+
+	if _, err := service.Rankings(context.Background(), "user", 9999, 9999); err != nil {
+		t.Fatalf("Rankings returned error: %v", err)
+	}
+	if !reader.lastRankingSince.Equal(fixedNow.AddDate(0, 0, -90)) {
+		t.Fatalf("expected ranking since %v, got %v", fixedNow.AddDate(0, 0, -90), reader.lastRankingSince)
+	}
+	if reader.lastRankingLimit != 100 {
+		t.Fatalf("expected ranking limit 100, got %d", reader.lastRankingLimit)
+	}
+
+	if _, err := service.Events(context.Background(), 9999, 9999); err != nil {
+		t.Fatalf("Events returned error: %v", err)
+	}
+	if reader.lastEventsPage != 1000 {
+		t.Fatalf("expected events page 1000, got %d", reader.lastEventsPage)
+	}
+	if reader.lastEventsLimit != 100 {
+		t.Fatalf("expected events limit 100, got %d", reader.lastEventsLimit)
+	}
+}
+
 func TestSub2APIDashboardValidateDoesNotSetDefaultNow(t *testing.T) {
 	service := &Sub2APIDashboardService{reader: &fakeSub2APIReader{}}
 

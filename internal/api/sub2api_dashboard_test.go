@@ -266,6 +266,78 @@ func TestSub2APIAccountQuotasRoute(t *testing.T) {
 	}
 }
 
+func TestSub2APIQueryClampsMaximums(t *testing.T) {
+	tests := []struct {
+		name       string
+		path       string
+		assertions func(*testing.T, *fakeSub2APIDashboardProvider)
+	}{
+		{
+			name: "accounts days clamps to ninety",
+			path: "/api/v1/sub2api/accounts?days=9999",
+			assertions: func(t *testing.T, provider *fakeSub2APIDashboardProvider) {
+				t.Helper()
+				if provider.accountsDays != 90 {
+					t.Fatalf("expected days 90, got %d", provider.accountsDays)
+				}
+			},
+		},
+		{
+			name: "timeseries hours clamps to one week",
+			path: "/api/v1/sub2api/timeseries?hours=9999",
+			assertions: func(t *testing.T, provider *fakeSub2APIDashboardProvider) {
+				t.Helper()
+				if provider.hourlyHours != 168 {
+					t.Fatalf("expected hours 168, got %d", provider.hourlyHours)
+				}
+			},
+		},
+		{
+			name: "models days and limit clamp",
+			path: "/api/v1/sub2api/models?days=9999&limit=9999",
+			assertions: func(t *testing.T, provider *fakeSub2APIDashboardProvider) {
+				t.Helper()
+				if provider.modelsDays != 90 {
+					t.Fatalf("expected days 90, got %d", provider.modelsDays)
+				}
+				if provider.modelsLimit != 100 {
+					t.Fatalf("expected limit 100, got %d", provider.modelsLimit)
+				}
+			},
+		},
+		{
+			name: "events page and limit clamp",
+			path: "/api/v1/sub2api/events?page=9999&limit=9999",
+			assertions: func(t *testing.T, provider *fakeSub2APIDashboardProvider) {
+				t.Helper()
+				if provider.eventsPage != 1000 {
+					t.Fatalf("expected page 1000, got %d", provider.eventsPage)
+				}
+				if provider.eventsLimit != 100 {
+					t.Fatalf("expected limit 100, got %d", provider.eventsLimit)
+				}
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			provider := &fakeSub2APIDashboardProvider{}
+			router := gin.New()
+			registerSub2APIDashboardRoutes(router.Group("/api/v1"), provider)
+
+			req := httptest.NewRequest(http.MethodGet, tt.path, nil)
+			resp := httptest.NewRecorder()
+			router.ServeHTTP(resp, req)
+
+			if resp.Code != http.StatusOK {
+				t.Fatalf("expected status 200, got %d", resp.Code)
+			}
+			tt.assertions(t, provider)
+		})
+	}
+}
+
 func TestSub2APIQueryDefaults(t *testing.T) {
 	tests := []struct {
 		name       string
