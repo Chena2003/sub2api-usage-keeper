@@ -60,6 +60,39 @@ describe('UsagePage toolbar styles', () => {
     expect(usagePageSource).not.toContain("'credentials'")
   })
 
+  it('uses a clean light blue and white presentation for the dashboard shell and selected tabs', () => {
+    const pageShellBlock = usagePageStyles.slice(
+      usagePageStyles.indexOf('.pageShell {'),
+      usagePageStyles.indexOf('.pageFrame')
+    )
+    const topBarBlock = usagePageStyles.slice(
+      usagePageStyles.indexOf('.topBar {'),
+      usagePageStyles.indexOf('.brandBlock')
+    )
+    const statCardBlock = usagePageStyles.slice(
+      usagePageStyles.indexOf('.statCard {'),
+      usagePageStyles.indexOf('.statCard:nth-child')
+    )
+    const healthCardBlock = usagePageStyles.slice(
+      usagePageStyles.indexOf('.healthCard {'),
+      usagePageStyles.indexOf('.healthHeader')
+    )
+    const activeTabBlock = usagePageStyles.slice(
+      usagePageStyles.indexOf('.tabPillActive {'),
+      usagePageStyles.indexOf('.toolbarActionsRight')
+    )
+
+    expect(pageShellBlock).toContain('background: linear-gradient(180deg, #eff6ff 0%, #f8fafc 36%, #ffffff 100%);')
+    expect(pageShellBlock).toContain('color: #0f172a;')
+    for (const block of [topBarBlock, statCardBlock, healthCardBlock]) {
+      expect(block).toContain('background: rgba(255, 255, 255, 0.88);')
+      expect(block).toContain('border: 1px solid #dbeafe;')
+      expect(block).toContain('box-shadow: 0 18px 45px rgba(37, 99, 235, 0.08);')
+    }
+    expect(activeTabBlock).toContain('background: #2563eb;')
+    expect(activeTabBlock).toContain('color: #ffffff;')
+  })
+
   it('keeps mobile tab labels on one line without changing desktop tab sizing', () => {
     const desktopTabPillBlock = usagePageStyles.slice(
       usagePageStyles.indexOf('.tabPill {'),

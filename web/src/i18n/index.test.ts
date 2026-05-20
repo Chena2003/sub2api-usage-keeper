@@ -17,4 +17,37 @@ describe('i18n resources', () => {
       expect(flattenKeys(i18n.getResourceBundle(language, 'translation')).sort()).toEqual(englishKeys);
     }
   });
+
+  it('defines Sub2API redesign keys in every language', async () => {
+    const keys = [
+      'usage_stats.tab_ranking',
+      'usage_stats.tab_quotas',
+      'usage_stats.active_users',
+      'usage_stats.quota_risk_summary',
+      'usage_stats.quota_risk_count',
+      'usage_stats.ranking_dimension',
+      'usage_stats.ranking_user',
+      'usage_stats.ranking_api_key',
+      'usage_stats.ranking_model',
+      'usage_stats.ranking_account',
+      'usage_stats.ranking_name',
+      'usage_stats.ranking_share',
+      'usage_stats.account',
+      'usage_stats.status',
+      'usage_stats.five_hour_window',
+      'usage_stats.weekly_window',
+      'usage_stats.refresh_time',
+      'usage_stats.unknown',
+      'usage_stats.user',
+      'usage_stats.api_key',
+    ];
+
+    for (const language of SUPPORTED_LANGUAGES) {
+      await i18n.changeLanguage(language);
+
+      for (const key of keys) {
+        expect(i18n.t(key)).not.toBe(key);
+      }
+    }
+  });
 });
