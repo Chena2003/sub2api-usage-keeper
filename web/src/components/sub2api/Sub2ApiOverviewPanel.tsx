@@ -55,8 +55,7 @@ export function Sub2ApiOverviewPanel({ overview, points, models, quotaAccounts }
           <strong className={styles.statValue}>{formatNumber(overview?.activeUsers ?? 0)}</strong>
         </article>
         <article className={styles.statCard}>
-          <span className={styles.statLabel}>{t('usage_stats.sub2api_quota_risk_count')}</span>
-          <strong className={styles.statValue}>{formatNumber(quotaRiskCount)}</strong>
+          <strong className={styles.statValue}>{t('usage_stats.sub2api_quota_risk_count', { count: quotaRiskCount })}</strong>
         </article>
       </section>
 
