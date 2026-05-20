@@ -6,6 +6,10 @@ import (
 	"reflect"
 	"strings"
 	"testing"
+	"time"
+
+	"gorm.io/driver/sqlite"
+	"gorm.io/gorm"
 )
 
 func TestAccountCredentialKeys(t *testing.T) {
@@ -114,6 +118,64 @@ func TestRepositoryNilDatabaseReturnsError(t *testing.T) {
 	}
 	if !strings.Contains(err.Error(), "database is nil") {
 		t.Fatalf("ListAccounts() error = %q, want database is nil", err.Error())
+	}
+}
+
+func TestRepositoryRankingsAndEventsUseSub2APIUsageLogColumns(t *testing.T) {
+	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
+	if err != nil {
+		t.Fatalf("open sqlite database: %v", err)
+	}
+	if err := db.Exec(`
+		CREATE TABLE usage_logs (
+			id INTEGER PRIMARY KEY,
+			created_at DATETIME NOT NULL,
+			user_id INTEGER,
+			api_key_id INTEGER,
+			account_id INTEGER,
+			model TEXT,
+			requested_model TEXT,
+			upstream_model TEXT,
+			input_tokens INTEGER,
+			output_tokens INTEGER,
+			cache_creation_tokens INTEGER,
+			cache_read_tokens INTEGER,
+			actual_cost REAL,
+			duration_ms INTEGER
+		)
+	`).Error; err != nil {
+		t.Fatalf("create usage_logs table: %v", err)
+	}
+	createdAt := time.Now().Add(-time.Hour)
+	if err := db.Exec(`
+		INSERT INTO usage_logs (
+			id, created_at, user_id, api_key_id, account_id, model, requested_model,
+			upstream_model, input_tokens, output_tokens, cache_creation_tokens,
+			cache_read_tokens, actual_cost, duration_ms
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+	`, 1, createdAt, 42, 7, 3, "claude-sonnet", "sonnet", "claude-3-5-sonnet", 100, 20, 5, 10, 0.25, 1234).Error; err != nil {
+		t.Fatalf("insert usage log: %v", err)
+	}
+
+	repository := NewRepository(db)
+
+	rankings, err := repository.GetRankings(context.Background(), "user", time.Now().Add(-24*time.Hour), 5)
+	if err != nil {
+		t.Fatalf("GetRankings() error = %v", err)
+	}
+	if len(rankings) != 1 || rankings[0].Name != "42" || rankings[0].TotalRequests != 1 {
+		t.Fatalf("GetRankings() = %+v, want one user_id ranking", rankings)
+	}
+
+	events, total, err := repository.GetEvents(context.Background(), 1, 5)
+	if err != nil {
+		t.Fatalf("GetEvents() error = %v", err)
+	}
+	if total != 1 {
+		t.Fatalf("GetEvents() total = %d, want 1", total)
+	}
+	if len(events) != 1 || events[0].User != "42" || events[0].APIKey != "7" || events[0].AccountName != "3" {
+		t.Fatalf("GetEvents() = %+v, want derived user/api key/account labels", events)
 	}
 }
 

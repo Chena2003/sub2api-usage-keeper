@@ -309,20 +309,20 @@ func (r *Repository) GetEvents(ctx context.Context, page int, limit int) ([]Usag
 		SELECT
 			id,
 			created_at,
-			user_identifier,
-			api_key_label,
-			model,
-			requested_model,
-			upstream_model,
-			account_id,
-			account_name,
-			status,
-			input_tokens,
-			output_tokens,
-			cache_creation_tokens,
-			cache_read_tokens,
-			actual_cost,
-			duration_ms
+			COALESCE(CAST(user_id AS TEXT), '') AS user_identifier,
+			COALESCE(CAST(api_key_id AS TEXT), '') AS api_key_label,
+			COALESCE(model, '') AS model,
+			COALESCE(requested_model, '') AS requested_model,
+			COALESCE(upstream_model, '') AS upstream_model,
+			COALESCE(account_id, 0) AS account_id,
+			COALESCE(CAST(account_id AS TEXT), '') AS account_name,
+			'success' AS status,
+			COALESCE(input_tokens, 0) AS input_tokens,
+			COALESCE(output_tokens, 0) AS output_tokens,
+			COALESCE(cache_creation_tokens, 0) AS cache_creation_tokens,
+			COALESCE(cache_read_tokens, 0) AS cache_read_tokens,
+			COALESCE(actual_cost, 0) AS actual_cost,
+			COALESCE(duration_ms, 0) AS duration_ms
 		FROM usage_logs
 		ORDER BY created_at DESC
 		LIMIT ? OFFSET ?
@@ -336,12 +336,12 @@ func (r *Repository) GetEvents(ctx context.Context, page int, limit int) ([]Usag
 func rankingColumn(dimension string) string {
 	switch dimension {
 	case "api_key":
-		return "api_key_label"
+		return "CAST(api_key_id AS TEXT)"
 	case "model":
 		return "model"
 	case "account":
-		return "account_id::text"
+		return "CAST(account_id AS TEXT)"
 	default:
-		return "user_identifier"
+		return "CAST(user_id AS TEXT)"
 	}
 }
