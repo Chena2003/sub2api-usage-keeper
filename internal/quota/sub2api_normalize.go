@@ -196,6 +196,15 @@ func accountUsageTokens(usage *sub2api.AccountUsageRow) int64 {
 	return usage.TotalTokens()
 }
 
+func maskedSub2APIKey(value string) string {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return "unknown key"
+	}
+	digest := sha256.Sum256([]byte(strings.ToLower(value)))
+	return fmt.Sprintf("key-%x", digest[:4])
+}
+
 func maskedSub2APIUser(value string) string {
 	value = strings.TrimSpace(value)
 	if value == "" {
@@ -223,6 +232,9 @@ func NormalizeSub2APIRankings(dimension string, rows []sub2api.RankingRow) []Sub
 		if dimension == "user" {
 			name = maskedSub2APIUser(row.Name)
 		}
+		if dimension == "api_key" {
+			name = maskedSub2APIKey(row.Name)
+		}
 		rankings = append(rankings, Sub2APIRankingRow{
 			Dimension:     dimension,
 			Name:          name,
@@ -246,7 +258,7 @@ func NormalizeSub2APIEvents(rows []sub2api.UsageEventRow) []Sub2APIEvent {
 			ID:             row.ID,
 			CreatedAt:      row.CreatedAt,
 			User:           maskedSub2APIUser(row.User),
-			APIKey:         row.APIKey,
+			APIKey:         maskedSub2APIKey(row.APIKey),
 			Model:          row.Model,
 			RequestedModel: row.RequestedModel,
 			UpstreamModel:  row.UpstreamModel,

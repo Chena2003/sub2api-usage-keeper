@@ -13,4 +13,12 @@ export default defineConfig({
       '@': path.resolve(__dirname, 'src'),
     },
   },
+  server: {
+    proxy: {
+      '/api': {
+        target: 'https://usage.chena.info',
+        changeOrigin: true,
+      },
+    },
+  },
 })

@@ -209,6 +209,28 @@ func TestNormalizeSub2APIRankingsMasksUserIdentifiers(t *testing.T) {
 	}
 }
 
+func TestNormalizeSub2APIRankingsMasksAPIKeyIdentifiers(t *testing.T) {
+	rankings := NormalizeSub2APIRankings("api_key", []sub2api.RankingRow{{Name: "sk-live-secret", TotalRequests: 1, InputTokens: 10}})
+
+	if len(rankings) != 1 {
+		t.Fatalf("len(rankings) = %d, want 1", len(rankings))
+	}
+	if rankings[0].Name == "" {
+		t.Fatal("Name is empty, want masked display value")
+	}
+	if rankings[0].Name == "sk-live-secret" {
+		t.Fatalf("Name leaked raw API key identifier: %#v", rankings[0])
+	}
+
+	body, err := json.Marshal(rankings)
+	if err != nil {
+		t.Fatalf("marshal rankings: %v", err)
+	}
+	if strings.Contains(string(body), "sk-live-secret") {
+		t.Fatalf("serialized rankings leaked raw API key identifier: %s", body)
+	}
+}
+
 func TestNormalizeSub2APIEventsMasksUserIdentifiers(t *testing.T) {
 	events := NormalizeSub2APIEvents([]sub2api.UsageEventRow{{User: "user@example.com"}})
 
@@ -228,6 +250,28 @@ func TestNormalizeSub2APIEventsMasksUserIdentifiers(t *testing.T) {
 	}
 	if strings.Contains(string(body), "user@example.com") {
 		t.Fatalf("serialized events leaked raw user identifier: %s", body)
+	}
+}
+
+func TestNormalizeSub2APIEventsMasksAPIKeyIdentifiers(t *testing.T) {
+	events := NormalizeSub2APIEvents([]sub2api.UsageEventRow{{APIKey: "sk-live-secret"}})
+
+	if len(events) != 1 {
+		t.Fatalf("len(events) = %d, want 1", len(events))
+	}
+	if events[0].APIKey == "" {
+		t.Fatal("APIKey is empty, want masked display value")
+	}
+	if events[0].APIKey == "sk-live-secret" {
+		t.Fatalf("APIKey leaked raw identifier: %#v", events[0])
+	}
+
+	body, err := json.Marshal(events)
+	if err != nil {
+		t.Fatalf("marshal events: %v", err)
+	}
+	if strings.Contains(string(body), "sk-live-secret") {
+		t.Fatalf("serialized events leaked raw API key identifier: %s", body)
 	}
 }
 
@@ -258,7 +302,7 @@ func TestNormalizeSub2APIEventsMapsUsageEventRows(t *testing.T) {
 		t.Fatalf("len(events) = %d, want 1", len(events))
 	}
 	event := events[0]
-	if event.ID != 9 || !event.CreatedAt.Equal(createdAt) || event.User == "" || event.User == "user-a" || event.APIKey != "key-a" || event.Model != "gpt-4o" || event.RequestedModel != "gpt-4" || event.UpstreamModel != "upstream-gpt-4o" || event.AccountID != 7 || event.AccountName != "openai #7" || event.Status != "success" {
+	if event.ID != 9 || !event.CreatedAt.Equal(createdAt) || event.User == "" || event.User == "user-a" || event.APIKey == "" || event.APIKey == "key-a" || event.Model != "gpt-4o" || event.RequestedModel != "gpt-4" || event.UpstreamModel != "upstream-gpt-4o" || event.AccountID != 7 || event.AccountName != "openai #7" || event.Status != "success" {
 		t.Fatalf("event identity fields = %#v", event)
 	}
 	if event.InputTokens != 10 || event.OutputTokens != 5 || event.CacheTokens != 5 || event.TotalTokens != 20 || event.ActualCost != 0.12 || event.DurationMS != 456 {

@@ -18,9 +18,10 @@ const formatShare = (value: number) => `${(value * 100).toFixed(1)}%`
 
 export function TokenRankingCard({ rankings, dimension, onDimensionChange }: TokenRankingCardProps) {
   const { t } = useTranslation()
+  const maxTokens = Math.max(...rankings.map((ranking) => ranking.totalTokens), 1)
 
   return (
-    <section className="card">
+    <section className={styles.rankingSurface}>
       <div className={styles.sectionTitleBlock}>
         <span className={styles.sectionEyebrow}>{t('usage_stats.sub2api_ranking_eyebrow')}</span>
         <h3 className={styles.sectionTitle}>{t('usage_stats.sub2api_ranking_title')}</h3>
@@ -45,37 +46,27 @@ export function TokenRankingCard({ rankings, dimension, onDimensionChange }: Tok
       {rankings.length === 0 ? (
         <div className={styles.hint}>{t('usage_stats.sub2api_no_data')}</div>
       ) : (
-        <div className={styles.tableWrapper}>
-          <table className={styles.table}>
-            <thead>
-              <tr>
-                <th>{t('usage_stats.sub2api_rank')}</th>
-                <th>{t('usage_stats.sub2api_name')}</th>
-                <th>{t('usage_stats.sub2api_requests')}</th>
-                <th>{t('usage_stats.sub2api_input_tokens')}</th>
-                <th>{t('usage_stats.sub2api_output_tokens')}</th>
-                <th>{t('usage_stats.sub2api_cache_tokens')}</th>
-                <th>{t('usage_stats.sub2api_total_tokens')}</th>
-                <th>{t('usage_stats.sub2api_cost')}</th>
-                <th>{t('usage_stats.sub2api_share')}</th>
-              </tr>
-            </thead>
-            <tbody>
-              {rankings.map((ranking, index) => (
-                <tr key={`${ranking.dimension}-${ranking.name}-${index}`}>
-                  <td>{index + 1}</td>
-                  <td className={styles.modelCell}>{ranking.name || 'unknown'}</td>
-                  <td>{formatNumber(ranking.totalRequests)}</td>
-                  <td>{formatNumber(ranking.inputTokens)}</td>
-                  <td>{formatNumber(ranking.outputTokens)}</td>
-                  <td>{formatNumber(ranking.cacheTokens)}</td>
-                  <td>{formatNumber(ranking.totalTokens)}</td>
-                  <td>{formatCost(ranking.actualCost)}</td>
-                  <td>{formatShare(ranking.share)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+        <div className={styles.rankingList}>
+          {rankings.map((ranking, index) => (
+            <article key={`${ranking.dimension}-${ranking.name}-${index}`} className={styles.rankingItem}>
+              <div className={styles.rankingHeader}>
+                <span className={styles.rankingRank}>#{index + 1}</span>
+                <strong className={styles.rankingName}>{ranking.name || 'unknown'}</strong>
+                <span className={styles.rankingShare}>{formatShare(ranking.share)}</span>
+              </div>
+              <div className={styles.rankingMeterShell} aria-hidden="true">
+                <span className={styles.rankingMeterFill} style={{ width: `${Math.max((ranking.totalTokens / maxTokens) * 100, 3)}%` }} />
+              </div>
+              <div className={styles.rankingMetrics}>
+                <span>{t('usage_stats.sub2api_requests')}: {formatNumber(ranking.totalRequests)}</span>
+                <span>{t('usage_stats.sub2api_total_tokens')}: {formatNumber(ranking.totalTokens)}</span>
+                <span>{t('usage_stats.sub2api_input_tokens')}: {formatNumber(ranking.inputTokens)}</span>
+                <span>{t('usage_stats.sub2api_output_tokens')}: {formatNumber(ranking.outputTokens)}</span>
+                <span>{t('usage_stats.sub2api_cache_tokens')}: {formatNumber(ranking.cacheTokens)}</span>
+                <span>{t('usage_stats.sub2api_cost')}: {formatCost(ranking.actualCost)}</span>
+              </div>
+            </article>
+          ))}
         </div>
       )}
     </section>

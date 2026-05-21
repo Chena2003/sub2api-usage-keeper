@@ -18,7 +18,7 @@ export function RequestEventsPanel({ events }: RequestEventsPanelProps) {
   const { t } = useTranslation()
 
   return (
-    <section className="card">
+    <section className={styles.requestEventsCard}>
       <div className={styles.sectionTitleBlock}>
         <span className={styles.sectionEyebrow}>{t('usage_stats.sub2api_events_eyebrow')}</span>
         <h3 className={styles.sectionTitle}>{t('usage_stats.sub2api_events_title')}</h3>

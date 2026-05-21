@@ -6,6 +6,7 @@ const usagePageSource = readFileSync(new URL('./UsagePage.tsx', import.meta.url)
 const loginPageSource = readFileSync(new URL('./LoginPage.tsx', import.meta.url), 'utf8')
 const indexHtmlSource = readFileSync(new URL('../../index.html', import.meta.url), 'utf8')
 const requestEventsSource = readFileSync(new URL('../components/usage/RequestEventsDetailsCard.tsx', import.meta.url), 'utf8')
+const sub2apiRequestEventsSource = readFileSync(new URL('../components/sub2api/RequestEventsPanel.tsx', import.meta.url), 'utf8')
 const priceSettingsSource = readFileSync(new URL('../components/usage/PriceSettingsCard.tsx', import.meta.url), 'utf8')
 const chartLineSelectorSource = readFileSync(new URL('../components/usage/ChartLineSelector.tsx', import.meta.url), 'utf8')
 const selectSource = readFileSync(new URL('../components/ui/Select.tsx', import.meta.url), 'utf8')
@@ -71,7 +72,7 @@ describe('UsagePage toolbar styles', () => {
     expect(usagePageSource).not.toContain("'credentials'")
   })
 
-  it('uses a clean light blue and white presentation for the dashboard shell and selected tabs', () => {
+  it('uses a warm Sub2API presentation for the dashboard shell and selected tabs', () => {
     const pageShellBlock = usagePageStyles.slice(
       usagePageStyles.indexOf('.pageShell {'),
       usagePageStyles.indexOf('.pageFrame')
@@ -93,14 +94,17 @@ describe('UsagePage toolbar styles', () => {
       usagePageStyles.indexOf('.toolbarActionsRight')
     )
 
-    expect(pageShellBlock).toContain('background: linear-gradient(180deg, #eff6ff 0%, #f8fafc 36%, #ffffff 100%);')
-    expect(pageShellBlock).toContain('color: #0f172a;')
+    expect(pageShellBlock).toContain('radial-gradient(circle at top left, rgba(124, 58, 237, 0.14), transparent 22rem)')
+    expect(pageShellBlock).toContain('radial-gradient(circle at top right, rgba(59, 130, 246, 0.11), transparent 18rem)')
+    expect(pageShellBlock).toContain('color: #111827;')
     for (const block of [topBarBlock, statCardBlock, healthCardBlock]) {
-      expect(block).toContain('background: rgba(255, 255, 255, 0.88);')
-      expect(block).toContain('border: 1px solid #dbeafe;')
+      expect(block).toContain('rgba(255, 255, 255')
       expect(block).toContain('box-shadow: 0 18px 45px rgba(37, 99, 235, 0.08);')
     }
-    expect(activeTabBlock).toContain('background: #2563eb;')
+    expect(topBarBlock).toContain('border: 1px solid color-mix(in srgb, #7c3aed 18%, #dbeafe);')
+    expect(statCardBlock).toContain('border: 1px solid color-mix(in srgb, #7c3aed 14%, #dbeafe);')
+    expect(healthCardBlock).toContain('border: 1px solid color-mix(in srgb, #7c3aed 12%, #dbeafe);')
+    expect(activeTabBlock).toContain('background: linear-gradient(135deg, #7c3aed, #2563eb);')
     expect(activeTabBlock).toContain('color: #ffffff;')
   })
 
@@ -341,6 +345,7 @@ describe('UsagePage toolbar styles', () => {
 
   it('aligns Request Event Log pagination with credential pagination height', () => {
     expect(usagePageStyles).toMatch(/\.requestEventsCard:global\(\.card\)\s*\{[\s\S]*?padding-bottom:\s*0;/)
+    expect(sub2apiRequestEventsSource).toContain('className={styles.requestEventsCard}')
     expect(requestEventsSource).toContain('className={styles.requestEventsCard}')
     expect(usagePageStyles).toMatch(/\.requestEventsPaginationFooter\s*\{[\s\S]*?--usage-pagination-bar-height:\s*51px;/)
     expect(usagePageStyles).toMatch(/\.requestEventsPaginationFooter\s*\{[\s\S]*?height:\s*var\(--usage-pagination-bar-height\);/)

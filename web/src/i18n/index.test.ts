@@ -53,9 +53,10 @@ const sub2ApiRenderedKeys = [
   'usage_stats.sub2api_no_quota_window',
   'usage_stats.sub2api_output_tokens',
   'usage_stats.sub2api_overview_title',
+  'usage_stats.sub2api_ratio',
   'usage_stats.sub2api_plan',
   'usage_stats.sub2api_provider',
-  'usage_stats.sub2api_quota_risk_count',
+  'usage_stats.sub2api_available_accounts',
   'usage_stats.sub2api_quotas_eyebrow',
   'usage_stats.sub2api_quotas_hint',
   'usage_stats.sub2api_quotas_title',
@@ -98,14 +99,14 @@ describe('i18n resources', () => {
     }
   });
 
-  it('interpolates rendered Sub2API quota risk counts in every language', async () => {
+  it('resolves rendered Sub2API available accounts label in every language', async () => {
     for (const language of SUPPORTED_LANGUAGES) {
       await i18n.changeLanguage(language);
 
-      const text = i18n.t('usage_stats.sub2api_quota_risk_count', { count: 7 });
+      const text = i18n.t('usage_stats.sub2api_available_accounts');
 
-      expect(text).not.toBe('usage_stats.sub2api_quota_risk_count');
-      expect(text).toContain('7');
+      expect(text).not.toBe('usage_stats.sub2api_available_accounts');
+      expect(text.length).toBeGreaterThan(0);
     }
   });
 });

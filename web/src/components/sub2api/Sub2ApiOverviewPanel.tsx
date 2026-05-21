@@ -1,4 +1,7 @@
+import { useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
+import { Line, Bar, Doughnut } from 'react-chartjs-2'
+import type { ChartData, ChartOptions } from 'chart.js'
 import type { Sub2ApiAccount, Sub2ApiModelUsage, Sub2ApiOverview, Sub2ApiTimeseriesPoint } from '@/lib/sub2apiTypes'
 import styles from '@/pages/UsagePage.module.scss'
 
@@ -29,7 +32,165 @@ export function Sub2ApiOverviewPanel({ overview, points, models, quotaAccounts }
   const { t } = useTranslation()
   const hasData = Boolean(overview) || points.length > 0 || models.length > 0 || quotaAccounts.length > 0
   const topModels = models.slice(0, 5)
+  const maxModelTokens = Math.max(...topModels.map(modelTokenTotal), 1)
   const quotaRiskCount = quotaAccounts.filter(isQuotaAtRisk).length
+  const availableAccounts = quotaAccounts.length - quotaRiskCount
+
+  const fmtHour = (s: string) => {
+    const d = new Date(s)
+    return Number.isNaN(d.getTime()) ? s : `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
+  }
+  const fmtDate = (s: string) => {
+    const d = new Date(s)
+    return Number.isNaN(d.getTime()) ? s : `${d.getMonth() + 1}/${d.getDate()} ${String(d.getHours()).padStart(2, '0')}:00`
+  }
+
+  // Chart data transforms
+  const chartLabels = useMemo(() => points.map((p) => fmtHour(p.bucketStart)), [points])
+
+  const tokenChartData = useMemo((): ChartData<'line'> | null => {
+    if (points.length === 0) return null
+    return {
+      labels: chartLabels,
+      datasets: [
+        {
+          label: 'Input',
+          data: points.map((p) => p.inputTokens),
+          borderColor: '#3b82f6',
+          backgroundColor: 'rgba(59, 130, 246, 0.12)',
+          fill: true,
+          tension: 0.25,
+          pointRadius: 0,
+          pointHitRadius: 8,
+          borderWidth: 1.5,
+        },
+        {
+          label: 'Output',
+          data: points.map((p) => p.outputTokens),
+          borderColor: '#22c55e',
+          backgroundColor: 'rgba(34, 197, 94, 0.12)',
+          fill: true,
+          tension: 0.25,
+          pointRadius: 0,
+          pointHitRadius: 8,
+          borderWidth: 1.5,
+        },
+        {
+          label: 'Cache',
+          data: points.map((p) => p.cacheCreationTokens + p.cacheReadTokens),
+          borderColor: '#f59e0b',
+          backgroundColor: 'rgba(245, 158, 11, 0.10)',
+          fill: true,
+          tension: 0.25,
+          pointRadius: 0,
+          pointHitRadius: 8,
+          borderWidth: 1.5,
+        },
+      ],
+    }
+  }, [points, chartLabels])
+
+  const requestChartData = useMemo((): ChartData<'bar'> | null => {
+    if (points.length === 0) return null
+    return {
+      labels: chartLabels,
+      datasets: [
+        {
+          label: 'Requests',
+          data: points.map((p) => p.totalRequests),
+          backgroundColor: 'rgba(124, 58, 237, 0.55)',
+          borderColor: '#7c3aed',
+          borderWidth: 1,
+          borderRadius: 4,
+        },
+      ],
+    }
+  }, [points, chartLabels])
+
+  const costChartData = useMemo((): ChartData<'line'> | null => {
+    if (points.length === 0) return null
+    return {
+      labels: chartLabels,
+      datasets: [
+        {
+          label: 'Cost',
+          data: points.map((p) => p.actualCost),
+          borderColor: '#ec4899',
+          backgroundColor: 'rgba(236, 72, 153, 0.10)',
+          fill: true,
+          tension: 0.35,
+          pointRadius: 0,
+          pointHitRadius: 8,
+          borderWidth: 2,
+        },
+      ],
+    }
+  }, [points, chartLabels])
+
+  const usersChartData = useMemo((): ChartData<'line'> | null => {
+    if (points.length === 0) return null
+    return {
+      labels: chartLabels,
+      datasets: [
+        {
+          label: 'Active Users',
+          data: points.map((p) => p.activeUsers),
+          borderColor: '#06b6d4',
+          backgroundColor: 'rgba(6, 182, 212, 0.10)',
+          fill: true,
+          tension: 0.35,
+          pointRadius: 0,
+          pointHitRadius: 8,
+          borderWidth: 2,
+        },
+      ],
+    }
+  }, [points, chartLabels])
+
+  const modelChartData = useMemo((): ChartData<'doughnut'> | null => {
+    if (topModels.length === 0) return null
+    const colors = ['#7c3aed', '#2563eb', '#22c55e', '#f59e0b', '#ec4899', '#06b6d4', '#8b5cf6', '#f97316']
+    return {
+      labels: topModels.map((m) => m.model || m.requestedModel || 'unknown'),
+      datasets: [
+        {
+          data: topModels.map(modelTokenTotal),
+          backgroundColor: colors.slice(0, topModels.length),
+          borderWidth: 0,
+          hoverOffset: 8,
+        },
+      ],
+    }
+  }, [topModels])
+
+  const chartOptions: ChartOptions<'line'> = {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: { legend: { display: false }, tooltip: { enabled: true, mode: 'index', intersect: false } },
+    scales: {
+      x: { display: true, grid: { display: false }, ticks: { color: '#9ca3af', font: { size: 10, family: 'inherit' }, maxTicksLimit: 8 } },
+      y: { display: true, grid: { color: 'rgba(0,0,0,0.04)', drawTicks: false }, ticks: { color: '#9ca3af', font: { size: 10, family: 'inherit' }, maxTicksLimit: 5 } },
+    },
+    interaction: { mode: 'index', intersect: false },
+  }
+
+  const barOptions: ChartOptions<'bar'> = {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: { legend: { display: false }, tooltip: { enabled: true, mode: 'index', intersect: false } },
+    scales: {
+      x: { display: true, grid: { display: false }, ticks: { color: '#9ca3af', font: { size: 10, family: 'inherit' }, maxTicksLimit: 8 } },
+      y: { display: true, grid: { color: 'rgba(0,0,0,0.04)', drawTicks: false }, beginAtZero: true, ticks: { color: '#9ca3af', font: { size: 10, family: 'inherit' }, maxTicksLimit: 5 } },
+    },
+    interaction: { mode: 'index', intersect: false },
+  }
+
+  const doughnutOptions: ChartOptions<'doughnut'> = {
+    responsive: true,
+    maintainAspectRatio: false,
+    cutout: '62%',
+    plugins: { legend: { display: false }, tooltip: { enabled: true } },
+  }
 
   if (!hasData) {
     return <div className={styles.hint}>{t('usage_stats.sub2api_no_data')}</div>
@@ -55,11 +216,92 @@ export function Sub2ApiOverviewPanel({ overview, points, models, quotaAccounts }
           <strong className={styles.statValue}>{formatNumber(overview?.activeUsers ?? 0)}</strong>
         </article>
         <article className={styles.statCard}>
-          <strong className={styles.statValue}>{t('usage_stats.sub2api_quota_risk_count', { count: quotaRiskCount })}</strong>
+          <span className={styles.statLabel}>{t('usage_stats.sub2api_available_accounts')}</span>
+          <strong className={styles.statValue}>{formatNumber(availableAccounts)} / {formatNumber(quotaAccounts.length)}</strong>
         </article>
       </section>
 
-      <section className="card">
+      {points.length > 1 && tokenChartData && (
+        <section className={styles.overviewSurface} aria-label="Token usage chart">
+          <div className={styles.sectionTitleBlock}>
+            <span className={styles.sectionEyebrow}>{t('usage_stats.sub2api_overview_title')}</span>
+            <h3 className={styles.sectionTitle}>{t('usage_stats.sub2api_tokens')} — {t('usage_stats.input_tokens')} / {t('usage_stats.output_tokens')} / {t('usage_stats.cached_tokens')}</h3>
+            <p className={styles.sectionSubtitle}>Token consumption over time</p>
+          </div>
+          <div className={styles.overviewChartStacked}>
+            <div className={styles.chartLegendRow}>
+              <span className={styles.chartLegendDot} style={{ background: '#3b82f6' }} /> Input
+              <span className={styles.chartLegendDot} style={{ background: '#22c55e', marginLeft: 14 }} /> Output
+              <span className={styles.chartLegendDot} style={{ background: '#f59e0b', marginLeft: 14 }} /> Cache
+            </div>
+            <div className={styles.overviewChartArea}>
+              <Line data={tokenChartData} options={chartOptions} />
+            </div>
+          </div>
+        </section>
+      )}
+
+      {points.length > 1 && (requestChartData || costChartData || usersChartData) && (
+        <div className={styles.overviewChartGrid}>
+          {requestChartData && (
+            <section className={styles.overviewChartCard} aria-label="Request volume chart">
+              <div className={styles.chartCardHeader}>
+                <strong className={styles.chartCardTitle}>{t('usage_stats.sub2api_total_requests')}</strong>
+                <span className={styles.chartCardHint}>per hour</span>
+              </div>
+              <div className={styles.overviewChartAreaShort}>
+                <Bar data={requestChartData} options={barOptions} />
+              </div>
+            </section>
+          )}
+          {costChartData && (
+            <section className={styles.overviewChartCard} aria-label="Cost chart">
+              <div className={styles.chartCardHeader}>
+                <strong className={styles.chartCardTitle}>{t('usage_stats.sub2api_total_cost')}</strong>
+                <span className={styles.chartCardHint}>per hour</span>
+              </div>
+              <div className={styles.overviewChartAreaShort}>
+                <Line data={costChartData} options={chartOptions} />
+              </div>
+            </section>
+          )}
+          {usersChartData && (
+            <section className={styles.overviewChartCard} aria-label="Active users chart">
+              <div className={styles.chartCardHeader}>
+                <strong className={styles.chartCardTitle}>{t('usage_stats.sub2api_active_users')}</strong>
+                <span className={styles.chartCardHint}>per hour</span>
+              </div>
+              <div className={styles.overviewChartAreaShort}>
+                <Line data={usersChartData} options={chartOptions} />
+              </div>
+            </section>
+          )}
+          {modelChartData && (
+            <section className={styles.overviewChartCard} aria-label="Model share chart">
+              <div className={styles.chartCardHeader}>
+                <strong className={styles.chartCardTitle}>{t('usage_stats.sub2api_model')}</strong>
+                <span className={styles.chartCardHint}>token share</span>
+              </div>
+              <div className={styles.overviewChartAreaShort}>
+                <Doughnut data={modelChartData} options={doughnutOptions} />
+              </div>
+              <div className={styles.chartDoughnutLegend}>
+                {topModels.map((m, i) => {
+                  const colors = ['#7c3aed', '#2563eb', '#22c55e', '#f59e0b', '#ec4899']
+                  return (
+                    <span key={m.model} className={styles.chartLegendItem}>
+                      <span className={styles.chartLegendDot} style={{ background: colors[i] || '#9ca3af' }} />
+                      {m.model || m.requestedModel || 'unknown'}
+                    </span>
+                  )
+                })}
+              </div>
+            </section>
+          )}
+        </div>
+      )}
+
+      <section className={styles.overviewSurface}>
         <div className={styles.sectionTitleBlock}>
           <span className={styles.sectionEyebrow}>{t('usage_stats.sub2api_models_eyebrow')}</span>
           <h3 className={styles.sectionTitle}>{t('usage_stats.sub2api_top_models')}</h3>
@@ -68,27 +310,25 @@ export function Sub2ApiOverviewPanel({ overview, points, models, quotaAccounts }
         {topModels.length === 0 ? (
           <div className={styles.hint}>{t('usage_stats.sub2api_no_data')}</div>
         ) : (
-          <div className={styles.tableWrapper}>
-            <table className={styles.table}>
-              <thead>
-                <tr>
-                  <th>{t('usage_stats.sub2api_model')}</th>
-                  <th>{t('usage_stats.sub2api_requests')}</th>
-                  <th>{t('usage_stats.sub2api_tokens')}</th>
-                  <th>{t('usage_stats.sub2api_cost')}</th>
-                </tr>
-              </thead>
-              <tbody>
-                {topModels.map((model) => (
-                  <tr key={`${model.model}-${model.requestedModel}-${model.upstreamModel}`}>
-                    <td className={styles.modelCell}>{model.model || model.requestedModel || model.upstreamModel || 'unknown'}</td>
-                    <td>{formatNumber(model.totalRequests)}</td>
-                    <td>{formatNumber(modelTokenTotal(model))}</td>
-                    <td>{formatCost(model.actualCost)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+          <div className={styles.modelSummaryList}>
+            {topModels.map((model) => {
+              const totalTokens = modelTokenTotal(model)
+              return (
+                <article key={`${model.model}-${model.requestedModel}-${model.upstreamModel}`} className={styles.modelSummaryItem}>
+                  <div className={styles.modelSummaryHeader}>
+                    <strong className={styles.modelSummaryName}>{model.model || model.requestedModel || model.upstreamModel || 'unknown'}</strong>
+                    <span className={styles.modelSummaryCost}>{formatCost(model.actualCost)}</span>
+                  </div>
+                  <div className={styles.rankingMeterShell} aria-hidden="true">
+                    <span className={styles.rankingMeterFill} style={{ width: `${Math.max((totalTokens / maxModelTokens) * 100, 3)}%` }} />
+                  </div>
+                  <div className={styles.rankingMetrics}>
+                    <span>{t('usage_stats.sub2api_requests')}: {formatNumber(model.totalRequests)}</span>
+                    <span>{t('usage_stats.sub2api_tokens')}: {formatNumber(totalTokens)}</span>
+                  </div>
+                </article>
+              )
+            })}
           </div>
         )}
       </section>
