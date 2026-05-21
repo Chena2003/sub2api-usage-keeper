@@ -46,4 +46,39 @@ describe('Sub2ApiOverviewPanel', () => {
 
     expect(html).not.toContain('{{count}}')
   })
+
+  it('computes heatmap tooltip token totals from timeseries token fields', () => {
+    const html = renderToStaticMarkup(
+      <Sub2ApiOverviewPanel
+        overview={null}
+        points={[
+          {
+            bucketStart: '2026-05-21T10:00:00Z',
+            totalRequests: 3,
+            inputTokens: 10,
+            outputTokens: 20,
+            cacheCreationTokens: 30,
+            cacheReadTokens: 40,
+            actualCost: 0.1,
+            activeUsers: 1,
+          },
+          {
+            bucketStart: '2026-05-21T11:00:00Z',
+            totalRequests: 6,
+            inputTokens: 1,
+            outputTokens: 2,
+            cacheCreationTokens: 3,
+            cacheReadTokens: 4,
+            actualCost: 0.2,
+            activeUsers: 2,
+          },
+        ]}
+        models={[]}
+        quotaAccounts={[]}
+      />,
+    )
+
+    expect(html).toContain('100 tokens')
+    expect(html).toContain('10 tokens')
+  })
 })

@@ -1,6 +1,6 @@
 import { useTranslation } from 'react-i18next'
 import type { Sub2ApiAccount, Sub2ApiQuotaWindow } from '@/lib/sub2apiTypes'
-import styles from '@/pages/UsagePage.module.scss'
+import styles from './Sub2ApiDesign.module.scss'
 
 type AccountQuotasCardProps = {
   accounts: Sub2ApiAccount[]
@@ -20,67 +20,54 @@ const formatPercent = (ratio?: number) => {
   return `${Math.round(ratio * 100)}%`
 }
 
-const windowTone = (window?: Sub2ApiQuotaWindow) => {
-  const status = window?.status?.toLowerCase() ?? ''
-  if (status.includes('exhaust') || status.includes('limit') || status.includes('risk')) return styles.quotaMeterDanger
-  if (status.includes('warning') || (window?.ratio ?? 0) >= 0.65) return styles.quotaMeterWarning
-  return styles.quotaMeterOk
+const getWindowStatusClass = (status?: string) => {
+  const s = status?.toLowerCase() || ''
+  if (s.includes('exhaust')) return styles.statusExhausted
+  if (s.includes('limit') || s.includes('risk') || s.includes('warning')) return styles.statusLimited
+  if (s.includes('active') || s.includes('ok')) return styles.statusActive
+  return styles.statusUnknown
 }
 
-function QuotaWindowCard({ label, window }: { label: string; window?: Sub2ApiQuotaWindow }) {
+const statusLabel = (status: string | undefined, t: ReturnType<typeof useTranslation>['t']) => {
+  if (!status) return t('usage_stats.quota_status_unknown')
+  const normalized = status.toLowerCase()
+  if (normalized.includes('exhaust')) return t('usage_stats.quota_status_exhausted')
+  if (normalized.includes('limit')) return t('usage_stats.quota_status_rate_limited')
+  if (normalized.includes('warning') || normalized.includes('risk')) return t('usage_stats.quota_status_near_limit')
+  if (normalized.includes('active') || normalized.includes('ok')) return t('usage_stats.quota_status_active')
+  if (normalized.includes('unknown')) return t('usage_stats.quota_status_unknown')
+  return status
+}
+
+function QuotaWindowInline({ label, window }: { label: string; window?: Sub2ApiQuotaWindow }) {
   const { t } = useTranslation()
-  const meterClass = windowTone(window)
+  const statusClass = getWindowStatusClass(window?.status)
+  const status = window?.status.toLowerCase() ?? ''
+  const isDanger = (window?.ratio ?? 0) >= 0.8 || status.includes('exhaust')
 
   return (
-    <div className={styles.quotaWindowCard}>
-      <div className={styles.quotaWindowHeader}>
-        <span className={styles.quotaWindowLabel}>{label}</span>
-        <span className={`${styles.quotaWindowStatus} ${meterClass}`.trim()}>{window?.status || t('usage_stats.sub2api_no_quota_window')}</span>
+    <div className={styles.windowInline}>
+      <div className={styles.windowInlineTop}>
+        <span className={styles.windowName}>{label}</span>
+        <span className={`${styles.windowStatus} ${statusClass}`}>{statusLabel(window?.status, t)}</span>
       </div>
+
       {window ? (
         <>
-          <div className={styles.quotaMeterShell} aria-hidden="true">
-            <span
-              className={`${styles.quotaMeterFill} ${meterClass}`.trim()}
+          <div className={styles.progressBarInline}>
+            <div
+              className={`${styles.progressFill} ${isDanger ? styles.progressFillDanger : ''}`}
               style={{ width: `${Math.min(Math.max((window.ratio ?? 0) * 100, 0), 100)}%` }}
             />
           </div>
-          <div className={styles.quotaWindowStats}>
-            <span>
-              {t('usage_stats.sub2api_consumed')}: {formatNumber(window.consumed)}{window.limit !== undefined ? ` / ${formatNumber(window.limit)}` : ''}
-            </span>
-            <span>
-              {t('usage_stats.sub2api_ratio')}: {formatPercent(window.ratio)}
-            </span>
-            <span>
-              {t('usage_stats.sub2api_refresh_at')}: {formatDateTime(window.refreshAt)}
-            </span>
+          <div className={styles.windowDetailsInline}>
+            <span>{formatNumber(window.consumed)} {window.limit !== undefined ? `/ ${formatNumber(window.limit)}` : ''} ({formatPercent(window.ratio)})</span>
+            <span className={styles.windowRefreshTime}>{formatDateTime(window.refreshAt)}</span>
           </div>
         </>
       ) : (
-        <div className={styles.quotaWindowEmpty}>{t('usage_stats.sub2api_no_quota_window')}</div>
+        <div className={styles.windowEmpty}>{t('usage_stats.sub2api_no_quota_window')}</div>
       )}
-    </div>
-  )
-}
-
-function AccountIdentity({ account }: { account: Sub2ApiAccount }) {
-  const { t } = useTranslation()
-  const title = account.displayName.trim() || t('usage_stats.sub2api_account')
-  const subtitle = [account.provider, account.planType || account.accountType || ''].filter(Boolean).join(' · ')
-
-  return (
-    <div className={styles.accountIdentity}>
-      <div className={styles.accountIdentityTitleRow}>
-        <strong className={styles.accountIdentityTitle}>{title}</strong>
-        <span className={styles.accountIdentityBadge}>{account.status}</span>
-      </div>
-      <div className={styles.accountIdentityMeta}>{subtitle || t('usage_stats.sub2api_account')}</div>
-      <div className={styles.accountIdentityMetrics}>
-        <span>{t('usage_stats.sub2api_total_requests')}: {formatNumber(account.usage.totalRequests)}</span>
-        <span>{t('usage_stats.sub2api_total_tokens')}: {formatNumber(account.usage.totalTokens)}</span>
-        <span>{t('usage_stats.sub2api_cost')}: ${account.usage.actualCost.toFixed(4)}</span>
-      </div>
     </div>
   )
 }
@@ -90,26 +77,40 @@ export function AccountQuotasCard({ accounts }: AccountQuotasCardProps) {
 
   return (
     <section className={styles.quotaSurface}>
-      <div className={styles.sectionTitleBlock}>
-        <span className={styles.sectionEyebrow}>{t('usage_stats.sub2api_quotas_eyebrow')}</span>
-        <h3 className={styles.sectionTitle}>{t('usage_stats.sub2api_quotas_title')}</h3>
-        <p className={styles.sectionSubtitle}>{t('usage_stats.sub2api_quotas_hint')}</p>
+      <div className={styles.panelHeader}>
+        <span className={styles.eyebrow}>{t('usage_stats.sub2api_quotas_eyebrow')}</span>
+        <h3 className={styles.title}>{t('usage_stats.sub2api_quotas_title')}</h3>
+        <p className={styles.subtitle}>{t('usage_stats.sub2api_quotas_hint')}</p>
       </div>
 
       {accounts.length === 0 ? (
-        <div className={styles.hint}>{t('usage_stats.sub2api_no_data')}</div>
+        <div className={styles.emptyState}>{t('usage_stats.sub2api_no_data')}</div>
       ) : (
-        <div className={styles.quotaAccountList}>
+        <div className={styles.quotaList}>
           {accounts.map((account) => (
-            <article key={account.id} className={styles.quotaAccountCard}>
-              <AccountIdentity account={account} />
-              <div className={styles.quotaWindowGrid}>
-                <QuotaWindowCard label={t('usage_stats.sub2api_five_hour_window')} window={account.fiveHourWindow} />
-                <QuotaWindowCard label={t('usage_stats.sub2api_weekly_window')} window={account.weeklyWindow} />
+            <article key={account.id} className={styles.quotaRow}>
+              <div className={styles.quotaInfo}>
+                <h4 className={styles.quotaTitle}>{account.displayName || t('usage_stats.sub2api_account')}</h4>
+                <span className={styles.quotaProvider}>{account.provider}</span>
               </div>
-              <div className={styles.quotaAccountFooter}>
-                <span>{t('usage_stats.sub2api_last_used')}: {formatDateTime(account.lastUsedAt)}</span>
+
+              <div className={styles.quotaMetricsInline}>
+                <div className={styles.metricBlockInline}>
+                  <span className={styles.metricLabel}>{t('usage_stats.sub2api_total_requests')}</span>
+                  <span className={styles.metricValue}>{formatNumber(account.usage.totalRequests)}</span>
+                </div>
+                <div className={styles.metricBlockInline}>
+                  <span className={styles.metricLabel}>{t('usage_stats.sub2api_total_tokens')}</span>
+                  <span className={styles.metricValue}>{formatNumber(account.usage.totalTokens)}</span>
+                </div>
+                <div className={styles.metricBlockInline}>
+                  <span className={styles.metricLabel}>{t('usage_stats.sub2api_cost')}</span>
+                  <span className={`${styles.metricValue} ${styles.costValue}`}>${account.usage.actualCost.toFixed(4)}</span>
+                </div>
               </div>
+
+              <QuotaWindowInline label={t('usage_stats.sub2api_five_hour_window')} window={account.fiveHourWindow} />
+              <QuotaWindowInline label={t('usage_stats.sub2api_weekly_window')} window={account.weeklyWindow} />
             </article>
           ))}
         </div>

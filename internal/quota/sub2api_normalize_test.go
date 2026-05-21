@@ -231,6 +231,10 @@ func TestNormalizeSub2APIRankingsMasksAPIKeyIdentifiers(t *testing.T) {
 	}
 }
 
+func int64Ptr(value int64) *int64 {
+	return &value
+}
+
 func TestNormalizeSub2APIEventsMasksUserIdentifiers(t *testing.T) {
 	events := NormalizeSub2APIEvents([]sub2api.UsageEventRow{{User: "user@example.com"}})
 
@@ -294,6 +298,7 @@ func TestNormalizeSub2APIEventsMapsUsageEventRows(t *testing.T) {
 		CacheReadTokens:     3,
 		ActualCost:          0.12,
 		DurationMS:          456,
+		FirstTokenMS:        int64Ptr(123),
 	}}
 
 	events := NormalizeSub2APIEvents(rows)
@@ -305,7 +310,7 @@ func TestNormalizeSub2APIEventsMapsUsageEventRows(t *testing.T) {
 	if event.ID != 9 || !event.CreatedAt.Equal(createdAt) || event.User == "" || event.User == "user-a" || event.APIKey == "" || event.APIKey == "key-a" || event.Model != "gpt-4o" || event.RequestedModel != "gpt-4" || event.UpstreamModel != "upstream-gpt-4o" || event.AccountID != 7 || event.AccountName != "openai #7" || event.Status != "success" {
 		t.Fatalf("event identity fields = %#v", event)
 	}
-	if event.InputTokens != 10 || event.OutputTokens != 5 || event.CacheTokens != 5 || event.TotalTokens != 20 || event.ActualCost != 0.12 || event.DurationMS != 456 {
+	if event.InputTokens != 10 || event.OutputTokens != 5 || event.CacheTokens != 5 || event.TotalTokens != 20 || event.ActualCost != 0.12 || event.DurationMS != 456 || event.FirstTokenDurationMS == nil || *event.FirstTokenDurationMS != 123 {
 		t.Fatalf("event usage fields = %#v", event)
 	}
 }

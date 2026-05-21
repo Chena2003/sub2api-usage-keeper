@@ -40,6 +40,7 @@ export type Sub2ApiEvent = {
   totalTokens: number
   actualCost: number
   durationMs: number
+  firstTokenDurationMs?: number
 }
 
 export type Sub2ApiEventsResponse = {
@@ -48,6 +49,17 @@ export type Sub2ApiEventsResponse = {
   page: number
   limit: number
 }
+
+export type Sub2ApiTokenBreakdown = {
+  inputTokens: number
+  outputTokens: number
+  cacheCreationTokens: number
+  cacheReadTokens: number
+}
+
+export const sub2ApiTokenTotal = (item: Sub2ApiTokenBreakdown): number => (
+  item.inputTokens + item.outputTokens + item.cacheCreationTokens + item.cacheReadTokens
+)
 
 export type Sub2ApiAccountUsage = {
   totalRequests: number

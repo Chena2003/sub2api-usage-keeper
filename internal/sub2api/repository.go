@@ -3,6 +3,7 @@ package sub2api
 import (
 	"context"
 	"fmt"
+	"sync"
 	"time"
 
 	"gorm.io/driver/postgres"
@@ -17,7 +18,9 @@ const (
 )
 
 type Repository struct {
-	db *gorm.DB
+	db                    *gorm.DB
+	usageLogsSchemaOnce   sync.Once
+	usageLogsFirstTokenMS bool
 }
 
 func Open(databaseURL string) (*Repository, error) {
@@ -50,6 +53,16 @@ func (r *Repository) database() (*gorm.DB, error) {
 		return nil, fmt.Errorf("sub2api repository database is nil")
 	}
 	return r.db, nil
+}
+
+func (r *Repository) usageLogsFirstTokenMSSelect(db *gorm.DB) string {
+	r.usageLogsSchemaOnce.Do(func() {
+		r.usageLogsFirstTokenMS = db.Migrator().HasColumn("usage_logs", "first_token_ms")
+	})
+	if r.usageLogsFirstTokenMS {
+		return "first_token_ms"
+	}
+	return "NULL AS first_token_ms"
 }
 
 func ClampDashboardDays(days int) int {
@@ -298,6 +311,7 @@ func (r *Repository) GetEvents(ctx context.Context, page int, limit int) ([]Usag
 	if err != nil {
 		return nil, 0, fmt.Errorf("get sub2api events: %w", err)
 	}
+	firstTokenMSSelect := r.usageLogsFirstTokenMSSelect(db)
 
 	var total int64
 	if err := db.WithContext(ctx).Raw(`SELECT COUNT(*) FROM usage_logs`).Scan(&total).Error; err != nil {
@@ -305,7 +319,7 @@ func (r *Repository) GetEvents(ctx context.Context, page int, limit int) ([]Usag
 	}
 
 	var rows []UsageEventRow
-	err = db.WithContext(ctx).Raw(`
+	err = db.WithContext(ctx).Raw(fmt.Sprintf(`
 		SELECT
 			id,
 			created_at,
@@ -322,11 +336,12 @@ func (r *Repository) GetEvents(ctx context.Context, page int, limit int) ([]Usag
 			COALESCE(cache_creation_tokens, 0) AS cache_creation_tokens,
 			COALESCE(cache_read_tokens, 0) AS cache_read_tokens,
 			COALESCE(actual_cost, 0) AS actual_cost,
-			COALESCE(duration_ms, 0) AS duration_ms
+			COALESCE(duration_ms, 0) AS duration_ms,
+			%s
 		FROM usage_logs
 		ORDER BY created_at DESC
 		LIMIT ? OFFSET ?
-	`, limit, (page-1)*limit).Scan(&rows).Error
+	`, firstTokenMSSelect), limit, (page-1)*limit).Scan(&rows).Error
 	if err != nil {
 		return nil, 0, fmt.Errorf("get sub2api events: %w", err)
 	}

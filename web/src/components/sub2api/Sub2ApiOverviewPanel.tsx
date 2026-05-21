@@ -2,8 +2,10 @@ import { useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Line, Bar, Doughnut } from 'react-chartjs-2'
 import type { ChartData, ChartOptions } from 'chart.js'
+import { sub2ApiTokenTotal } from '@/lib/sub2apiTypes'
 import type { Sub2ApiAccount, Sub2ApiModelUsage, Sub2ApiOverview, Sub2ApiTimeseriesPoint } from '@/lib/sub2apiTypes'
 import styles from '@/pages/UsagePage.module.scss'
+import designStyles from './Sub2ApiDesign.module.scss'
 
 type Sub2ApiOverviewPanelProps = {
   overview: Sub2ApiOverview | null
@@ -15,10 +17,6 @@ type Sub2ApiOverviewPanelProps = {
 const formatNumber = (value: number) => new Intl.NumberFormat().format(value)
 
 const formatCost = (value: number) => `$${value.toFixed(4)}`
-
-const modelTokenTotal = (model: Sub2ApiModelUsage) => (
-  model.inputTokens + model.outputTokens + model.cacheCreationTokens + model.cacheReadTokens
-)
 
 const isQuotaAtRisk = (account: Sub2ApiAccount) => {
   const windows = [account.fiveHourWindow, account.weeklyWindow].filter(Boolean)
@@ -32,7 +30,8 @@ export function Sub2ApiOverviewPanel({ overview, points, models, quotaAccounts }
   const { t } = useTranslation()
   const hasData = Boolean(overview) || points.length > 0 || models.length > 0 || quotaAccounts.length > 0
   const topModels = models.slice(0, 5)
-  const maxModelTokens = Math.max(...topModels.map(modelTokenTotal), 1)
+  const maxModelTokens = Math.max(...topModels.map(sub2ApiTokenTotal), 1)
+  const maxPointRequests = Math.max(...points.map((point) => point.totalRequests), 1)
   const quotaRiskCount = quotaAccounts.filter(isQuotaAtRisk).length
   const availableAccounts = quotaAccounts.length - quotaRiskCount
 
@@ -154,7 +153,7 @@ export function Sub2ApiOverviewPanel({ overview, points, models, quotaAccounts }
       labels: topModels.map((m) => m.model || m.requestedModel || 'unknown'),
       datasets: [
         {
-          data: topModels.map(modelTokenTotal),
+          data: topModels.map(sub2ApiTokenTotal),
           backgroundColor: colors.slice(0, topModels.length),
           borderWidth: 0,
           hoverOffset: 8,
@@ -238,6 +237,26 @@ export function Sub2ApiOverviewPanel({ overview, points, models, quotaAccounts }
               <Line data={tokenChartData} options={chartOptions} />
             </div>
           </div>
+
+          <div className={designStyles.heatmapContainer}>
+            <div className={designStyles.heatmapHeader}>
+              <span className={designStyles.heatmapTitle}>{t('usage_stats.sub2api_activity_heatmap')}</span>
+            </div>
+            <div className={designStyles.heatmapGrid}>
+              {points.map((point) => {
+                const intensity = point.totalRequests / maxPointRequests
+                const activeStyle = intensity > 0 ? { opacity: Math.max(0.2, intensity) } : {}
+                return (
+                  <div
+                    key={point.bucketStart}
+                    className={`${designStyles.heatmapCell} ${intensity > 0 ? designStyles.heatmapCellActive : ''}`}
+                    style={activeStyle}
+                    title={`${new Date(point.bucketStart).toLocaleString()}: ${point.totalRequests} reqs, ${sub2ApiTokenTotal(point)} tokens`}
+                  />
+                )
+              })}
+            </div>
+          </div>
         </section>
       )}
 
@@ -312,7 +331,7 @@ export function Sub2ApiOverviewPanel({ overview, points, models, quotaAccounts }
         ) : (
           <div className={styles.modelSummaryList}>
             {topModels.map((model) => {
-              const totalTokens = modelTokenTotal(model)
+              const totalTokens = sub2ApiTokenTotal(model)
               return (
                 <article key={`${model.model}-${model.requestedModel}-${model.upstreamModel}`} className={styles.modelSummaryItem}>
                   <div className={styles.modelSummaryHeader}>

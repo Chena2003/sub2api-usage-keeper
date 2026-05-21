@@ -129,6 +129,7 @@ type UsageEventRow struct {
 	CacheReadTokens     int64     `json:"cacheReadTokens" gorm:"column:cache_read_tokens"`
 	ActualCost          float64   `json:"actualCost" gorm:"column:actual_cost"`
 	DurationMS          int64     `json:"durationMs" gorm:"column:duration_ms"`
+	FirstTokenMS        *int64    `json:"firstTokenMs" gorm:"column:first_token_ms"`
 }
 
 func (r UsageEventRow) TotalTokens() int64 {

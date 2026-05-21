@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"sort"
 	"strings"
+	"unicode/utf8"
 
 	"sub2api-usage-keeper/internal/sub2api"
 )
@@ -205,10 +206,35 @@ func maskedSub2APIKey(value string) string {
 	return fmt.Sprintf("key-%x", digest[:4])
 }
 
+func maskSub2APIDisplayValue(value string) string {
+	runes := []rune(value)
+	if len(runes) == 0 {
+		return ""
+	}
+	if len(runes) <= 2 {
+		return string(runes[:1]) + "***"
+	}
+	if len(runes) <= 4 {
+		return string(runes[:1]) + strings.Repeat("*", len(runes)-1)
+	}
+	return string(runes[:2]) + "***" + string(runes[len(runes)-2:])
+}
+
 func maskedSub2APIUser(value string) string {
 	value = strings.TrimSpace(value)
 	if value == "" {
 		return "unknown user"
+	}
+	if strings.Contains(value, "@") {
+		parts := strings.SplitN(value, "@", 2)
+		local := maskSub2APIDisplayValue(parts[0])
+		if local == "" {
+			local = "***"
+		}
+		return fmt.Sprintf("%s@%s", local, parts[1])
+	}
+	if utf8.RuneCountInString(value) > 4 {
+		return maskSub2APIDisplayValue(value)
 	}
 	digest := sha256.Sum256([]byte(strings.ToLower(value)))
 	return fmt.Sprintf("user-%x", digest[:4])
@@ -255,22 +281,23 @@ func NormalizeSub2APIEvents(rows []sub2api.UsageEventRow) []Sub2APIEvent {
 	for _, row := range rows {
 		cacheTokens := row.CacheCreationTokens + row.CacheReadTokens
 		events = append(events, Sub2APIEvent{
-			ID:             row.ID,
-			CreatedAt:      row.CreatedAt,
-			User:           maskedSub2APIUser(row.User),
-			APIKey:         maskedSub2APIKey(row.APIKey),
-			Model:          row.Model,
-			RequestedModel: row.RequestedModel,
-			UpstreamModel:  row.UpstreamModel,
-			AccountID:      row.AccountID,
-			AccountName:    row.AccountName,
-			Status:         row.Status,
-			InputTokens:    row.InputTokens,
-			OutputTokens:   row.OutputTokens,
-			CacheTokens:    cacheTokens,
-			TotalTokens:    row.TotalTokens(),
-			ActualCost:     row.ActualCost,
-			DurationMS:     row.DurationMS,
+			ID:                   row.ID,
+			CreatedAt:            row.CreatedAt,
+			User:                 maskedSub2APIUser(row.User),
+			APIKey:               maskedSub2APIKey(row.APIKey),
+			Model:                row.Model,
+			RequestedModel:       row.RequestedModel,
+			UpstreamModel:        row.UpstreamModel,
+			AccountID:            row.AccountID,
+			AccountName:          row.AccountName,
+			Status:               row.Status,
+			InputTokens:          row.InputTokens,
+			OutputTokens:         row.OutputTokens,
+			CacheTokens:          cacheTokens,
+			TotalTokens:          row.TotalTokens(),
+			ActualCost:           row.ActualCost,
+			DurationMS:           row.DurationMS,
+			FirstTokenDurationMS: row.FirstTokenMS,
 		})
 	}
 	return events
