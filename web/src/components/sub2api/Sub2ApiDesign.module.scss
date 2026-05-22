@@ -439,9 +439,8 @@
 }
 
 .heatmapGrid {
-  display: grid;
-  grid-auto-flow: column;
-  grid-template-rows: repeat(7, 1fr);
+  display: flex;
+  flex-wrap: wrap;
   gap: 4px;
   overflow-x: auto;
   padding-bottom: 8px;
