@@ -3,7 +3,6 @@ package sub2api
 import (
 	"context"
 	"fmt"
-	"sync"
 	"time"
 
 	"gorm.io/driver/postgres"
@@ -18,9 +17,7 @@ const (
 )
 
 type Repository struct {
-	db                    *gorm.DB
-	usageLogsSchemaOnce   sync.Once
-	usageLogsFirstTokenMS bool
+	db *gorm.DB
 }
 
 func Open(databaseURL string) (*Repository, error) {
@@ -53,16 +50,6 @@ func (r *Repository) database() (*gorm.DB, error) {
 		return nil, fmt.Errorf("sub2api repository database is nil")
 	}
 	return r.db, nil
-}
-
-func (r *Repository) usageLogsFirstTokenMSSelect(db *gorm.DB) string {
-	r.usageLogsSchemaOnce.Do(func() {
-		r.usageLogsFirstTokenMS = db.Migrator().HasColumn("usage_logs", "first_token_ms")
-	})
-	if r.usageLogsFirstTokenMS {
-		return "first_token_ms"
-	}
-	return "NULL AS first_token_ms"
 }
 
 func ClampDashboardDays(days int) int {
@@ -285,13 +272,14 @@ func (r *Repository) GetRankings(ctx context.Context, dimension string, since ti
 		SELECT
 			COALESCE(NULLIF(%s, ''), 'unknown') AS name,
 			COUNT(*) AS total_requests,
-			COALESCE(SUM(input_tokens), 0) AS input_tokens,
-			COALESCE(SUM(output_tokens), 0) AS output_tokens,
-			COALESCE(SUM(cache_creation_tokens), 0) AS cache_creation_tokens,
-			COALESCE(SUM(cache_read_tokens), 0) AS cache_read_tokens,
-			COALESCE(SUM(actual_cost), 0) AS actual_cost
-		FROM usage_logs
-		WHERE created_at >= ?
+			COALESCE(SUM(l.input_tokens), 0) AS input_tokens,
+			COALESCE(SUM(l.output_tokens), 0) AS output_tokens,
+			COALESCE(SUM(l.cache_creation_tokens), 0) AS cache_creation_tokens,
+			COALESCE(SUM(l.cache_read_tokens), 0) AS cache_read_tokens,
+			COALESCE(SUM(l.actual_cost), 0) AS actual_cost
+		FROM usage_logs l
+		LEFT JOIN users u ON l.user_id = u.id
+		WHERE l.created_at >= ?
 		GROUP BY name
 		ORDER BY total_requests DESC
 		LIMIT ?
@@ -311,7 +299,6 @@ func (r *Repository) GetEvents(ctx context.Context, page int, limit int) ([]Usag
 	if err != nil {
 		return nil, 0, fmt.Errorf("get sub2api events: %w", err)
 	}
-	firstTokenMSSelect := r.usageLogsFirstTokenMSSelect(db)
 
 	var total int64
 	if err := db.WithContext(ctx).Raw(`SELECT COUNT(*) FROM usage_logs`).Scan(&total).Error; err != nil {
@@ -319,29 +306,30 @@ func (r *Repository) GetEvents(ctx context.Context, page int, limit int) ([]Usag
 	}
 
 	var rows []UsageEventRow
-	err = db.WithContext(ctx).Raw(fmt.Sprintf(`
+	err = db.WithContext(ctx).Raw(`
 		SELECT
-			id,
-			created_at,
-			COALESCE(CAST(user_id AS TEXT), '') AS user_identifier,
-			COALESCE(CAST(api_key_id AS TEXT), '') AS api_key_label,
-			COALESCE(model, '') AS model,
-			COALESCE(requested_model, '') AS requested_model,
-			COALESCE(upstream_model, '') AS upstream_model,
-			COALESCE(account_id, 0) AS account_id,
-			COALESCE(CAST(account_id AS TEXT), '') AS account_name,
+			l.id,
+			l.created_at,
+			COALESCE(NULLIF(u.email, ''), CAST(l.user_id AS TEXT), '') AS user_identifier,
+			COALESCE(CAST(l.api_key_id AS TEXT), '') AS api_key_label,
+			COALESCE(l.model, '') AS model,
+			COALESCE(l.requested_model, '') AS requested_model,
+			COALESCE(l.upstream_model, '') AS upstream_model,
+			COALESCE(l.account_id, 0) AS account_id,
+			COALESCE(CAST(l.account_id AS TEXT), '') AS account_name,
 			'success' AS status,
-			COALESCE(input_tokens, 0) AS input_tokens,
-			COALESCE(output_tokens, 0) AS output_tokens,
-			COALESCE(cache_creation_tokens, 0) AS cache_creation_tokens,
-			COALESCE(cache_read_tokens, 0) AS cache_read_tokens,
-			COALESCE(actual_cost, 0) AS actual_cost,
-			COALESCE(duration_ms, 0) AS duration_ms,
-			%s
-		FROM usage_logs
-		ORDER BY created_at DESC
+			COALESCE(l.input_tokens, 0) AS input_tokens,
+			COALESCE(l.output_tokens, 0) AS output_tokens,
+			COALESCE(l.cache_creation_tokens, 0) AS cache_creation_tokens,
+			COALESCE(l.cache_read_tokens, 0) AS cache_read_tokens,
+			COALESCE(l.actual_cost, 0) AS actual_cost,
+			COALESCE(l.duration_ms, 0) AS duration_ms,
+			COALESCE(l.first_token_ms, 0) AS first_token_ms
+		FROM usage_logs l
+		LEFT JOIN users u ON l.user_id = u.id
+		ORDER BY l.created_at DESC
 		LIMIT ? OFFSET ?
-	`, firstTokenMSSelect), limit, (page-1)*limit).Scan(&rows).Error
+	`, limit, (page-1)*limit).Scan(&rows).Error
 	if err != nil {
 		return nil, 0, fmt.Errorf("get sub2api events: %w", err)
 	}
@@ -351,12 +339,12 @@ func (r *Repository) GetEvents(ctx context.Context, page int, limit int) ([]Usag
 func rankingColumn(dimension string) string {
 	switch dimension {
 	case "api_key":
-		return "CAST(api_key_id AS TEXT)"
+		return "CAST(l.api_key_id AS TEXT)"
 	case "model":
-		return "model"
+		return "l.model"
 	case "account":
-		return "CAST(account_id AS TEXT)"
+		return "CAST(l.account_id AS TEXT)"
 	default:
-		return "CAST(user_id AS TEXT)"
+		return "COALESCE(NULLIF(u.email, ''), CAST(l.user_id AS TEXT))"
 	}
 }

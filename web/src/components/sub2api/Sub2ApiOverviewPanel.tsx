@@ -1,22 +1,29 @@
 import { useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Line, Bar, Doughnut } from 'react-chartjs-2'
+import { Line, Bar } from 'react-chartjs-2'
 import type { ChartData, ChartOptions } from 'chart.js'
-import { sub2ApiTokenTotal } from '@/lib/sub2apiTypes'
 import type { Sub2ApiAccount, Sub2ApiModelUsage, Sub2ApiOverview, Sub2ApiTimeseriesPoint } from '@/lib/sub2apiTypes'
 import styles from '@/pages/UsagePage.module.scss'
 import designStyles from './Sub2ApiDesign.module.scss'
+import { ServiceHealthCard } from '@/components/usage/ServiceHealthCard'
+import type { UsageOverviewPayload } from '@/components/usage/hooks/useUsageData'
 
 type Sub2ApiOverviewPanelProps = {
   overview: Sub2ApiOverview | null
   points: Sub2ApiTimeseriesPoint[]
   models: Sub2ApiModelUsage[]
   quotaAccounts: Sub2ApiAccount[]
+  usage?: UsageOverviewPayload | null
+  loading?: boolean
 }
 
 const formatNumber = (value: number) => new Intl.NumberFormat().format(value)
 
 const formatCost = (value: number) => `$${value.toFixed(4)}`
+
+const modelTokenTotal = (model: Sub2ApiModelUsage) => (
+  model.inputTokens + model.outputTokens + model.cacheCreationTokens + model.cacheReadTokens
+)
 
 const isQuotaAtRisk = (account: Sub2ApiAccount) => {
   const windows = [account.fiveHourWindow, account.weeklyWindow].filter(Boolean)
@@ -26,12 +33,11 @@ const isQuotaAtRisk = (account: Sub2ApiAccount) => {
   })
 }
 
-export function Sub2ApiOverviewPanel({ overview, points, models, quotaAccounts }: Sub2ApiOverviewPanelProps) {
+export function Sub2ApiOverviewPanel({ overview, points, models, quotaAccounts, usage, loading }: Sub2ApiOverviewPanelProps) {
   const { t } = useTranslation()
   const hasData = Boolean(overview) || points.length > 0 || models.length > 0 || quotaAccounts.length > 0
   const topModels = models.slice(0, 5)
-  const maxModelTokens = Math.max(...topModels.map(sub2ApiTokenTotal), 1)
-  const maxPointRequests = Math.max(...points.map((point) => point.totalRequests), 1)
+  const maxModelTokens = Math.max(...topModels.map(modelTokenTotal), 1)
   const quotaRiskCount = quotaAccounts.filter(isQuotaAtRisk).length
   const availableAccounts = quotaAccounts.length - quotaRiskCount
 
@@ -146,22 +152,6 @@ export function Sub2ApiOverviewPanel({ overview, points, models, quotaAccounts }
     }
   }, [points, chartLabels])
 
-  const modelChartData = useMemo((): ChartData<'doughnut'> | null => {
-    if (topModels.length === 0) return null
-    const colors = ['#7c3aed', '#2563eb', '#22c55e', '#f59e0b', '#ec4899', '#06b6d4', '#8b5cf6', '#f97316']
-    return {
-      labels: topModels.map((m) => m.model || m.requestedModel || 'unknown'),
-      datasets: [
-        {
-          data: topModels.map(sub2ApiTokenTotal),
-          backgroundColor: colors.slice(0, topModels.length),
-          borderWidth: 0,
-          hoverOffset: 8,
-        },
-      ],
-    }
-  }, [topModels])
-
   const chartOptions: ChartOptions<'line'> = {
     responsive: true,
     maintainAspectRatio: false,
@@ -184,48 +174,41 @@ export function Sub2ApiOverviewPanel({ overview, points, models, quotaAccounts }
     interaction: { mode: 'index', intersect: false },
   }
 
-  const doughnutOptions: ChartOptions<'doughnut'> = {
-    responsive: true,
-    maintainAspectRatio: false,
-    cutout: '62%',
-    plugins: { legend: { display: false }, tooltip: { enabled: true } },
-  }
-
   if (!hasData) {
     return <div className={styles.hint}>{t('usage_stats.sub2api_no_data')}</div>
   }
 
   return (
     <div className={styles.settingsSections}>
-      <section className={styles.statsGrid} aria-label={t('usage_stats.sub2api_overview_title')}>
-        <article className={styles.statCard}>
-          <span className={styles.statLabel}>{t('usage_stats.sub2api_total_requests')}</span>
-          <strong className={styles.statValue}>{formatNumber(overview?.totalRequests ?? 0)}</strong>
+      <section className={designStyles.statsGrid} aria-label={t('usage_stats.sub2api_overview_title')}>
+        <article className={designStyles.statCard}>
+          <span className={designStyles.statLabel}>{t('usage_stats.sub2api_total_requests')}</span>
+          <strong className={designStyles.statValue}>{formatNumber(overview?.totalRequests ?? 0)}</strong>
         </article>
-        <article className={styles.statCard}>
-          <span className={styles.statLabel}>{t('usage_stats.sub2api_total_tokens')}</span>
-          <strong className={styles.statValue}>{formatNumber(overview?.totalTokens ?? 0)}</strong>
+        <article className={designStyles.statCard}>
+          <span className={designStyles.statLabel}>{t('usage_stats.sub2api_total_tokens')}</span>
+          <strong className={designStyles.statValue}>{formatNumber(overview?.totalTokens ?? 0)}</strong>
         </article>
-        <article className={styles.statCard}>
-          <span className={styles.statLabel}>{t('usage_stats.sub2api_total_cost')}</span>
-          <strong className={styles.statValue}>{formatCost(overview?.actualCost ?? 0)}</strong>
+        <article className={designStyles.statCard}>
+          <span className={designStyles.statLabel}>{t('usage_stats.sub2api_total_cost')}</span>
+          <strong className={designStyles.statValue}>{formatCost(overview?.actualCost ?? 0)}</strong>
         </article>
-        <article className={styles.statCard}>
-          <span className={styles.statLabel}>{t('usage_stats.sub2api_active_users')}</span>
-          <strong className={styles.statValue}>{formatNumber(overview?.activeUsers ?? 0)}</strong>
+        <article className={designStyles.statCard}>
+          <span className={designStyles.statLabel}>{t('usage_stats.sub2api_active_users')}</span>
+          <strong className={designStyles.statValue}>{formatNumber(overview?.activeUsers ?? 0)}</strong>
         </article>
-        <article className={styles.statCard}>
-          <span className={styles.statLabel}>{t('usage_stats.sub2api_available_accounts')}</span>
-          <strong className={styles.statValue}>{formatNumber(availableAccounts)} / {formatNumber(quotaAccounts.length)}</strong>
+        <article className={designStyles.statCard}>
+          <span className={designStyles.statLabel}>{t('usage_stats.sub2api_available_accounts')}</span>
+          <strong className={designStyles.statValue}>{formatNumber(availableAccounts)} / {formatNumber(quotaAccounts.length)}</strong>
         </article>
       </section>
 
       {points.length > 1 && tokenChartData && (
-        <section className={styles.overviewSurface} aria-label="Token usage chart">
-          <div className={styles.sectionTitleBlock}>
-            <span className={styles.sectionEyebrow}>{t('usage_stats.sub2api_overview_title')}</span>
-            <h3 className={styles.sectionTitle}>{t('usage_stats.sub2api_tokens')} — {t('usage_stats.input_tokens')} / {t('usage_stats.output_tokens')} / {t('usage_stats.cached_tokens')}</h3>
-            <p className={styles.sectionSubtitle}>Token consumption over time</p>
+        <section className={designStyles.overviewSurface} aria-label="Token usage chart">
+          <div className={designStyles.sectionTitleBlock}>
+            <span className={designStyles.sectionEyebrow}>{t('usage_stats.sub2api_overview_title')}</span>
+            <h3 className={designStyles.sectionTitle}>{t('usage_stats.sub2api_tokens')} — {t('usage_stats.input_tokens')} / {t('usage_stats.output_tokens')} / {t('usage_stats.cached_tokens')}</h3>
+            <p className={designStyles.sectionSubtitle}>Token consumption over time</p>
           </div>
           <div className={styles.overviewChartStacked}>
             <div className={styles.chartLegendRow}>
@@ -237,26 +220,10 @@ export function Sub2ApiOverviewPanel({ overview, points, models, quotaAccounts }
               <Line data={tokenChartData} options={chartOptions} />
             </div>
           </div>
-
-          <div className={designStyles.heatmapContainer}>
-            <div className={designStyles.heatmapHeader}>
-              <span className={designStyles.heatmapTitle}>{t('usage_stats.sub2api_activity_heatmap')}</span>
-            </div>
-            <div className={designStyles.heatmapGrid}>
-              {points.map((point) => {
-                const intensity = point.totalRequests / maxPointRequests
-                const activeStyle = intensity > 0 ? { opacity: Math.max(0.2, intensity) } : {}
-                return (
-                  <div
-                    key={point.bucketStart}
-                    className={`${designStyles.heatmapCell} ${intensity > 0 ? designStyles.heatmapCellActive : ''}`}
-                    style={activeStyle}
-                    title={`${new Date(point.bucketStart).toLocaleString()}: ${point.totalRequests} reqs, ${sub2ApiTokenTotal(point)} tokens`}
-                  />
-                )
-              })}
-            </div>
-          </div>
+          
+          {usage && <div style={{ marginTop: '24px' }}>
+            <ServiceHealthCard usage={usage} loading={!!loading} />
+          </div>}
         </section>
       )}
 
@@ -295,28 +262,7 @@ export function Sub2ApiOverviewPanel({ overview, points, models, quotaAccounts }
               </div>
             </section>
           )}
-          {modelChartData && (
-            <section className={styles.overviewChartCard} aria-label="Model share chart">
-              <div className={styles.chartCardHeader}>
-                <strong className={styles.chartCardTitle}>{t('usage_stats.sub2api_model')}</strong>
-                <span className={styles.chartCardHint}>token share</span>
-              </div>
-              <div className={styles.overviewChartAreaShort}>
-                <Doughnut data={modelChartData} options={doughnutOptions} />
-              </div>
-              <div className={styles.chartDoughnutLegend}>
-                {topModels.map((m, i) => {
-                  const colors = ['#7c3aed', '#2563eb', '#22c55e', '#f59e0b', '#ec4899']
-                  return (
-                    <span key={m.model} className={styles.chartLegendItem}>
-                      <span className={styles.chartLegendDot} style={{ background: colors[i] || '#9ca3af' }} />
-                      {m.model || m.requestedModel || 'unknown'}
-                    </span>
-                  )
-                })}
-              </div>
-            </section>
-          )}
+
         </div>
       )}
 
@@ -331,7 +277,7 @@ export function Sub2ApiOverviewPanel({ overview, points, models, quotaAccounts }
         ) : (
           <div className={styles.modelSummaryList}>
             {topModels.map((model) => {
-              const totalTokens = sub2ApiTokenTotal(model)
+              const totalTokens = modelTokenTotal(model)
               return (
                 <article key={`${model.model}-${model.requestedModel}-${model.upstreamModel}`} className={styles.modelSummaryItem}>
                   <div className={styles.modelSummaryHeader}>

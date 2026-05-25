@@ -36,20 +36,20 @@ type Sub2APIRankingRow struct {
 }
 
 type Sub2APIEvent struct {
-	ID                   int64     `json:"id"`
-	CreatedAt            time.Time `json:"createdAt"`
-	User                 string    `json:"user"`
-	APIKey               string    `json:"apiKey"`
-	Model                string    `json:"model"`
-	RequestedModel       string    `json:"requestedModel"`
-	UpstreamModel        string    `json:"upstreamModel"`
-	AccountID            int64     `json:"accountId"`
-	AccountName          string    `json:"accountName"`
-	Status               string    `json:"status"`
-	InputTokens          int64     `json:"inputTokens"`
-	OutputTokens         int64     `json:"outputTokens"`
-	CacheTokens          int64     `json:"cacheTokens"`
-	TotalTokens          int64     `json:"totalTokens"`
+	ID             int64     `json:"id"`
+	CreatedAt      time.Time `json:"createdAt"`
+	User           string    `json:"user"`
+	APIKey         string    `json:"apiKey"`
+	Model          string    `json:"model"`
+	RequestedModel string    `json:"requestedModel"`
+	UpstreamModel  string    `json:"upstreamModel"`
+	AccountID      int64     `json:"accountId"`
+	AccountName    string    `json:"accountName"`
+	Status         string    `json:"status"`
+	InputTokens    int64     `json:"inputTokens"`
+	OutputTokens   int64     `json:"outputTokens"`
+	CacheTokens    int64     `json:"cacheTokens"`
+	TotalTokens    int64     `json:"totalTokens"`
 	ActualCost           float64   `json:"actualCost"`
 	DurationMS           int64     `json:"durationMs"`
 	FirstTokenDurationMS *int64    `json:"firstTokenDurationMs,omitempty"`

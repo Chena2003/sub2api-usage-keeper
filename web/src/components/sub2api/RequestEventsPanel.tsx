@@ -1,6 +1,5 @@
 import { useTranslation } from 'react-i18next'
 import type { Sub2ApiEventsResponse } from '@/lib/sub2apiTypes'
-import { formatDurationMs } from '@/utils/usage'
 import styles from './Sub2ApiDesign.module.scss'
 
 type RequestEventsPanelProps = {
@@ -15,15 +14,16 @@ const formatDateTime = (value: string) => {
   return date.toLocaleString()
 }
 
+const formatDuration = (ms?: number) => {
+  if (ms == null) return '-'
+  if (ms < 1000) return `${ms}ms`
+  return `${(ms / 1000).toFixed(2)}s`
+}
+
 const getBadgeClass = (status: string) => {
   const s = status.toLowerCase()
-  const statusCode = Number(s)
-  if (Number.isInteger(statusCode)) {
-    if (statusCode >= 200 && statusCode < 400) return styles.badgeSuccess
-    if (statusCode >= 400) return styles.badgeError
-  }
-  if (s === 'success') return styles.badgeSuccess
-  if (s.includes('fail') || s.includes('error') || s.includes('timeout')) return styles.badgeError
+  if (s === 'success' || s === '200') return styles.badgeSuccess
+  if (s.includes('fail') || s.includes('error') || s.includes('timeout') || s >= '400') return styles.badgeError
   return styles.badgeWarning
 }
 
@@ -39,19 +39,19 @@ export function RequestEventsPanel({ events }: RequestEventsPanelProps) {
       </div>
 
       {events.events.length === 0 ? (
-        <div className={styles.emptyState}>{t('usage_stats.sub2api_no_data')}</div>
+        <div style={{ color: '#94a3b8' }}>{t('usage_stats.sub2api_no_data')}</div>
       ) : (
-        <div className={styles.eventTable}>
+        <div style={{ marginTop: '24px' }}>
           <div className={styles.eventGrid}>
             <div className={styles.gridHeader}>{t('usage_stats.sub2api_timestamp')}</div>
             <div className={styles.gridHeader}>{t('usage_stats.sub2api_user')}</div>
             <div className={styles.gridHeader}>{t('usage_stats.sub2api_api_key')}</div>
             <div className={styles.gridHeader}>{t('usage_stats.sub2api_model')}</div>
             <div className={styles.gridHeader}>{t('usage_stats.sub2api_total_tokens')}</div>
-            <div className={styles.gridHeader}>{t('usage_stats.sub2api_ttft')} / {t('usage_stats.sub2api_duration_short')}</div>
+            <div className={styles.gridHeader}>TTFT / DUR</div>
             <div className={styles.gridHeader}>{t('usage_stats.sub2api_cost')} / {t('usage_stats.sub2api_status')}</div>
           </div>
-
+          
           <div>
             {events.events.map((event) => (
               <div key={event.id} className={styles.eventRow}>
@@ -61,12 +61,12 @@ export function RequestEventsPanel({ events }: RequestEventsPanelProps) {
                 <div className={styles.cellModel}>{event.model || event.requestedModel || event.upstreamModel || 'unknown'}</div>
                 <div className={styles.cellTokens}>{formatNumber(event.totalTokens)}</div>
                 <div className={styles.cellDuration}>
-                  <span className={styles.firstTokenDuration}>{formatDurationMs(event.firstTokenDurationMs, { invalidText: '-' })}</span>
-                  <span className={styles.durationSeparator}>/</span>
-                  <span className={styles.totalDuration}>{formatDurationMs(event.durationMs, { invalidText: '-' })}</span>
+                  <span style={{ color: '#38bdf8' }}>{formatDuration(event.firstTokenDurationMs)}</span>
+                  <span style={{ margin: '0 4px', color: '#64748b' }}>/</span>
+                  <span style={{ color: '#2dd4bf' }}>{formatDuration(event.durationMs)}</span>
                 </div>
                 <div>
-                  <div className={styles.cellCost}>${event.actualCost.toFixed(6)}</div>
+                  <div className={styles.cellCost} style={{ marginBottom: '4px' }}>${event.actualCost.toFixed(6)}</div>
                   <span className={`${styles.badge} ${getBadgeClass(event.status)}`}>{event.status}</span>
                 </div>
               </div>

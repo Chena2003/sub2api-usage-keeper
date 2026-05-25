@@ -17,6 +17,8 @@ import {
 import { ApiError, fetchCpaApiKeyOptions, fetchCpaApiKeys, fetchStatus, fetchUpdateCheck, updateCpaApiKeyAlias } from '@/lib/api';
 import type { CpaApiKeyOption, CpaApiKeySettingsItem, StatusResponse } from '@/lib/types';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
+
+import { Sub2ApiAnalysisPanel } from '@/components/sub2api/Sub2ApiAnalysisPanel';
 import { LanguageSwitcher } from '@/components/ui/LanguageSwitcher';
 import { Select } from '@/components/ui/Select';
 import { IconRefreshCw } from '@/components/ui/icons';
@@ -1085,8 +1087,17 @@ export function UsagePage({ onAuthRequired }: { onAuthRequired?: () => void }) {
             {activeTab === 'settings' && apiKeySettingsError && <div className={styles.errorBox}>{apiKeySettingsError}</div>}
             {!(activeTab === 'overview' ? error : activeTab === 'settings' ? (pricingError || apiKeySettingsError) : '') && statusError && <div className={styles.errorBox}>{statusError}</div>}
 
-            {activeTab === 'overview' && <Sub2ApiOverviewPanel overview={sub2apiOverview} points={sub2apiPoints} models={sub2apiModels} quotaAccounts={sub2apiQuotaAccounts} />}
-            {activeTab === 'analysis' && <Sub2ApiOverviewPanel overview={sub2apiOverview} points={sub2apiPoints} models={sub2apiModels} quotaAccounts={sub2apiQuotaAccounts} />}
+            {activeTab === 'overview' && (
+              <Sub2ApiOverviewPanel 
+                overview={sub2apiOverview} 
+                points={sub2apiPoints} 
+                models={sub2apiModels} 
+                quotaAccounts={sub2apiQuotaAccounts} 
+                usage={usage} 
+                loading={overviewDisplayLoading} 
+              />
+            )}
+            {activeTab === 'analysis' && <Sub2ApiAnalysisPanel models={sub2apiModels} />}
             {activeTab === 'events' && <RequestEventsPanel events={sub2apiEvents} />}
             {activeTab === 'ranking' && <TokenRankingCard rankings={sub2apiRankings} dimension={rankingDimension} onDimensionChange={loadRankings} />}
             {activeTab === 'quotas' && <AccountQuotasCard accounts={sub2apiQuotaAccounts} />}

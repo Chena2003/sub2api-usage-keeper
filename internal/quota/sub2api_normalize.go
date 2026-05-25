@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"sort"
 	"strings"
-	"unicode/utf8"
 
 	"sub2api-usage-keeper/internal/sub2api"
 )
@@ -46,7 +45,7 @@ func NormalizeSub2APIAccount(row sub2api.AccountRow, usage *sub2api.AccountUsage
 		CredentialKeys:      publicCredentialKeys(row.Credentials),
 		Usage:               normalizeSub2APIAccountUsage(usage),
 		FiveHourWindow:      buildFiveHourWindow(row, usage),
-		WeeklyWindow:        buildUnknownQuotaWindow(),
+		WeeklyWindow:        buildWeeklyWindow(row, usage),
 	}
 }
 
@@ -150,10 +149,21 @@ func normalizeSub2APIAccountUsage(usage *sub2api.AccountUsageRow) Sub2APIAccount
 }
 
 func buildFiveHourWindow(row sub2api.AccountRow, usage *sub2api.AccountUsageRow) Sub2APIQuotaWindow {
+	limit := extractQuotaLimit(row.Credentials, "session_limit", "quota_limit", "limit", "quota")
+	consumed := accountUsageTokens(usage)
+
 	window := Sub2APIQuotaWindow{
-		Consumed: accountUsageTokens(usage),
+		Consumed: consumed,
 		Status:   normalizeWindowStatus(row.SessionWindowStatus),
 	}
+	
+	if limit > 0 {
+		intLimit := int64(limit)
+		window.Limit = &intLimit
+		ratio := float64(consumed) / limit
+		window.Ratio = &ratio
+	}
+
 	if row.SessionWindowStart != nil {
 		window.WindowStart = row.SessionWindowStart
 	}
@@ -168,6 +178,38 @@ func buildFiveHourWindow(row sub2api.AccountRow, usage *sub2api.AccountUsageRow)
 		window.Status = "rate_limited"
 	}
 	return window
+}
+
+func buildWeeklyWindow(row sub2api.AccountRow, usage *sub2api.AccountUsageRow) Sub2APIQuotaWindow {
+	limit := extractQuotaLimit(row.Credentials, "weekly_limit", "weekly_quota", "weekly_limit_usd")
+	if limit <= 0 {
+		return Sub2APIQuotaWindow{Status: "unknown"}
+	}
+	
+	// Assuming usage is total consumption. In a real system this should be weekly consumption.
+	consumed := accountUsageTokens(usage)
+	ratio := float64(consumed) / limit
+	
+	intLimit := int64(limit)
+	return Sub2APIQuotaWindow{
+		Consumed: consumed,
+		Limit:    &intLimit,
+		Ratio:    &ratio,
+		Status:   normalizeWindowStatus(row.SessionWindowStatus),
+	}
+}
+
+func extractQuotaLimit(credentials json.RawMessage, keys ...string) float64 {
+	fields := credentialFields(credentials)
+	if fields == nil {
+		return 0
+	}
+	for _, key := range keys {
+		if v, ok := fields[key].(float64); ok && v > 0 {
+			return v
+		}
+	}
+	return 0
 }
 
 func buildUnknownQuotaWindow() Sub2APIQuotaWindow {
@@ -206,38 +248,30 @@ func maskedSub2APIKey(value string) string {
 	return fmt.Sprintf("key-%x", digest[:4])
 }
 
-func maskSub2APIDisplayValue(value string) string {
-	runes := []rune(value)
-	if len(runes) == 0 {
-		return ""
-	}
-	if len(runes) <= 2 {
-		return string(runes[:1]) + "***"
-	}
-	if len(runes) <= 4 {
-		return string(runes[:1]) + strings.Repeat("*", len(runes)-1)
-	}
-	return string(runes[:2]) + "***" + string(runes[len(runes)-2:])
-}
-
 func maskedSub2APIUser(value string) string {
 	value = strings.TrimSpace(value)
 	if value == "" {
 		return "unknown user"
 	}
-	if strings.Contains(value, "@") {
-		parts := strings.SplitN(value, "@", 2)
-		local := maskSub2APIDisplayValue(parts[0])
-		if local == "" {
-			local = "***"
+	if local, domain, ok := strings.Cut(value, "@"); ok {
+		local = strings.TrimSpace(local)
+		domain = strings.TrimSpace(domain)
+		if local != "" && domain != "" {
+			return fmt.Sprintf("%s@%s", maskEmailLocal(local), domain)
 		}
-		return fmt.Sprintf("%s@%s", local, parts[1])
-	}
-	if utf8.RuneCountInString(value) > 4 {
-		return maskSub2APIDisplayValue(value)
 	}
 	digest := sha256.Sum256([]byte(strings.ToLower(value)))
 	return fmt.Sprintf("user-%x", digest[:4])
+}
+
+func maskEmailLocal(local string) string {
+	if len(local) <= 1 {
+		return "*"
+	}
+	if len(local) == 2 {
+		return local[:1] + "*"
+	}
+	return local[:1] + "**" + local[len(local)-1:]
 }
 
 func NormalizeSub2APIRankings(dimension string, rows []sub2api.RankingRow) []Sub2APIRankingRow {
@@ -281,19 +315,19 @@ func NormalizeSub2APIEvents(rows []sub2api.UsageEventRow) []Sub2APIEvent {
 	for _, row := range rows {
 		cacheTokens := row.CacheCreationTokens + row.CacheReadTokens
 		events = append(events, Sub2APIEvent{
-			ID:                   row.ID,
-			CreatedAt:            row.CreatedAt,
-			User:                 maskedSub2APIUser(row.User),
-			APIKey:               maskedSub2APIKey(row.APIKey),
-			Model:                row.Model,
-			RequestedModel:       row.RequestedModel,
-			UpstreamModel:        row.UpstreamModel,
-			AccountID:            row.AccountID,
-			AccountName:          row.AccountName,
-			Status:               row.Status,
-			InputTokens:          row.InputTokens,
-			OutputTokens:         row.OutputTokens,
-			CacheTokens:          cacheTokens,
+			ID:             row.ID,
+			CreatedAt:      row.CreatedAt,
+			User:           maskedSub2APIUser(row.User),
+			APIKey:         maskedSub2APIKey(row.APIKey),
+			Model:          row.Model,
+			RequestedModel: row.RequestedModel,
+			UpstreamModel:  row.UpstreamModel,
+			AccountID:      row.AccountID,
+			AccountName:    row.AccountName,
+			Status:         row.Status,
+			InputTokens:    row.InputTokens,
+			OutputTokens:   row.OutputTokens,
+			CacheTokens:    cacheTokens,
 			TotalTokens:          row.TotalTokens(),
 			ActualCost:           row.ActualCost,
 			DurationMS:           row.DurationMS,

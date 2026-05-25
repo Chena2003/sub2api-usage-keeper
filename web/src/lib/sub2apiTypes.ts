@@ -50,17 +50,6 @@ export type Sub2ApiEventsResponse = {
   limit: number
 }
 
-export type Sub2ApiTokenBreakdown = {
-  inputTokens: number
-  outputTokens: number
-  cacheCreationTokens: number
-  cacheReadTokens: number
-}
-
-export const sub2ApiTokenTotal = (item: Sub2ApiTokenBreakdown): number => (
-  item.inputTokens + item.outputTokens + item.cacheCreationTokens + item.cacheReadTokens
-)
-
 export type Sub2ApiAccountUsage = {
   totalRequests: number
   inputTokens: number

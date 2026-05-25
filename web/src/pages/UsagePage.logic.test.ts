@@ -476,8 +476,8 @@ describe('UsagePage settings tab content', () => {
 });
 
 describe('UsagePage Analysis tab content', () => {
-  it('renders the Sub2API overview panel without the legacy analysis loader', () => {
-    expect(usagePageSource).toContain("activeTab === 'analysis' && <Sub2ApiOverviewPanel");
+  it('renders the dedicated Sub2API analysis panel without the legacy analysis loader', () => {
+    expect(usagePageSource).toContain("activeTab === 'analysis' && <Sub2ApiAnalysisPanel");
     expect(usagePageSource).not.toContain('fetchAnalysis');
     expect(usagePageSource).not.toContain('loadAnalysis');
   });

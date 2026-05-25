@@ -1065,22 +1065,22 @@
 
 .statCard {
   --accent: var(--primary-color);
-  --accent-soft: rgba($primary-color, 0.18);
-  --accent-border: rgba($primary-color, 0.35);
+  --accent-soft: rgba(124, 58, 237, 0.18);
+  --accent-border: var(--border-color);
 
   grid-column: span 4;
   position: relative;
   padding: 18px;
-  background:
-    radial-gradient(circle at top right, rgba(124, 58, 237, 0.08), transparent 38%),
-    rgba(255, 255, 255, 0.9);
+  background: var(--bg-primary);
+  backdrop-filter: var(--glass-backdrop-filter);
+  -webkit-backdrop-filter: var(--glass-backdrop-filter);
   border-radius: $radius-lg;
-  border: 1px solid color-mix(in srgb, #7c3aed 14%, #dbeafe);
+  border: 1px solid var(--border-color);
   display: flex;
   flex-direction: column;
   gap: 10px;
   min-height: 176px;
-  box-shadow: 0 18px 45px rgba(37, 99, 235, 0.08);
+  box-shadow: var(--shadow-lg), inset 0 1px 0 rgba(255, 255, 255, 0.05);
   transition:
     transform $transition-fast,
     box-shadow $transition-fast,
@@ -1092,16 +1092,16 @@
     position: absolute;
     top: 0;
     left: 0;
-    height: 3px;
+    height: 4px;
     width: 100%;
-    background: linear-gradient(90deg, var(--accent), rgba(0, 0, 0, 0));
-    opacity: 0.95;
+    background: linear-gradient(90deg, #3b82f6, #8b5cf6, #ec4899);
+    opacity: 0.8;
   }
 
   &:hover {
-    transform: translateY(-2px);
-    border-color: color-mix(in srgb, #2563eb 42%, #dbeafe);
-    box-shadow: 0 20px 50px rgba(37, 99, 235, 0.12);
+    transform: translateY(-4px);
+    border-color: #8b5cf6;
+    box-shadow: 0 20px 40px rgba(139, 92, 246, 0.15);
   }
 
   @include tablet {

@@ -48,13 +48,14 @@ describe('UsagePage toolbar styles', () => {
     expect(usagePageStyles).not.toContain('.apiKeyFilterGroupHidden')
   })
 
-  it('uses the Sub2API Overview panel for Overview and Analysis instead of old detail tables', () => {
+  it('uses dedicated Sub2API panels for Overview and Analysis instead of old detail tables', () => {
     expect(usagePageSource).not.toContain('fetchAnalysis')
     expect(usagePageSource).not.toContain('loadAnalysis')
+    expect(usagePageSource).toContain("import { Sub2ApiAnalysisPanel } from '@/components/sub2api/Sub2ApiAnalysisPanel';")
     expect(usagePageSource).toContain('import { AccountQuotasCard, RequestEventsPanel, Sub2ApiOverviewPanel, TokenRankingCard } from')
-    expect(usagePageSource).toContain("{activeTab === 'overview' && <Sub2ApiOverviewPanel")
-    expect(usagePageSource).toContain("{activeTab === 'analysis' && <Sub2ApiOverviewPanel")
-    expect(usagePageSource).not.toContain('<AnalysisPanel')
+    expect(usagePageSource).toContain("{activeTab === 'overview' && (")
+    expect(usagePageSource).toContain('<Sub2ApiOverviewPanel')
+    expect(usagePageSource).toContain("{activeTab === 'analysis' && <Sub2ApiAnalysisPanel")
     expect(usagePageSource).not.toContain('fetchUsageAnalysis')
     expect(usagePageSource).not.toContain('<ApiDetailsCard')
     expect(usagePageSource).not.toContain('<ModelStatsCard')
@@ -97,12 +98,12 @@ describe('UsagePage toolbar styles', () => {
     expect(pageShellBlock).toContain('radial-gradient(circle at top left, rgba(124, 58, 237, 0.14), transparent 22rem)')
     expect(pageShellBlock).toContain('radial-gradient(circle at top right, rgba(59, 130, 246, 0.11), transparent 18rem)')
     expect(pageShellBlock).toContain('color: #111827;')
-    for (const block of [topBarBlock, statCardBlock, healthCardBlock]) {
-      expect(block).toContain('rgba(255, 255, 255')
-      expect(block).toContain('box-shadow: 0 18px 45px rgba(37, 99, 235, 0.08);')
-    }
+    expect(topBarBlock).toContain('rgba(255, 255, 255')
+    expect(topBarBlock).toContain('box-shadow: 0 18px 45px rgba(37, 99, 235, 0.08);')
+    expect(statCardBlock).toContain('var(--bg-primary)')
+    expect(statCardBlock).toContain('box-shadow: var(--shadow-lg), inset 0 1px 0 rgba(255, 255, 255, 0.05);')
     expect(topBarBlock).toContain('border: 1px solid color-mix(in srgb, #7c3aed 18%, #dbeafe);')
-    expect(statCardBlock).toContain('border: 1px solid color-mix(in srgb, #7c3aed 14%, #dbeafe);')
+    expect(statCardBlock).toContain('border: 1px solid var(--border-color);')
     expect(healthCardBlock).toContain('border: 1px solid color-mix(in srgb, #7c3aed 12%, #dbeafe);')
     expect(activeTabBlock).toContain('background: linear-gradient(135deg, #7c3aed, #2563eb);')
     expect(activeTabBlock).toContain('color: #ffffff;')
@@ -317,8 +318,8 @@ describe('UsagePage toolbar styles', () => {
   })
 
   it('renders each Task 5 tab with the intended Sub2API panel and keeps health in Settings', () => {
-    const overviewPanelIndex = usagePageSource.indexOf("{activeTab === 'overview' && <Sub2ApiOverviewPanel")
-    const analysisPanelIndex = usagePageSource.indexOf("{activeTab === 'analysis' && <Sub2ApiOverviewPanel")
+    const overviewPanelIndex = usagePageSource.indexOf('<Sub2ApiOverviewPanel')
+    const analysisPanelIndex = usagePageSource.indexOf("{activeTab === 'analysis' && <Sub2ApiAnalysisPanel")
     const eventsPanelIndex = usagePageSource.indexOf("{activeTab === 'events' && <RequestEventsPanel")
     const rankingCardIndex = usagePageSource.indexOf("{activeTab === 'ranking' && <TokenRankingCard")
     const quotasCardIndex = usagePageSource.indexOf("{activeTab === 'quotas' && <AccountQuotasCard")
