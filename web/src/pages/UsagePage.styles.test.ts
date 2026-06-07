@@ -18,6 +18,16 @@ const analysisPanelStyles = readFileSync(new URL('../components/usage/analysis/A
 const usageChartSource = readFileSync(new URL('../components/usage/UsageChart.tsx', import.meta.url), 'utf8')
 const tokenBreakdownChartSource = readFileSync(new URL('../components/usage/TokenBreakdownChart.tsx', import.meta.url), 'utf8')
 const costTrendChartSource = readFileSync(new URL('../components/usage/CostTrendChart.tsx', import.meta.url), 'utf8')
+const sub2apiOverviewPanelSource = readFileSync(new URL('../components/sub2api/Sub2ApiOverviewPanel.tsx', import.meta.url), 'utf8')
+const sub2apiAnalysisPanelSource = readFileSync(new URL('../components/sub2api/Sub2ApiAnalysisPanel.tsx', import.meta.url), 'utf8')
+const sub2apiDesignStyles = readFileSync(new URL('../components/sub2api/Sub2ApiDesign.module.scss', import.meta.url), 'utf8')
+const requestHealthTimelineCardSource = (() => {
+  try {
+    return readFileSync(new URL('../components/sub2api/RequestHealthTimelineCard.tsx', import.meta.url), 'utf8')
+  } catch {
+    return ''
+  }
+})()
 
 describe('UsagePage toolbar styles', () => {
   it('uses Sub2API Usage Keeper branding in the browser title and visible shell labels', () => {
@@ -317,7 +327,28 @@ describe('UsagePage toolbar styles', () => {
     expect(costTrendChartSource).not.toContain('className={styles.periodButtons}')
   })
 
-  it('renders each Task 5 tab with the intended Sub2API panel and keeps health in Settings', () => {
+  it('applies the selected Sub2API overview chart palette and Total Tokens chart', () => {
+    expect(sub2apiOverviewPanelSource).toContain("backgroundColor: 'rgba(16, 185, 129, 0.25)'")
+    expect(sub2apiOverviewPanelSource).toContain("borderColor: '#10b981'")
+    expect(sub2apiOverviewPanelSource).toContain("borderColor: '#f59e0b'")
+    expect(sub2apiOverviewPanelSource).toContain("borderColor: '#14b8a6'")
+    expect(sub2apiOverviewPanelSource).toContain('const tokensChartData = useMemo')
+    expect(sub2apiOverviewPanelSource).toContain("label: 'Total Tokens'")
+    expect(sub2apiOverviewPanelSource).toContain('data: points.map(pointTokenTotal)')
+    expect(sub2apiOverviewPanelSource).toContain('const pointTokenTotal = (point: Sub2ApiTimeseriesPoint) => (')
+    expect(sub2apiOverviewPanelSource).toContain('point.inputTokens + point.outputTokens + point.cacheCreationTokens + point.cacheReadTokens')
+    expect(sub2apiOverviewPanelSource).toContain('aria-label="Total tokens chart"')
+  })
+
+  it('applies the selected Sub2API analysis model palette and compact stat value style', () => {
+    expect(sub2apiAnalysisPanelSource).toContain("const colors = ['#10b981', '#f59e0b', '#f43f5e', '#14b8a6', '#64748b']")
+    expect(sub2apiDesignStyles).toMatch(/\.statValue\s*\{[\s\S]*?font-size:\s*28px;/)
+    expect(sub2apiDesignStyles).toMatch(/\.statValue\s*\{[\s\S]*?font-weight:\s*500;/)
+    expect(sub2apiDesignStyles).toMatch(/\.statValue\s*\{[\s\S]*?white-space:\s*nowrap;/)
+    expect(sub2apiDesignStyles).toMatch(/\.statValue\s*\{[\s\S]*?text-overflow:\s*ellipsis;/)
+  })
+
+  it('renders each Task 5 tab with the intended Sub2API panel and keeps health only in Overview', () => {
     const overviewPanelIndex = usagePageSource.indexOf('<Sub2ApiOverviewPanel')
     const analysisPanelIndex = usagePageSource.indexOf("{activeTab === 'analysis' && <Sub2ApiAnalysisPanel")
     const eventsPanelIndex = usagePageSource.indexOf("{activeTab === 'events' && <RequestEventsPanel")
@@ -326,7 +357,7 @@ describe('UsagePage toolbar styles', () => {
     const settingsIndex = usagePageSource.indexOf("{activeTab === 'settings' && (")
     const apiKeySettingsIndex = usagePageSource.indexOf('<ApiKeySettingsCard')
     const priceSettingsIndex = usagePageSource.indexOf('<PriceSettingsCard')
-    const serviceHealthIndex = usagePageSource.indexOf('<ServiceHealthCard')
+    const settingsBlockSource = usagePageSource.slice(settingsIndex, usagePageSource.indexOf('</main>', settingsIndex))
 
     expect(overviewPanelIndex).toBeGreaterThan(-1)
     expect(analysisPanelIndex).toBeGreaterThan(overviewPanelIndex)
@@ -336,7 +367,20 @@ describe('UsagePage toolbar styles', () => {
     expect(settingsIndex).toBeGreaterThan(quotasCardIndex)
     expect(apiKeySettingsIndex).toBeGreaterThan(settingsIndex)
     expect(priceSettingsIndex).toBeGreaterThan(apiKeySettingsIndex)
-    expect(serviceHealthIndex).toBeGreaterThan(priceSettingsIndex)
+    expect(settingsBlockSource).not.toContain('<ServiceHealthCard')
+    expect(settingsBlockSource).not.toContain('<RequestHealthTimelineCard')
+  })
+
+  it('uses a dedicated real-data Request Health Timeline card on Overview', () => {
+    expect(sub2apiOverviewPanelSource).toContain("import { RequestHealthTimelineCard } from './RequestHealthTimelineCard'")
+    expect(sub2apiOverviewPanelSource).toContain('<RequestHealthTimelineCard usage={usage ?? null} loading={!!loading} />')
+    expect(sub2apiOverviewPanelSource).not.toContain('ServiceHealthCard')
+    expect(requestHealthTimelineCardSource).toContain('export function RequestHealthTimelineCard')
+    expect(requestHealthTimelineCardSource).toContain('usage?.service_health?.block_details')
+    expect(requestHealthTimelineCardSource).not.toContain('mockUsage')
+    expect(requestHealthTimelineCardSource).not.toContain('Math.random')
+    expect(usagePageSource).not.toContain('mockUsage')
+    expect(usagePageSource).not.toContain('Math.random')
   })
 
   it('keeps chart line controls aligned with reusable pill controls', () => {

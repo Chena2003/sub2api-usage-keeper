@@ -24,7 +24,7 @@ export function Sub2ApiAnalysisPanel({ models }: Sub2ApiAnalysisPanelProps) {
 
   const modelChartData = useMemo((): ChartData<'doughnut'> | null => {
     if (topModels.length === 0) return null
-    const colors = ['#34d399', '#3b82f6', '#f59e0b', '#ec4899', '#8b5cf6']
+    const colors = ['#10b981', '#f59e0b', '#f43f5e', '#14b8a6', '#64748b']
     return {
       labels: topModels.map((m) => m.model || m.requestedModel || 'unknown'),
       datasets: [
@@ -66,7 +66,7 @@ export function Sub2ApiAnalysisPanel({ models }: Sub2ApiAnalysisPanelProps) {
               <h4 className={styles.chartTitleSmall} style={{ marginBottom: '16px' }}>Top Models (by token volume)</h4>
               <div className={styles.chartDoughnutLegend} style={{ display: 'flex', flexDirection: 'column', gap: '12px', padding: 0 }}>
                 {topModels.map((m, i) => {
-                  const colors = ['#34d399', '#3b82f6', '#f59e0b', '#ec4899', '#8b5cf6']
+                  const colors = ['#10b981', '#f59e0b', '#f43f5e', '#14b8a6', '#64748b']
                   return (
                     <div key={m.model} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                       <span className={styles.chartLegendItem}>

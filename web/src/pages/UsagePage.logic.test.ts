@@ -461,17 +461,20 @@ describe('UsagePage refresh action', () => {
   });
 });
 
-describe('UsagePage settings tab content', () => {
-  it('keeps the existing service health card in Settings', () => {
-    expect(usagePageSource).toContain('ServiceHealthCard');
-    expect(usagePageSource).toContain('<ServiceHealthCard\n                  usage={usage}\n                  loading={overviewDisplayLoading}\n                />');
+describe('UsagePage request health timeline data', () => {
+  it('keeps the health timeline out of Settings', () => {
+    const settingsIndex = usagePageSource.indexOf("{activeTab === 'settings' && (");
+    const settingsBlockSource = usagePageSource.slice(settingsIndex, usagePageSource.indexOf('</main>', settingsIndex));
+
+    expect(settingsBlockSource).not.toContain('ServiceHealthCard');
+    expect(settingsBlockSource).not.toContain('RequestHealthTimelineCard');
   });
 
-  it('enables legacy usage data only while Settings renders the health card', () => {
+  it('enables legacy usage data only while Overview renders the real health timeline', () => {
     const usageDataOptionsSource = usagePageSource.match(/useUsageData\(\{[\s\S]*?\n {2}\}\);/)?.[0] ?? '';
 
-    expect(usageDataOptionsSource).toContain("enabled: activeTab === 'settings'");
-    expect(usageDataOptionsSource).not.toContain("enabled: activeTab === 'overview'");
+    expect(usageDataOptionsSource).toContain("enabled: activeTab === 'overview'");
+    expect(usageDataOptionsSource).not.toContain("enabled: activeTab === 'settings'");
   });
 });
 

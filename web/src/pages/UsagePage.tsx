@@ -27,7 +27,6 @@ import { useThemeStore } from '@/stores';
 import {
   ApiKeySettingsCard,
   PriceSettingsCard,
-  ServiceHealthCard,
   useUsageData,
   usePricingData
 } from '@/components/usage';
@@ -439,7 +438,7 @@ export function UsagePage({ onAuthRequired }: { onAuthRequired?: () => void }) {
     range: timeRange,
     customStart: customTimeRange.start,
     customEnd: customTimeRange.end,
-    enabled: activeTab === 'settings',
+    enabled: activeTab === 'overview',
     apiKeyId: selectedApiKeyId,
   });
   const {
@@ -1115,10 +1114,6 @@ export function UsagePage({ onAuthRequired }: { onAuthRequired?: () => void }) {
                   modelPrices={modelPrices}
                   onPricesChange={setModelPrices}
                   loading={pricingLoading}
-                />
-                <ServiceHealthCard
-                  usage={usage}
-                  loading={overviewDisplayLoading}
                 />
               </div>
             )}

@@ -5,7 +5,7 @@ import type { ChartData, ChartOptions } from 'chart.js'
 import type { Sub2ApiAccount, Sub2ApiModelUsage, Sub2ApiOverview, Sub2ApiTimeseriesPoint } from '@/lib/sub2apiTypes'
 import styles from '@/pages/UsagePage.module.scss'
 import designStyles from './Sub2ApiDesign.module.scss'
-import { ServiceHealthCard } from '@/components/usage/ServiceHealthCard'
+import { RequestHealthTimelineCard } from './RequestHealthTimelineCard'
 import type { UsageOverviewPayload } from '@/components/usage/hooks/useUsageData'
 
 type Sub2ApiOverviewPanelProps = {
@@ -23,6 +23,10 @@ const formatCost = (value: number) => `$${value.toFixed(4)}`
 
 const modelTokenTotal = (model: Sub2ApiModelUsage) => (
   model.inputTokens + model.outputTokens + model.cacheCreationTokens + model.cacheReadTokens
+)
+
+const pointTokenTotal = (point: Sub2ApiTimeseriesPoint) => (
+  point.inputTokens + point.outputTokens + point.cacheCreationTokens + point.cacheReadTokens
 )
 
 const isQuotaAtRisk = (account: Sub2ApiAccount) => {
@@ -103,8 +107,8 @@ export function Sub2ApiOverviewPanel({ overview, points, models, quotaAccounts, 
         {
           label: 'Requests',
           data: points.map((p) => p.totalRequests),
-          backgroundColor: 'rgba(124, 58, 237, 0.55)',
-          borderColor: '#7c3aed',
+          backgroundColor: 'rgba(16, 185, 129, 0.25)',
+          borderColor: '#10b981',
           borderWidth: 1,
           borderRadius: 4,
         },
@@ -120,8 +124,8 @@ export function Sub2ApiOverviewPanel({ overview, points, models, quotaAccounts, 
         {
           label: 'Cost',
           data: points.map((p) => p.actualCost),
-          borderColor: '#ec4899',
-          backgroundColor: 'rgba(236, 72, 153, 0.10)',
+          borderColor: '#f59e0b',
+          backgroundColor: 'rgba(245, 158, 11, 0.10)',
           fill: true,
           tension: 0.35,
           pointRadius: 0,
@@ -140,8 +144,28 @@ export function Sub2ApiOverviewPanel({ overview, points, models, quotaAccounts, 
         {
           label: 'Active Users',
           data: points.map((p) => p.activeUsers),
-          borderColor: '#06b6d4',
-          backgroundColor: 'rgba(6, 182, 212, 0.10)',
+          borderColor: '#14b8a6',
+          backgroundColor: 'rgba(20, 184, 166, 0.10)',
+          fill: true,
+          tension: 0.35,
+          pointRadius: 0,
+          pointHitRadius: 8,
+          borderWidth: 2,
+        },
+      ],
+    }
+  }, [points, chartLabels])
+
+  const tokensChartData = useMemo((): ChartData<'line'> | null => {
+    if (points.length === 0) return null
+    return {
+      labels: chartLabels,
+      datasets: [
+        {
+          label: 'Total Tokens',
+          data: points.map(pointTokenTotal),
+          borderColor: '#64748b',
+          backgroundColor: 'rgba(100, 116, 139, 0.10)',
           fill: true,
           tension: 0.35,
           pointRadius: 0,
@@ -221,13 +245,13 @@ export function Sub2ApiOverviewPanel({ overview, points, models, quotaAccounts, 
             </div>
           </div>
           
-          {usage && <div style={{ marginTop: '24px' }}>
-            <ServiceHealthCard usage={usage} loading={!!loading} />
-          </div>}
+          <div style={{ marginTop: '24px' }}>
+            <RequestHealthTimelineCard usage={usage ?? null} loading={!!loading} />
+          </div>
         </section>
       )}
 
-      {points.length > 1 && (requestChartData || costChartData || usersChartData) && (
+      {points.length > 1 && (requestChartData || costChartData || usersChartData || tokensChartData) && (
         <div className={styles.overviewChartGrid}>
           {requestChartData && (
             <section className={styles.overviewChartCard} aria-label="Request volume chart">
@@ -259,6 +283,17 @@ export function Sub2ApiOverviewPanel({ overview, points, models, quotaAccounts, 
               </div>
               <div className={styles.overviewChartAreaShort}>
                 <Line data={usersChartData} options={chartOptions} />
+              </div>
+            </section>
+          )}
+          {tokensChartData && (
+            <section className={styles.overviewChartCard} aria-label="Total tokens chart">
+              <div className={styles.chartCardHeader}>
+                <strong className={styles.chartCardTitle}>{t('usage_stats.sub2api_total_tokens')}</strong>
+                <span className={styles.chartCardHint}>per hour</span>
+              </div>
+              <div className={styles.overviewChartAreaShort}>
+                <Line data={tokensChartData} options={chartOptions} />
               </div>
             </section>
           )}
