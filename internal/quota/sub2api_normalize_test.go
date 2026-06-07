@@ -253,6 +253,21 @@ func TestNormalizeSub2APIEventsMasksUserIdentifiers(t *testing.T) {
 	}
 }
 
+func TestNormalizeSub2APIUserEmailMasksLocalPartAsFirstThreeAndLastTwo(t *testing.T) {
+	rankings := NormalizeSub2APIRankings("user", []sub2api.RankingRow{{Name: "12345678901@qq.com"}})
+	events := NormalizeSub2APIEvents([]sub2api.UsageEventRow{{User: "laijiachen@example.com"}})
+
+	if len(rankings) != 1 || rankings[0].Name != "123******01@qq.com" {
+		t.Fatalf("ranking user = %#v, want 123******01@qq.com", rankings)
+	}
+	if len(events) != 1 || events[0].User != "lai*****en@example.com" {
+		t.Fatalf("event user = %#v, want lai*****en@example.com", events)
+	}
+	if strings.Contains(rankings[0].Name, "12345678901") || strings.Contains(events[0].User, "laijiachen") {
+		t.Fatalf("masked email leaked raw local part: rankings=%#v events=%#v", rankings, events)
+	}
+}
+
 func TestNormalizeSub2APIEventsMasksAPIKeyIdentifiers(t *testing.T) {
 	events := NormalizeSub2APIEvents([]sub2api.UsageEventRow{{APIKey: "sk-live-secret"}})
 

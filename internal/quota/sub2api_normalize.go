@@ -268,10 +268,10 @@ func maskEmailLocal(local string) string {
 	if len(local) <= 1 {
 		return "*"
 	}
-	if len(local) == 2 {
-		return local[:1] + "*"
+	if len(local) <= 5 {
+		return local[:1] + strings.Repeat("*", len(local)-1)
 	}
-	return local[:1] + "**" + local[len(local)-1:]
+	return local[:3] + strings.Repeat("*", len(local)-5) + local[len(local)-2:]
 }
 
 func NormalizeSub2APIRankings(dimension string, rows []sub2api.RankingRow) []Sub2APIRankingRow {
