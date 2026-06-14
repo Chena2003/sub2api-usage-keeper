@@ -1,0 +1,190 @@
+// Sub2ApiAnalysisPanel.module.scss
+
+.analysisRoot {
+  display: flex;
+  flex-direction: column;
+  gap: var(--gap-bento, 18px);
+}
+
+// ── Model Mix panel: doughnut + legend row ────────────────────────────────────
+.mixRow {
+  display: flex;
+  gap: 28px;
+  align-items: flex-start;
+
+  @media (max-width: 640px) {
+    flex-direction: column;
+    gap: 18px;
+  }
+}
+
+.doughnutWrap {
+  width: 180px;
+  height: 180px;
+  flex-shrink: 0;
+}
+
+.mixLegend {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding-top: 4px;
+}
+
+.mixLegendItem {
+  display: grid;
+  grid-template-columns: 10px 1fr 80px 44px 76px 64px;
+  align-items: center;
+  gap: 0 10px;
+  font-size: 13px;
+}
+
+.mixLegendDot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.mixLegendName {
+  color: var(--fg);
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mixMeter {
+  height: 4px;
+  background: var(--surface-2);
+  border-radius: 2px;
+  overflow: hidden;
+
+  @media (max-width: 800px) {
+    display: none;
+  }
+}
+
+.mixMeterFill {
+  display: block;
+  height: 100%;
+  border-radius: 2px;
+  opacity: 0.7;
+}
+
+.mixLegendPct {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: 12px;
+  color: var(--accent);
+  text-align: right;
+  flex-shrink: 0;
+}
+
+.mixLegendTokens {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: 12px;
+  color: var(--muted);
+  text-align: right;
+  flex-shrink: 0;
+
+  @media (max-width: 600px) {
+    display: none;
+  }
+}
+
+.mixLegendCost {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: 12px;
+  color: color-mix(in oklch, var(--warn) 80%, var(--fg));
+  text-align: right;
+  flex-shrink: 0;
+
+  @media (max-width: 500px) {
+    display: none;
+  }
+}
+
+// ── Chart legend inline ───────────────────────────────────────────────────────
+.chartLegend {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  padding-bottom: 12px;
+}
+
+.legendDotInline {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.legendLabelInline {
+  font-size: 12px;
+  color: var(--muted);
+  margin-right: 6px;
+}
+
+// ── Chart areas ───────────────────────────────────────────────────────────────
+.chartAreaFull {
+  height: 200px;
+  position: relative;
+}
+
+.chartAreaMid {
+  height: 140px;
+  position: relative;
+}
+
+// ── Model detail table ────────────────────────────────────────────────────────
+.tableWrap {
+  overflow-x: auto;
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+
+  th {
+    text-align: left;
+    font-size: 11.5px;
+    font-weight: 600;
+    color: var(--muted);
+    padding: 7px 12px;
+    border-bottom: 1px solid var(--border);
+    white-space: nowrap;
+  }
+
+  td {
+    padding: 8px 12px;
+    border-bottom: 1px solid var(--border);
+    color: var(--fg);
+  }
+
+  tr:last-child td { border-bottom: none; }
+  tr:hover td { background: var(--surface-2); }
+}
+
+.tdName {
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mono {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+.cost {
+  color: color-mix(in oklch, var(--warn) 80%, var(--fg));
+}

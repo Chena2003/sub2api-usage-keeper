@@ -1,9 +1,14 @@
 import { useTranslation } from 'react-i18next'
 import type { Sub2ApiAccount, Sub2ApiQuotaWindow } from '@/lib/sub2apiTypes'
-import styles from './Sub2ApiDesign.module.scss'
+import { Panel } from '@/components/ui/Panel'
+import { StatusPill } from '@/components/ui/StatusPill'
+import styles from './AccountQuotasCard.module.scss'
 
 type AccountQuotasCardProps = {
   accounts: Sub2ApiAccount[]
+  loading?: boolean
+  error?: string | null
+  onRetry?: () => void
 }
 
 const formatNumber = (value: number) => new Intl.NumberFormat().format(value)
@@ -20,92 +25,95 @@ const formatPercent = (ratio?: number) => {
   return `${Math.round(ratio * 100)}%`
 }
 
-const getWindowStatusClass = (status?: string) => {
-  const s = status?.toLowerCase() || ''
-  if (s.includes('exhaust') || s.includes('limit') || s.includes('risk')) return styles.statusExhausted
-  if (s.includes('active') || s.includes('ok')) return styles.statusActive
-  return styles.statusUnknown
+function quotaVariant(window?: Sub2ApiQuotaWindow): 'ok' | 'warn' | 'danger' | 'neutral' {
+  if (!window) return 'neutral'
+  const ratio = window.ratio ?? 0
+  const status = (window.status ?? '').toLowerCase()
+  if (ratio >= 1 || status.includes('exhaust')) return 'danger'
+  if (ratio >= 0.8 || status.includes('risk') || status.includes('limit') || status.includes('warn')) return 'warn'
+  return 'ok'
 }
 
-function QuotaWindowInline({ label, window }: { label: string; window?: Sub2ApiQuotaWindow }) {
+function QuotaWindow({ label, window }: { label: string; window?: Sub2ApiQuotaWindow }) {
   const { t } = useTranslation()
-  const statusClass = getWindowStatusClass(window?.status)
-  const isDanger = (window?.ratio ?? 0) >= 0.8 || window?.status?.includes('exhaust')
+  const variant = quotaVariant(window)
+  const pct = window?.limit ? Math.min(Math.max((window.ratio ?? 0) * 100, 0), 100) : 0
 
   return (
-    <div className={styles.windowInline}>
-      <div className={styles.windowInlineTop}>
-        <span className={styles.windowName}>{label}</span>
-        <span className={`${styles.windowStatus} ${statusClass}`}>{window?.status || 'Unknown'}</span>
+    <div className={styles.window}>
+      <div className={styles.windowTop}>
+        <span className={styles.windowLabel}>{label}</span>
+        {window ? (
+          <StatusPill variant={variant} label={window.status || 'Unknown'} dot={false} />
+        ) : (
+          <span className={styles.windowEmpty}>{t('usage_stats.sub2api_no_quota_window')}</span>
+        )}
       </div>
-      
-      {window ? (
+      {window && (
         <>
-          <div className={styles.progressBarInline}>
-            <div 
-              className={`${styles.progressFill} ${isDanger ? styles.progressFillDanger : ''}`}
-              style={{ width: `${window.limit ? Math.min(Math.max((window.ratio ?? 0) * 100, 0), 100) : 0}%` }}
+          <div className={styles.progressShell}>
+            <div
+              className={`${styles.progressFill} ${styles[`fill_${variant}`]}`}
+              style={{ width: `${pct}%` }}
+              aria-label={`${pct.toFixed(0)}% used`}
             />
           </div>
-          <div className={styles.windowDetailsInline}>
-            <span>
-              {t('usage_stats.used', 'Used')}: {formatNumber(window.consumed)}
-              {window.limit ? ` | ${t('usage_stats.remaining', 'Remaining')}: ${formatNumber(Math.max(0, window.limit - window.consumed))} / ${formatNumber(window.limit)}` : ''} 
-              {window.limit ? ` (${formatPercent(window.ratio)})` : ''}
+          <div className={styles.windowMeta}>
+            <span className={styles.mono}>
+              {formatNumber(window.consumed)}
+              {window.limit ? ` / ${formatNumber(window.limit)} (${formatPercent(window.ratio)})` : ''}
             </span>
-            <span style={{ color: 'var(--info-color)' }}>{formatDateTime(window.refreshAt)}</span>
+            <span className={styles.windowReset}>{formatDateTime(window.refreshAt)}</span>
           </div>
         </>
-      ) : (
-        <div style={{ color: 'var(--text-tertiary)', fontSize: '10px' }}>{t('usage_stats.sub2api_no_quota_window')}</div>
       )}
     </div>
   )
 }
 
-export function AccountQuotasCard({ accounts }: AccountQuotasCardProps) {
+export function AccountQuotasCard({ accounts, loading, error, onRetry }: AccountQuotasCardProps) {
   const { t } = useTranslation()
 
   return (
-    <section className={styles.quotaSurface}>
-      <div className={styles.panelHeader}>
-        <span className={styles.eyebrow}>{t('usage_stats.sub2api_quotas_eyebrow')}</span>
-        <h3 className={styles.title}>{t('usage_stats.sub2api_quotas_title')}</h3>
-        <p className={styles.subtitle}>{t('usage_stats.sub2api_quotas_hint')}</p>
-      </div>
-
-      {accounts.length === 0 ? (
-        <div style={{ color: 'var(--text-tertiary)' }}>{t('usage_stats.sub2api_no_data')}</div>
+    <Panel
+      eyebrow={t('usage_stats.sub2api_quotas_eyebrow')}
+      title={t('usage_stats.sub2api_quotas_title')}
+      as="section"
+    >
+      {error ? (
+        <Panel.Error message={error} onRetry={onRetry} />
+      ) : loading ? (
+        <Panel.Loading rows={4} />
+      ) : accounts.length === 0 ? (
+        <Panel.Empty message={t('usage_stats.sub2api_no_data')} />
       ) : (
-        <div className={styles.quotaList}>
+        <div className={styles.list}>
           {accounts.map((account) => (
-            <article key={account.id} className={styles.quotaRow}>
-              <div className={styles.quotaInfo}>
-                <h4 className={styles.quotaTitle}>{account.displayName || t('usage_stats.sub2api_account')}</h4>
-                <span className={styles.quotaProvider}>{account.provider}</span>
+            <article key={account.id} className={styles.row}>
+              <div className={styles.rowInfo}>
+                <strong className={styles.rowName}>{account.displayName || t('usage_stats.sub2api_account')}</strong>
+                <span className={styles.rowProvider}>{account.provider}</span>
               </div>
-
-              <div className={styles.quotaMetricsInline}>
-                <div className={styles.metricBlockInline}>
+              <div className={styles.rowMetrics}>
+                <div className={styles.metric}>
                   <span className={styles.metricLabel}>{t('usage_stats.sub2api_total_requests')}</span>
-                  <span className={styles.metricValue}>{formatNumber(account.usage.totalRequests)}</span>
+                  <span className={styles.mono}>{formatNumber(account.usage.totalRequests)}</span>
                 </div>
-                <div className={styles.metricBlockInline}>
+                <div className={styles.metric}>
                   <span className={styles.metricLabel}>{t('usage_stats.sub2api_total_tokens')}</span>
-                  <span className={styles.metricValue}>{formatNumber(account.usage.totalTokens)}</span>
+                  <span className={styles.mono}>{formatNumber(account.usage.totalTokens)}</span>
                 </div>
-                <div className={styles.metricBlockInline}>
+                <div className={styles.metric}>
                   <span className={styles.metricLabel}>{t('usage_stats.sub2api_cost')}</span>
-                  <span className={`${styles.metricValue} ${styles.costValue}`}>${account.usage.actualCost.toFixed(4)}</span>
+                  <span className={`${styles.mono} ${styles.cost}`}>${account.usage.actualCost.toFixed(4)}</span>
                 </div>
               </div>
-
-              <QuotaWindowInline label={t('usage_stats.sub2api_five_hour_window')} window={account.fiveHourWindow} />
-              <QuotaWindowInline label={t('usage_stats.sub2api_weekly_window')} window={account.weeklyWindow} />
+              <QuotaWindow label={t('usage_stats.sub2api_five_hour_window')} window={account.fiveHourWindow} />
+              <QuotaWindow label={t('usage_stats.sub2api_weekly_window')} window={account.weeklyWindow} />
             </article>
           ))}
         </div>
       )}
-    </section>
+    </Panel>
   )
 }

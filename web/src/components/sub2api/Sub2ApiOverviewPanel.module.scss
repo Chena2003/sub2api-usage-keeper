@@ -1,0 +1,121 @@
+// Sub2ApiOverviewPanel.module.scss — Bento 网格布局
+// design.md §3.5, §2.1
+
+.bentoRoot {
+  display: flex;
+  flex-direction: column;
+  gap: var(--gap-bento, 18px);
+}
+
+// ── KPI row ───────────────────────────────────────────────────────────────────
+.kpiRow {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: var(--gap-bento-tight, 14px);
+
+  @media (max-width: 1280px) {
+    grid-template-columns: repeat(3, 1fr);
+  }
+
+  @media (max-width: 768px) {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  @media (max-width: 480px) {
+    grid-template-columns: 1fr;
+  }
+}
+
+.kpiCard {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card, 18px);
+  box-shadow: var(--shadow-card);
+  padding: var(--pad-kpi, 17px);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-height: 110px;
+}
+
+.kpiPill {
+  margin-top: 4px;
+}
+
+// 健康卡不额外包裹，RequestHealthTimelineCard 自带 healthCard 容器
+.healthPanel {
+  // 保留空 class 供未来扩展
+}
+
+// ── Chart legend ──────────────────────────────────────────────────────────────
+.chartLegend {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  padding-bottom: 12px;
+}
+
+.legendDot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.legendLabel {
+  font-size: 11px;
+  color: var(--muted);
+  margin-right: 6px;
+}
+
+// Full-width chart (token timeline)
+.chartAreaFull {
+  height: 220px;
+  position: relative;
+}
+
+// ── Mini charts row (4 col grid) ──────────────────────────────────────────────
+.miniChartsRow {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: var(--gap-bento-tight, 14px);
+
+  @media (max-width: 1280px) {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  @media (max-width: 600px) {
+    grid-template-columns: 1fr;
+  }
+}
+
+.miniChartHeader {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.miniChartTitle {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--fg);
+}
+
+.miniChartHint {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--muted);
+}
+
+.miniChartArea {
+  height: 60px;
+  position: relative;
+}
+
+.mono {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}

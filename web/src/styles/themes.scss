@@ -1,196 +1,241 @@
 /**
- * 主题样式
+ * 主题样式 — Sub2API Usage Keeper（白色 Bento 体系）
+ *
+ * 设计源：design.md §3.1-3.5、sub2api-dashboard-heatmap-token-ranking.html
+ *
+ * 命名规范：以 design.md 列出的 token 为权威 token：
+ *   --bg / --surface / --surface-2 / --fg / --muted / --border
+ *   --accent / --accent-2 / --ok / --warn / --danger
+ *   --font-body / --font-mono / --shadow-card
+ *
+ * 旧 token（--bg-primary / --text-primary / --primary-color 等）继续提供，
+ * 但全部映射到上面的权威 token，避免现有大量组件 SCSS module 改名。
  */
 
-// 浅色主题（默认）
 :root {
-  // 极简暖灰：浅色模式
-  --bg-secondary: #faf9f5; // 页面背景（纸感）
-  --bg-primary: #f0eee8; // 容器/卡片背景
-  --bg-tertiary: #e9e6df; // hover/次级背景
-  --bg-hover: var(--bg-tertiary);
-  --bg-quinary: #f6f4ee;
-  --bg-error-light: rgba(198, 87, 70, 0.1);
-  --floating-surface: #fffdf9;
-  --floating-border: #d8d3ca;
-  --floating-shadow: 0 12px 26px rgba(0, 0, 0, 0.14);
+  // —— 权威 token（design.md / 原型）——
+  --bg: oklch(99.5% 0.002 250);
+  --surface: oklch(100% 0 0);
+  --surface-2: oklch(96.5% 0.006 250);
+  --fg: oklch(22% 0.02 240);
+  --muted: oklch(50% 0.018 240);
+  --border: oklch(90% 0.008 240);
+  --accent: oklch(58% 0.16 145); // 绿（主色）
+  --accent-2: oklch(62% 0.15 250); // 蓝（辅色 / 渐变 / 高亮）
+  --warn: oklch(72% 0.17 82);
+  --danger: oklch(62% 0.2 28);
+  --ok: var(--accent);
 
-  --text-primary: #2d2a26;
-  --text-secondary: #6d6760;
-  --text-tertiary: #a29c95;
-  --text-quaternary: #c0bab3;
-  --text-muted: var(--text-tertiary);
+  --font-body: -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', 'IBM Plex Mono', ui-monospace, Menlo, monospace;
 
-  --border-color: #e3e1db; // 边框/分割线
-  --border-secondary: var(--border-color);
-  --border-primary: #d5d2cb;
-  --border-hover: #cecac4;
+  --shadow-card: 0 1px 2px rgb(15 23 42 / 0.05), 0 12px 30px rgb(15 23 42 / 0.05);
 
-  --primary-color: #8b8680; // 行动色（主色）
-  --primary-hover: #7f7a74;
-  --primary-active: #726d67;
+  // —— 卡片几何（design.md §3.5）——
+  --radius-card: 18px;
+  --radius-pill: 999px;
+  --pad-card: 18px;
+  --pad-card-tight: 16px;
+  --pad-card-loose: 24px;
+  --pad-kpi: 17px;
+  --gap-bento: 18px;
+  --gap-bento-tight: 14px;
+
+  // 全局尺寸
+  --shell-sidebar-w: 264px;
+  --shell-sidebar-w-compact: 82px;
+  --shell-topbar-h: 78px;
+  --shell-content-pad-x: 28px;
+  --shell-content-pad-top: 26px;
+  --shell-content-pad-bottom: 42px;
+
+  // —— 兼容别名（保留现有组件 className 不破坏）——
+  --bg-secondary: var(--bg);
+  --bg-primary: var(--surface);
+  --bg-tertiary: var(--surface-2);
+  --bg-hover: var(--surface-2);
+  --bg-quinary: color-mix(in oklch, var(--surface) 92%, var(--accent-2));
+  --bg-error-light: color-mix(in oklch, var(--danger) 10%, transparent);
+  --floating-surface: var(--surface);
+  --floating-border: var(--border);
+  --floating-shadow: 0 12px 26px rgb(15 23 42 / 0.10);
+
+  --text-primary: var(--fg);
+  --text-secondary: var(--muted);
+  --text-tertiary: oklch(62% 0.014 240);
+  --text-quaternary: oklch(74% 0.01 240);
+  --text-muted: var(--muted);
+  --text-h: var(--fg);
+
+  --border-color: var(--border);
+  --border-secondary: var(--border);
+  --border-primary: oklch(86% 0.01 240);
+  --border-hover: oklch(82% 0.012 240);
+
+  --primary-color: var(--accent);
+  --primary-hover: oklch(54% 0.165 145);
+  --primary-active: oklch(50% 0.17 145);
   --primary-contrast: #ffffff;
 
-  --success-color: #10b981;
-  --quota-medium-color: #e0aa14;
-  --warning-color: #c65746; // 错误/警告色
-  --error-color: #c65746;
-  --danger-color: var(--error-color);
-  --info-color: var(--primary-color);
+  --accent-color: var(--accent);
+  --accent-bg: color-mix(in oklch, var(--accent) 10%, var(--surface));
+  --accent-tertiary: var(--surface-2);
 
-  --warning-bg: rgba(198, 87, 70, 0.12);
-  --warning-border: rgba(198, 87, 70, 0.35);
-  --warning-text: var(--warning-color);
+  --success-color: var(--ok);
+  --quota-medium-color: var(--warn);
+  --warning-color: var(--warn);
+  --error-color: var(--danger);
+  --danger-color: var(--danger);
+  --info-color: var(--accent-2);
 
-  --success-badge-bg: #d1fae5;
-  --success-badge-text: #065f46;
-  --success-badge-border: #6ee7b7;
+  --warning-bg: color-mix(in oklch, var(--warn) 14%, transparent);
+  --warning-border: color-mix(in oklch, var(--warn) 38%, transparent);
+  --warning-text: oklch(48% 0.18 70);
 
-  --failure-badge-bg: rgba(198, 87, 70, 0.14);
-  --failure-badge-text: #8a3a30;
-  --failure-badge-border: rgba(198, 87, 70, 0.35);
+  --success-badge-bg: color-mix(in oklch, var(--ok) 14%, var(--surface));
+  --success-badge-fg: color-mix(in oklch, var(--ok) 80%, var(--fg));
+  --success-badge-text: oklch(40% 0.13 145);
+  --success-badge-border: color-mix(in oklch, var(--ok) 32%, var(--border));
 
-  --count-badge-bg: rgba(139, 134, 128, 0.18);
-  --count-badge-text: var(--primary-active);
+  --failure-badge-bg: color-mix(in oklch, var(--danger) 14%, var(--surface));
+  --failure-badge-text: oklch(42% 0.16 28);
+  --failure-badge-border: color-mix(in oklch, var(--danger) 32%, var(--border));
 
-  --shadow: 0 1px 2px 0 rgb(0 0 0 / 0.08);
-  --shadow-lg: 0 10px 18px -3px rgb(0 0 0 / 0.1);
+  --danger-badge-bg: color-mix(in oklch, var(--danger) 14%, var(--surface));
+  --danger-badge-fg: color-mix(in oklch, var(--danger) 80%, var(--fg));
 
-  --radius-md: 8px;
-  --accent-tertiary: var(--bg-tertiary);
+  --count-badge-bg: color-mix(in oklch, var(--muted) 16%, transparent);
+  --count-badge-text: var(--fg);
 
-  // Glass effect (blurred surfaces)
-  --glass-blur: 12px;
+  --shadow: 0 1px 2px 0 rgb(15 23 42 / 0.05);
+  --shadow-sm: 0 1px 2px 0 rgb(15 23 42 / 0.05);
+  --shadow-lg: var(--shadow-card);
+
+  --radius-sm: 8px;
+  --radius-md: 12px;
+
+  // Glass effect — 用 oklch 空间下的 surface 兜底
+  --glass-blur: 18px;
   --glass-backdrop-filter: blur(var(--glass-blur));
   --glass-filter: blur(var(--glass-blur));
-  --glass-bg: color-mix(in srgb, var(--bg-primary) 82%, transparent);
-  --glass-bg-secondary: color-mix(in srgb, var(--bg-secondary) 82%, transparent);
-  --glass-border: color-mix(in srgb, var(--border-color) 60%, transparent);
+  --glass-bg: color-mix(in oklch, var(--bg) 84%, white);
+  --glass-bg-secondary: color-mix(in oklch, var(--surface) 92%, transparent);
+  --glass-border: color-mix(in oklch, var(--border) 70%, transparent);
 }
 
-// 纯白主题
+// 纯白主题（与默认浅色基本一致，提供给用户切换）
 [data-theme='white'] {
-  --bg-secondary: #ffffff;
-  --bg-primary: #ffffff;
-  --bg-tertiary: #f6f6f6;
-  --bg-hover: var(--bg-tertiary);
-  --bg-quinary: #ffffff;
-  --bg-error-light: rgba(198, 87, 70, 0.08);
-  --floating-surface: #ffffff;
-  --floating-border: #d9d9d9;
-  --floating-shadow: 0 12px 26px rgba(0, 0, 0, 0.12);
-
-  --text-primary: #2d2a26;
-  --text-secondary: #6d6760;
-  --text-tertiary: #a29c95;
-  --text-quaternary: #c0bab3;
-  --text-muted: var(--text-tertiary);
-
-  --border-color: #e5e5e5;
-  --border-secondary: var(--border-color);
-  --border-primary: #d9d9d9;
-  --border-hover: #cccccc;
-
-  --primary-color: #8b8680;
-  --primary-hover: #7f7a74;
-  --primary-active: #726d67;
-  --primary-contrast: #ffffff;
-
-  --success-color: #10b981;
-  --quota-medium-color: #e0aa14;
-  --warning-color: #c65746;
-  --error-color: #c65746;
-  --danger-color: var(--error-color);
-  --info-color: var(--primary-color);
-
-  --warning-bg: rgba(198, 87, 70, 0.12);
-  --warning-border: rgba(198, 87, 70, 0.35);
-  --warning-text: var(--warning-color);
-
-  --success-badge-bg: #d1fae5;
-  --success-badge-text: #065f46;
-  --success-badge-border: #6ee7b7;
-
-  --failure-badge-bg: rgba(198, 87, 70, 0.14);
-  --failure-badge-text: #8a3a30;
-  --failure-badge-border: rgba(198, 87, 70, 0.35);
-
-  --count-badge-bg: rgba(139, 134, 128, 0.18);
-  --count-badge-text: var(--primary-active);
-
-  --shadow: 0 1px 2px 0 rgb(0 0 0 / 0.08);
-  --shadow-lg: 0 10px 18px -3px rgb(0 0 0 / 0.1);
-
-  --radius-md: 8px;
-  --accent-tertiary: var(--bg-tertiary);
+  --bg: oklch(99% 0.003 250);
+  --surface: #ffffff;
+  --surface-2: oklch(97.5% 0.004 250);
+  --fg: oklch(20% 0.018 240);
+  --muted: oklch(48% 0.014 240);
+  --border: oklch(91% 0.006 240);
 }
 
-// 深色主题（#191919）
+// 深色主题（保持冷调）
 [data-theme='dark'] {
-  // 极简暖灰：深色模式（提升对比度与层级）
-  --bg-secondary: #151412; // 页面背景
-  --bg-primary: #1d1b18; // 容器/卡片背景
-  --bg-tertiary: #262320; // hover/次级背景
-  --bg-hover: #2e2a26;
-  --bg-quinary: #191714;
-  --bg-error-light: rgba(198, 87, 70, 0.18);
-  --floating-surface: #2a2723;
-  --floating-border: #4a443d;
-  --floating-shadow: 0 14px 30px rgba(0, 0, 0, 0.4);
+  --bg: oklch(16% 0.012 240);
+  --surface: oklch(20% 0.014 240);
+  --surface-2: oklch(24% 0.014 240);
+  --fg: oklch(95% 0.01 240);
+  --muted: oklch(70% 0.012 240);
+  --border: oklch(30% 0.012 240);
+  --accent: oklch(72% 0.16 145);
+  --accent-2: oklch(72% 0.14 250);
+  --warn: oklch(78% 0.16 82);
+  --danger: oklch(68% 0.19 28);
 
-  --text-primary: #f6f4f1;
-  --text-secondary: #c9c3bb;
-  --text-tertiary: #9c958d;
-  --text-quaternary: #6f6962;
-  --text-muted: var(--text-tertiary);
+  --shadow-card: 0 1px 2px rgb(0 0 0 / 0.4), 0 14px 30px rgb(0 0 0 / 0.4);
 
-  --border-color: #3a3530;
-  --border-secondary: var(--border-color);
-  --border-primary: #4a453f;
-  --border-hover: #5a544d;
+  // 兼容别名也需在暗色下重算
+  --bg-secondary: var(--bg);
+  --bg-primary: var(--surface);
+  --bg-tertiary: var(--surface-2);
+  --bg-hover: var(--surface-2);
+  --bg-quinary: color-mix(in oklch, var(--surface) 92%, var(--accent-2));
+  --bg-error-light: color-mix(in oklch, var(--danger) 22%, transparent);
+  --floating-surface: var(--surface);
+  --floating-border: var(--border);
+  --floating-shadow: 0 14px 30px rgb(0 0 0 / 0.45);
 
-  --primary-color: #8b8680;
-  --primary-hover: #9a948e;
-  --primary-active: #a6a099;
-  --primary-contrast: #ffffff;
+  --text-primary: var(--fg);
+  --text-secondary: var(--muted);
+  --text-tertiary: oklch(64% 0.012 240);
+  --text-quaternary: oklch(50% 0.012 240);
+  --text-muted: var(--muted);
+  --text-h: var(--fg);
 
-  --success-color: #10b981;
-  --quota-medium-color: #ffd862;
-  --warning-color: #c65746;
-  --error-color: #c65746;
-  --danger-color: var(--error-color);
-  --info-color: var(--primary-color);
+  --border-color: var(--border);
+  --border-secondary: var(--border);
+  --border-primary: oklch(34% 0.012 240);
+  --border-hover: oklch(40% 0.014 240);
 
-  --warning-bg: rgba(198, 87, 70, 0.22);
-  --warning-border: rgba(198, 87, 70, 0.45);
-  --warning-text: #f1b0a6;
+  --primary-color: var(--accent);
+  --primary-hover: oklch(76% 0.16 145);
+  --primary-active: oklch(80% 0.16 145);
+  --primary-contrast: oklch(15% 0.01 240);
 
-  --success-badge-bg: rgba(6, 78, 59, 0.3);
-  --success-badge-text: #6ee7b7;
-  --success-badge-border: #059669;
+  --accent-color: var(--accent);
+  --accent-bg: color-mix(in oklch, var(--accent) 16%, var(--surface));
+  --accent-tertiary: var(--surface-2);
 
-  --failure-badge-bg: rgba(198, 87, 70, 0.24);
-  --failure-badge-text: #f1b0a6;
-  --failure-badge-border: rgba(198, 87, 70, 0.5);
+  --success-color: var(--accent);
+  --quota-medium-color: var(--warn);
+  --warning-color: var(--warn);
+  --error-color: var(--danger);
+  --danger-color: var(--danger);
+  --info-color: var(--accent-2);
 
-  --count-badge-bg: rgba(139, 134, 128, 0.28);
-  --count-badge-text: var(--primary-active);
+  --warning-bg: color-mix(in oklch, var(--warn) 22%, transparent);
+  --warning-border: color-mix(in oklch, var(--warn) 45%, transparent);
+  --warning-text: oklch(86% 0.16 82);
 
-  --shadow: 0 1px 3px 0 rgb(0 0 0 / 0.3);
-  --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.3);
+  --success-badge-bg: color-mix(in oklch, var(--accent) 22%, var(--surface));
+  --success-badge-fg: color-mix(in oklch, var(--ok) 80%, var(--fg));
+  --success-badge-text: oklch(86% 0.14 145);
+  --success-badge-border: color-mix(in oklch, var(--accent) 45%, var(--border));
 
-  --radius-md: 8px;
-  --accent-tertiary: var(--bg-tertiary);
+  --failure-badge-bg: color-mix(in oklch, var(--danger) 22%, var(--surface));
+  --failure-badge-text: oklch(82% 0.14 28);
+  --failure-badge-border: color-mix(in oklch, var(--danger) 50%, var(--border));
 
-  --glass-border: color-mix(in srgb, var(--border-color) 55%, transparent);
+  --danger-badge-bg: color-mix(in oklch, var(--danger) 22%, var(--surface));
+  --danger-badge-fg: color-mix(in oklch, var(--danger) 80%, var(--fg));
+
+  --count-badge-bg: color-mix(in oklch, var(--muted) 22%, transparent);
+  --count-badge-text: oklch(86% 0.012 240);
+
+  --shadow: 0 1px 3px 0 rgb(0 0 0 / 0.45);
+  --shadow-sm: var(--shadow);
+  --shadow-lg: var(--shadow-card);
+
+  --glass-bg: color-mix(in oklch, var(--bg) 80%, var(--surface));
+  --glass-bg-secondary: color-mix(in oklch, var(--surface) 88%, transparent);
+  --glass-border: color-mix(in oklch, var(--border) 70%, transparent);
 }
 
+// 减弱透明 / 移动端：禁用毛玻璃，回退到 surface
 @media (max-width: 768px), (prefers-reduced-motion: reduce), (prefers-reduced-transparency: reduce) {
   :root {
     --glass-backdrop-filter: none;
     --glass-filter: none;
-    --glass-bg: var(--bg-primary);
-    --glass-bg-secondary: var(--bg-secondary);
-    --glass-border: var(--border-color);
+    --glass-bg: var(--surface);
+    --glass-bg-secondary: var(--surface);
+    --glass-border: var(--border);
   }
+}
+
+// 全局数字对齐工具类（design.md §3.4：KPI、金额、百分比、排行）
+.mono,
+[data-mono] {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+// 焦点环统一规则（design.md §11.4：对比度 ≥ 3:1）
+:where(button, a, input, select, textarea, [role='button'], [tabindex]):focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: inherit;
 }

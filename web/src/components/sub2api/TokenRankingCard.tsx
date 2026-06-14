@@ -1,74 +1,113 @@
 import { useTranslation } from 'react-i18next'
 import type { Sub2ApiRanking, Sub2ApiRankingDimension } from '@/lib/sub2apiTypes'
-import styles from '@/pages/UsagePage.module.scss'
+import { Panel } from '@/components/ui/Panel'
+import styles from './TokenRankingCard.module.scss'
 
 type TokenRankingCardProps = {
   rankings: Sub2ApiRanking[]
   dimension: Sub2ApiRankingDimension
   onDimensionChange: (dimension: Sub2ApiRankingDimension) => void | Promise<void>
+  loading?: boolean
+  error?: string | null
+  onRetry?: () => void
 }
 
 const DIMENSIONS: Sub2ApiRankingDimension[] = ['user', 'api_key', 'model', 'account']
 
+const RANK_COLORS = [
+  'oklch(72% 0.17 82)',   // #1 amber
+  'oklch(62% 0.15 250)',  // #2 blue
+  'oklch(58% 0.16 145)',  // #3 green
+]
+
 const formatNumber = (value: number) => new Intl.NumberFormat().format(value)
+const formatCost   = (value: number) => `$${value.toFixed(4)}`
 
-const formatCost = (value: number) => `$${value.toFixed(4)}`
+const formatTokensCompact = (n: number) => {
+  if (n >= 1_000_000_000) return `${(n / 1_000_000_000).toFixed(1)}B`
+  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`
+  if (n >= 1_000) return `${(n / 1_000).toFixed(1)}K`
+  return String(n)
+}
 
-const formatShare = (value: number) => `${(value * 100).toFixed(1)}%`
-
-export function TokenRankingCard({ rankings, dimension, onDimensionChange }: TokenRankingCardProps) {
+export function TokenRankingCard({ rankings, dimension, onDimensionChange, loading, error, onRetry }: TokenRankingCardProps) {
   const { t } = useTranslation()
-  const maxTokens = Math.max(...rankings.map((ranking) => ranking.totalTokens), 1)
+  const maxTokens = Math.max(...rankings.map((r) => r.totalTokens), 1)
+  const totalTokens = rankings.reduce((s, r) => s + r.totalTokens, 0)
+
+  const dimSelector = (
+    <div className={styles.dimSwitcher} role="tablist" aria-label={t('usage_stats.sub2api_ranking_dimension')}>
+      {DIMENSIONS.map((opt) => (
+        <button
+          key={opt}
+          type="button"
+          role="tab"
+          aria-selected={dimension === opt}
+          className={`${styles.dimPill} ${dimension === opt ? styles.dimPillActive : ''}`}
+          onClick={() => void onDimensionChange(opt)}
+        >
+          {t(`usage_stats.sub2api_dimension_${opt}`)}
+        </button>
+      ))}
+    </div>
+  )
 
   return (
-    <section className={styles.rankingSurface}>
-      <div className={styles.sectionTitleBlock}>
-        <span className={styles.sectionEyebrow}>{t('usage_stats.sub2api_ranking_eyebrow')}</span>
-        <h3 className={styles.sectionTitle}>{t('usage_stats.sub2api_ranking_title')}</h3>
-        <p className={styles.sectionSubtitle}>{t('usage_stats.sub2api_ranking_hint')}</p>
-      </div>
-
-      <div className={styles.refreshSwitcher} role="tablist" aria-label={t('usage_stats.sub2api_ranking_dimension')}>
-        {DIMENSIONS.map((option) => (
-          <button
-            key={option}
-            type="button"
-            role="tab"
-            aria-selected={dimension === option}
-            className={`${styles.refreshPill} ${dimension === option ? styles.refreshPillActive : ''}`.trim()}
-            onClick={() => void onDimensionChange(option)}
-          >
-            {t(`usage_stats.sub2api_dimension_${option}`)}
-          </button>
-        ))}
-      </div>
-
-      {rankings.length === 0 ? (
-        <div className={styles.hint}>{t('usage_stats.sub2api_no_data')}</div>
+    <Panel
+      eyebrow={t('usage_stats.sub2api_ranking_eyebrow')}
+      title={t('usage_stats.sub2api_ranking_title')}
+      actions={dimSelector}
+      as="section"
+    >
+      {error ? (
+        <Panel.Error message={error} onRetry={onRetry} />
+      ) : loading ? (
+        <Panel.Loading rows={5} />
+      ) : rankings.length === 0 ? (
+        <Panel.Empty message={t('usage_stats.sub2api_no_data')} />
       ) : (
-        <div className={styles.rankingList}>
-          {rankings.map((ranking, index) => (
-            <article key={`${ranking.dimension}-${ranking.name}-${index}`} className={styles.rankingItem}>
-              <div className={styles.rankingHeader}>
-                <span className={styles.rankingRank}>#{index + 1}</span>
-                <strong className={styles.rankingName}>{ranking.name || 'unknown'}</strong>
-                <span className={styles.rankingShare}>{formatShare(ranking.share)}</span>
-              </div>
-              <div className={styles.rankingMeterShell} aria-hidden="true">
-                <span className={styles.rankingMeterFill} style={{ width: `${Math.max((ranking.totalTokens / maxTokens) * 100, 3)}%` }} />
-              </div>
-              <div className={styles.rankingMetrics}>
-                <span>{t('usage_stats.sub2api_requests')}: {formatNumber(ranking.totalRequests)}</span>
-                <span>{t('usage_stats.sub2api_total_tokens')}: {formatNumber(ranking.totalTokens)}</span>
-                <span>{t('usage_stats.sub2api_input_tokens')}: {formatNumber(ranking.inputTokens)}</span>
-                <span>{t('usage_stats.sub2api_output_tokens')}: {formatNumber(ranking.outputTokens)}</span>
-                <span>{t('usage_stats.sub2api_cache_tokens')}: {formatNumber(ranking.cacheTokens)}</span>
-                <span>{t('usage_stats.sub2api_cost')}: {formatCost(ranking.actualCost)}</span>
-              </div>
-            </article>
-          ))}
+        <div className={styles.list}>
+          {rankings.map((r, i) => {
+            const rankColor = i < 3 ? RANK_COLORS[i] : 'var(--muted)'
+            const pct = totalTokens > 0 ? ((r.totalTokens / totalTokens) * 100).toFixed(1) : '0.0'
+            return (
+              <article key={`${r.dimension}-${r.name}-${i}`} className={styles.item}>
+                <div className={styles.rankBadge} style={{ '--rank-color': rankColor } as React.CSSProperties}>
+                  {i + 1}
+                </div>
+                <div className={styles.body}>
+                  <div className={styles.topRow}>
+                    <strong className={styles.name}>{r.name || 'unknown'}</strong>
+                    <span className={styles.tokenCompact}>{formatTokensCompact(r.totalTokens)}</span>
+                  </div>
+                  <div className={styles.meterRow}>
+                    <div className={styles.meter} aria-hidden="true">
+                      <span
+                        className={styles.meterFill}
+                        style={{
+                          width: `${Math.max((r.totalTokens / maxTokens) * 100, 2)}%`,
+                          background: rankColor,
+                        }}
+                      />
+                    </div>
+                    <span className={styles.pct}>{pct}%</span>
+                  </div>
+                  <div className={styles.metaRow}>
+                    <span className={styles.metaItem}>
+                      <span className={styles.metaLabel}>{t('usage_stats.sub2api_requests')}</span>
+                      <span className={styles.mono}>{formatNumber(r.totalRequests)}</span>
+                    </span>
+                    <span className={styles.metaItem}>
+                      <span className={styles.metaLabel}>{t('usage_stats.sub2api_cost')}</span>
+                      <span className={styles.mono}>{formatCost(r.actualCost)}</span>
+                    </span>
+                  </div>
+                </div>
+              </article>
+            )
+          })}
         </div>
       )}
-    </section>
+    </Panel>
   )
 }

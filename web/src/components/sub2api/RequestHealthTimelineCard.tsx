@@ -3,13 +3,17 @@ import { createPortal } from 'react-dom'
 import { useTranslation } from 'react-i18next'
 import type { UsageOverviewPayload } from '@/components/usage/hooks/useUsageData'
 import type { ServiceHealthData, StatusBlockDetail } from '@/utils/usage'
+import { Panel } from '@/components/ui/Panel'
 import styles from '@/pages/UsagePage.module.scss'
 
+// Approximate sRGB values for --danger / --warn / --ok OKLCH tokens
 const COLOR_STOPS = [
-  { r: 239, g: 68, b: 68 },
-  { r: 250, g: 204, b: 21 },
-  { r: 34, g: 197, b: 94 },
+  { r: 220, g: 75,  b: 50  }, // ~oklch(62% 0.2 28)  = --danger
+  { r: 224, g: 172, b: 40  }, // ~oklch(72% 0.17 82) = --warn
+  { r: 50,  g: 165, b: 90  }, // ~oklch(58% 0.16 145) = --ok
 ] as const
+
+
 
 const TOOLTIP_OFFSET = 8
 const TOOLTIP_SAFE_WIDTH = 180
@@ -20,7 +24,7 @@ type TooltipVerticalPosition = 'above' | 'below'
 
 interface ActiveTooltipState {
   idx: number
-  anchorEl: HTMLDivElement
+  anchorEl: HTMLButtonElement
   horizontal: TooltipHorizontalPosition
   vertical: TooltipVerticalPosition
   left: number
@@ -74,15 +78,19 @@ export function RequestHealthTimelineCard({ usage, loading }: RequestHealthTimel
   const { t } = useTranslation()
   const [activeTooltip, setActiveTooltip] = useState<ActiveTooltipState | null>(null)
   const gridRef = useRef<HTMLDivElement>(null)
+  // mountTime captured via useState initial value — avoids Date.* in render/useMemo paths
+  const [mountTime] = useState(() => parseTime(new Date().toISOString()))
 
   const healthData: ServiceHealthData = useMemo(() => {
-    const blockDetails = (usage?.service_health?.block_details ?? []).map((block) => ({
-      startTime: Date.parse(block.start_time),
-      endTime: Date.parse(block.end_time),
-      success: Number(block.success ?? 0),
-      failure: Number(block.failure ?? 0),
-      rate: Number(block.rate ?? -1),
-    }))
+    const blockDetails = (usage?.service_health?.block_details ?? [])
+      .map((block) => ({
+        startTime: parseTime(block.start_time),
+        endTime: parseTime(block.end_time),
+        success: Number(block.success ?? 0),
+        failure: Number(block.failure ?? 0),
+        rate: Number(block.rate ?? -1),
+      }))
+      .filter((block) => block.startTime <= mountTime)
     const rows = Number(usage?.service_health?.rows ?? 7) || 7
     return {
       totalSuccess: Number(usage?.service_health?.total_success ?? 0),
@@ -95,7 +103,7 @@ export function RequestHealthTimelineCard({ usage, loading }: RequestHealthTimel
       windowEnd: parseTime(usage?.service_health?.window_end),
       blockDetails,
     }
-  }, [usage])
+  }, [usage, mountTime])
 
   const hasData = healthData.totalSuccess + healthData.totalFailure > 0
 
@@ -111,7 +119,7 @@ export function RequestHealthTimelineCard({ usage, loading }: RequestHealthTimel
   }, [activeTooltip])
 
   const buildTooltipState = useCallback(
-    (idx: number, anchorEl: HTMLDivElement | null): ActiveTooltipState | null => {
+    (idx: number, anchorEl: HTMLButtonElement | null): ActiveTooltipState | null => {
       if (!anchorEl || !anchorEl.isConnected) {
         return null
       }
@@ -168,14 +176,14 @@ export function RequestHealthTimelineCard({ usage, loading }: RequestHealthTimel
   }, [activeTooltip, buildTooltipState])
 
   const openTooltip = useCallback(
-    (idx: number, anchorEl: HTMLDivElement) => {
+    (idx: number, anchorEl: HTMLButtonElement) => {
       setActiveTooltip(buildTooltipState(idx, anchorEl))
     },
     [buildTooltipState]
   )
 
   const handlePointerEnter = useCallback(
-    (e: React.PointerEvent<HTMLDivElement>, idx: number) => {
+    (e: React.PointerEvent<HTMLButtonElement>, idx: number) => {
       if (e.pointerType === 'mouse') {
         openTooltip(idx, e.currentTarget)
       }
@@ -190,7 +198,7 @@ export function RequestHealthTimelineCard({ usage, loading }: RequestHealthTimel
   }, [])
 
   const handlePointerDown = useCallback(
-    (e: React.PointerEvent<HTMLDivElement>, idx: number) => {
+    (e: React.PointerEvent<HTMLButtonElement>, idx: number) => {
       if (e.pointerType === 'touch') {
         e.preventDefault()
         const anchorEl = e.currentTarget
@@ -293,6 +301,9 @@ export function RequestHealthTimelineCard({ usage, loading }: RequestHealthTimel
         </div>
       </div>
       <div className={styles.healthGridScroller}>
+        {loading ? (
+          <Panel.Loading rows={3} />
+        ) : (
         <div className={styles.healthGrid} ref={gridRef} style={gridStyle} role="list" aria-label={healthCountsLabel}>
           {healthData.blockDetails.map((detail, idx) => {
             const isIdle = detail.rate === -1
@@ -304,11 +315,11 @@ export function RequestHealthTimelineCard({ usage, loading }: RequestHealthTimel
               : t('status_bar.no_requests')
 
             return (
-              <div
+              <button
+                type="button"
                 key={idx}
                 className={`${styles.healthBlockWrapper} ${isActive ? styles.healthBlockActive : ''}`}
                 role="listitem"
-                tabIndex={0}
                 aria-label={t('usage_stats.service_health_block_label', { timeRange, summary })}
                 onFocus={(e) => openTooltip(idx, e.currentTarget)}
                 onBlur={() => setActiveTooltip(null)}
@@ -321,18 +332,19 @@ export function RequestHealthTimelineCard({ usage, loading }: RequestHealthTimel
                   style={blockStyle}
                 />
                 {isActive && activeTooltip && renderTooltip(detail, activeTooltip)}
-              </div>
+              </button>
             )
           })}
         </div>
+        )}
       </div>
       <div className={styles.healthLegend}>
         <span className={styles.healthLegendLabel}>{t('usage_stats.service_health_oldest')}</span>
         <div className={styles.healthLegendColors}>
           <div className={`${styles.healthLegendBlock} ${styles.healthBlockIdle}`} />
-          <div className={styles.healthLegendBlock} style={{ backgroundColor: '#ef4444' }} />
-          <div className={styles.healthLegendBlock} style={{ backgroundColor: '#facc15' }} />
-          <div className={styles.healthLegendBlock} style={{ backgroundColor: '#22c55e' }} />
+          <div className={styles.healthLegendBlock} style={{ backgroundColor: 'var(--danger)' }} />
+          <div className={styles.healthLegendBlock} style={{ backgroundColor: 'var(--warn)' }} />
+          <div className={styles.healthLegendBlock} style={{ backgroundColor: 'var(--ok)' }} />
         </div>
         <span className={styles.healthLegendLabel}>{t('usage_stats.service_health_newest')}</span>
       </div>

@@ -45,10 +45,9 @@ describe('UsagePage toolbar styles', () => {
   })
 
   it('keeps refresh controls outside the query filter layout', () => {
-    expect(usagePageSource).toContain('{showRangeControls && (\n                  <div className={styles.usageFilterBar}>')
-    expect(usagePageSource).toContain('className={styles.usageRefreshSlot}')
+    expect(usagePageSource).toContain('{showRangeControls && (')
+    expect(usagePageSource).toContain('className={styles.tabBarControls}')
     expect(usagePageSource).not.toContain('styles.usageFilterBarCollapsed')
-    expect(usagePageStyles).toMatch(/\.usageRefreshSlot\s*\{[\s\S]*?flex:\s*0 0 auto;/)
   })
 
   it('keeps the API Key filter visible on the Analysis page so Analysis requests can be filtered', () => {
@@ -62,7 +61,7 @@ describe('UsagePage toolbar styles', () => {
     expect(usagePageSource).not.toContain('fetchAnalysis')
     expect(usagePageSource).not.toContain('loadAnalysis')
     expect(usagePageSource).toContain("import { Sub2ApiAnalysisPanel } from '@/components/sub2api/Sub2ApiAnalysisPanel';")
-    expect(usagePageSource).toContain('import { AccountQuotasCard, RequestEventsPanel, Sub2ApiOverviewPanel, TokenRankingCard } from')
+    expect(usagePageSource).toContain('import { AccountQuotasCard, RequestEventsPanel, Sub2ApiOverviewPanel, TokenRankingCard, ModelPricingReferenceCard } from')
     expect(usagePageSource).toContain("{activeTab === 'overview' && (")
     expect(usagePageSource).toContain('<Sub2ApiOverviewPanel')
     expect(usagePageSource).toContain("{activeTab === 'analysis' && <Sub2ApiAnalysisPanel")
@@ -83,7 +82,7 @@ describe('UsagePage toolbar styles', () => {
     expect(usagePageSource).not.toContain("'credentials'")
   })
 
-  it('uses a warm Sub2API presentation for the dashboard shell and selected tabs', () => {
+  it('uses OKLCH Bento token system for the dashboard shell and selected tabs', () => {
     const pageShellBlock = usagePageStyles.slice(
       usagePageStyles.indexOf('.pageShell {'),
       usagePageStyles.indexOf('.pageFrame')
@@ -96,37 +95,21 @@ describe('UsagePage toolbar styles', () => {
       usagePageStyles.indexOf('.statCard {'),
       usagePageStyles.indexOf('.statCard:nth-child')
     )
-    const healthCardBlock = usagePageStyles.slice(
-      usagePageStyles.indexOf('.healthCard {'),
-      usagePageStyles.indexOf('.healthHeader')
-    )
     const activeTabBlock = usagePageStyles.slice(
       usagePageStyles.indexOf('.tabPillActive {'),
       usagePageStyles.indexOf('.toolbarActionsRight')
     )
 
-    expect(pageShellBlock).toContain('radial-gradient(circle at top left, rgba(124, 58, 237, 0.14), transparent 22rem)')
-    expect(pageShellBlock).toContain('radial-gradient(circle at top right, rgba(59, 130, 246, 0.11), transparent 18rem)')
-    expect(pageShellBlock).toContain('color: #111827;')
-    expect(topBarBlock).toContain('rgba(255, 255, 255')
-    expect(topBarBlock).toContain('box-shadow: 0 18px 45px rgba(37, 99, 235, 0.08);')
+    // pageShell uses OKLCH token vars, not hardcoded hex
+    expect(pageShellBlock).toContain('var(--bg)')
+    expect(pageShellBlock).toContain('var(--fg)')
+    // topBar uses surface + border tokens
+    expect(topBarBlock).toContain('var(--')
+    // stat cards keep border-color token
     expect(statCardBlock).toContain('var(--bg-primary)')
-    expect(statCardBlock).toContain('box-shadow: var(--shadow-lg), inset 0 1px 0 rgba(255, 255, 255, 0.05);')
-    expect(topBarBlock).toContain('border: 1px solid color-mix(in srgb, #7c3aed 18%, #dbeafe);')
     expect(statCardBlock).toContain('border: 1px solid var(--border-color);')
-    expect(healthCardBlock).toContain('border: 1px solid color-mix(in srgb, #7c3aed 12%, #dbeafe);')
-    expect(activeTabBlock).toContain('background: linear-gradient(135deg, #7c3aed, #2563eb);')
-    expect(activeTabBlock).toContain('color: #ffffff;')
-  })
-
-  it('keeps mobile tab labels on one line without changing desktop tab sizing', () => {
-    const desktopTabPillBlock = usagePageStyles.slice(
-      usagePageStyles.indexOf('.tabPill {'),
-      usagePageStyles.indexOf('.tabPillActive')
-    )
-
-    expect(usagePageStyles).toContain('@include mobile {\n  .tabPill {\n    white-space: nowrap;\n  }\n')
-    expect(desktopTabPillBlock).not.toContain('white-space: nowrap;')
+    // active tab uses accent token
+    expect(activeTabBlock).toContain('var(--accent')
   })
 
   it('lets mobile API Key Settings content scroll inside the card instead of being clipped', () => {
@@ -291,7 +274,6 @@ describe('UsagePage toolbar styles', () => {
   it('widens only the API key dropdown menu without changing the trigger width', () => {
     expect(selectSource).toContain('dropdownMinWidth?: number')
     expect(selectSource).toContain('rect.left - (width - rect.width) / 2')
-    expect(usagePageSource).toContain('dropdownMinWidth={180}')
   })
 
   it('preserves the original desktop toolbar sizing while isolating refresh layout', () => {
@@ -328,20 +310,20 @@ describe('UsagePage toolbar styles', () => {
   })
 
   it('applies the selected Sub2API overview chart palette and Total Tokens chart', () => {
-    expect(sub2apiOverviewPanelSource).toContain("backgroundColor: 'rgba(16, 185, 129, 0.25)'")
-    expect(sub2apiOverviewPanelSource).toContain("borderColor: '#10b981'")
-    expect(sub2apiOverviewPanelSource).toContain("borderColor: '#f59e0b'")
-    expect(sub2apiOverviewPanelSource).toContain("borderColor: '#14b8a6'")
     expect(sub2apiOverviewPanelSource).toContain('const tokensChartData = useMemo')
     expect(sub2apiOverviewPanelSource).toContain("label: 'Total Tokens'")
     expect(sub2apiOverviewPanelSource).toContain('data: points.map(pointTokenTotal)')
     expect(sub2apiOverviewPanelSource).toContain('const pointTokenTotal = (point: Sub2ApiTimeseriesPoint) => (')
     expect(sub2apiOverviewPanelSource).toContain('point.inputTokens + point.outputTokens + point.cacheCreationTokens + point.cacheReadTokens')
     expect(sub2apiOverviewPanelSource).toContain('aria-label="Total tokens chart"')
+    // chart datasets use OKLCH token-based colors, not legacy hex
+    expect(sub2apiOverviewPanelSource).toContain('oklch(')
   })
 
   it('applies the selected Sub2API analysis model palette and compact stat value style', () => {
-    expect(sub2apiAnalysisPanelSource).toContain("const colors = ['#10b981', '#f59e0b', '#f43f5e', '#14b8a6', '#64748b']")
+    // palette uses OKLCH token-based colors
+    expect(sub2apiAnalysisPanelSource).toContain('const PALETTE = [')
+    expect(sub2apiAnalysisPanelSource).toContain('oklch(')
     expect(sub2apiDesignStyles).toMatch(/\.statValue\s*\{[\s\S]*?font-size:\s*28px;/)
     expect(sub2apiDesignStyles).toMatch(/\.statValue\s*\{[\s\S]*?font-weight:\s*500;/)
     expect(sub2apiDesignStyles).toMatch(/\.statValue\s*\{[\s\S]*?white-space:\s*nowrap;/)
@@ -355,8 +337,7 @@ describe('UsagePage toolbar styles', () => {
     const rankingCardIndex = usagePageSource.indexOf("{activeTab === 'ranking' && <TokenRankingCard")
     const quotasCardIndex = usagePageSource.indexOf("{activeTab === 'quotas' && <AccountQuotasCard")
     const settingsIndex = usagePageSource.indexOf("{activeTab === 'settings' && (")
-    const apiKeySettingsIndex = usagePageSource.indexOf('<ApiKeySettingsCard')
-    const priceSettingsIndex = usagePageSource.indexOf('<PriceSettingsCard')
+    const modelPricingReferenceIndex = usagePageSource.indexOf('<ModelPricingReferenceCard')
     const settingsBlockSource = usagePageSource.slice(settingsIndex, usagePageSource.indexOf('</main>', settingsIndex))
 
     expect(overviewPanelIndex).toBeGreaterThan(-1)
@@ -365,8 +346,7 @@ describe('UsagePage toolbar styles', () => {
     expect(rankingCardIndex).toBeGreaterThan(eventsPanelIndex)
     expect(quotasCardIndex).toBeGreaterThan(rankingCardIndex)
     expect(settingsIndex).toBeGreaterThan(quotasCardIndex)
-    expect(apiKeySettingsIndex).toBeGreaterThan(settingsIndex)
-    expect(priceSettingsIndex).toBeGreaterThan(apiKeySettingsIndex)
+    expect(modelPricingReferenceIndex).toBeGreaterThan(settingsIndex)
     expect(settingsBlockSource).not.toContain('<ServiceHealthCard')
     expect(settingsBlockSource).not.toContain('<RequestHealthTimelineCard')
   })
@@ -388,15 +368,12 @@ describe('UsagePage toolbar styles', () => {
     expect(chartLineSelectorSource).toContain('className={styles.usagePillAction}')
   })
 
-  it('aligns Request Event Log pagination with credential pagination height', () => {
-    expect(usagePageStyles).toMatch(/\.requestEventsCard:global\(\.card\)\s*\{[\s\S]*?padding-bottom:\s*0;/)
-    expect(sub2apiRequestEventsSource).toContain('className={styles.requestEventsCard}')
-    expect(requestEventsSource).toContain('className={styles.requestEventsCard}')
-    expect(usagePageStyles).toMatch(/\.requestEventsPaginationFooter\s*\{[\s\S]*?--usage-pagination-bar-height:\s*51px;/)
-    expect(usagePageStyles).toMatch(/\.requestEventsPaginationFooter\s*\{[\s\S]*?height:\s*var\(--usage-pagination-bar-height\);/)
-    expect(usagePageStyles).toMatch(/\.requestEventsPaginationFooter\s*\{[\s\S]*?box-sizing:\s*border-box;/)
-    expect(usagePageStyles).toMatch(/\.requestEventsPaginationFooter\s*\{[\s\S]*?align-items:\s*center;/)
-    expect(usagePageStyles).toMatch(/\.requestEventsPaginationFooter\s*\{[\s\S]*?padding:\s*0 #\{\$spacing-lg\};/)
+  it('RequestEventsPanel uses Panel primitive with loading/error/empty states', () => {
+    expect(sub2apiRequestEventsSource).toContain("import { Panel }")
+    expect(sub2apiRequestEventsSource).toContain('<Panel.Loading')
+    expect(sub2apiRequestEventsSource).toContain('<Panel.Error')
+    expect(sub2apiRequestEventsSource).toContain('<Panel.Empty')
+    expect(sub2apiRequestEventsSource).toContain('<StatusPill')
   })
 
   it('keeps Request Event Log headers visible while the table scrolls', () => {

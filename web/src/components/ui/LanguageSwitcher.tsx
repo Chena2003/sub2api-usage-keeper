@@ -17,6 +17,7 @@ export function LanguageSwitcher({ className = '' }: { className?: string }) {
     if (currentLanguage === language) return;
     await i18n.changeLanguage(language);
     persistLanguage(language);
+    document.documentElement.lang = language;
   }, [currentLanguage]);
 
   const switcherClassName = `${styles.languageSwitcher} ${className}`.trim();

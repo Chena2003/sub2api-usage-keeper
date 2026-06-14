@@ -14,8 +14,8 @@ import {
   Legend,
   Filler
 } from 'chart.js';
-import { ApiError, fetchCpaApiKeyOptions, fetchCpaApiKeys, fetchStatus, fetchUpdateCheck, updateCpaApiKeyAlias } from '@/lib/api';
-import type { CpaApiKeyOption, CpaApiKeySettingsItem, StatusResponse } from '@/lib/types';
+import { ApiError, fetchCpaApiKeyOptions, fetchStatus, fetchUpdateCheck } from '@/lib/api';
+import type { CpaApiKeyOption, StatusResponse } from '@/lib/types';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 
 import { Sub2ApiAnalysisPanel } from '@/components/sub2api/Sub2ApiAnalysisPanel';
@@ -30,7 +30,7 @@ import {
   useUsageData,
   usePricingData
 } from '@/components/usage';
-import { AccountQuotasCard, RequestEventsPanel, Sub2ApiOverviewPanel, TokenRankingCard } from '@/components/sub2api';
+import { AccountQuotasCard, RequestEventsPanel, Sub2ApiOverviewPanel, TokenRankingCard, ModelPricingReferenceCard } from '@/components/sub2api';
 import { useSub2ApiDashboardStore } from '@/stores/useSub2ApiDashboardStore';
 import { buildUsageRangeQuery } from '@/utils/usage/rangeQuery';
 import {
@@ -442,21 +442,11 @@ export function UsagePage({ onAuthRequired }: { onAuthRequired?: () => void }) {
     apiKeyId: selectedApiKeyId,
   });
   const {
-    modelNames,
-    modelPrices,
-    loading: pricingLoading,
-    error: pricingError,
     loadPricing,
-    setModelPrices,
   } = usePricingData({
     onAuthRequired,
-    enabled: activeTab === 'settings',
+    enabled: false,
   });
-  const [apiKeySettings, setApiKeySettings] = useState<CpaApiKeySettingsItem[]>([]);
-  const [apiKeySettingsLoading, setApiKeySettingsLoading] = useState(false);
-  const [apiKeySettingsError, setApiKeySettingsError] = useState('');
-  const [apiKeySettingsSavingId, setApiKeySettingsSavingId] = useState<string | null>(null);
-  const apiKeySettingsRequestControllerRef = useRef<AbortController | null>(null);
   const [status, setStatus] = useState<StatusResponse | null>(null);
   const [statusError, setStatusError] = useState('');
   const [updateCheckLoading, setUpdateCheckLoading] = useState(false);
@@ -473,17 +463,11 @@ export function UsagePage({ onAuthRequired }: { onAuthRequired?: () => void }) {
   const sub2apiEvents = useSub2ApiDashboardStore((state) => state.events);
   const sub2apiQuotaAccounts = useSub2ApiDashboardStore((state) => state.quotaAccounts);
   const rankingDimension = useSub2ApiDashboardStore((state) => state.rankingDimension);
+  const sub2apiError = useSub2ApiDashboardStore((state) => state.error);
   const refreshSub2API = useSub2ApiDashboardStore((state) => state.refresh);
   const loadRankings = useSub2ApiDashboardStore((state) => state.loadRankings);
   const tabOptions = useMemo(() => getUsageTabOptions(t), [t]);
   const timeRangeOptions = useMemo(() => getTimeRangeOptions(t), [t]);
-  const apiKeySelectOptions = useMemo(
-    () => [
-      { value: '', label: t('usage_stats.api_key_filter_all') },
-      ...apiKeyOptions.map((option) => ({ value: option.id, label: option.label })),
-    ],
-    [apiKeyOptions, t],
-  );
   const themeOptions = useMemo(
     () =>
       THEME_OPTIONS.map((option) => ({
@@ -544,57 +528,6 @@ export function UsagePage({ onAuthRequired }: { onAuthRequired?: () => void }) {
       if (apiKeyOptionsRequestControllerRef.current === controller) {
         apiKeyOptionsRequestControllerRef.current = null;
       }
-    }
-  }, [onAuthRequired]);
-
-  const loadApiKeySettings = useCallback(async () => {
-    apiKeySettingsRequestControllerRef.current?.abort();
-    const controller = new AbortController();
-    apiKeySettingsRequestControllerRef.current = controller;
-
-    setApiKeySettingsLoading(true);
-    setApiKeySettingsError('');
-    try {
-      const response = await fetchCpaApiKeys(controller.signal);
-      if (apiKeySettingsRequestControllerRef.current !== controller) {
-        return;
-      }
-      setApiKeySettings(response.items ?? []);
-    } catch (error) {
-      if (controller.signal.aborted) {
-        return;
-      }
-      if (apiKeySettingsRequestControllerRef.current === controller) {
-        setApiKeySettings([]);
-      }
-      if (error instanceof ApiError && error.status === 401) {
-        onAuthRequired?.();
-        return;
-      }
-      setApiKeySettingsError(error instanceof Error ? error.message : 'Failed to load CPA API keys');
-    } finally {
-      if (apiKeySettingsRequestControllerRef.current === controller) {
-        setApiKeySettingsLoading(false);
-        apiKeySettingsRequestControllerRef.current = null;
-      }
-    }
-  }, [onAuthRequired]);
-
-  const handleSaveApiKeyAlias = useCallback(async (id: string, keyAlias: string) => {
-    setApiKeySettingsSavingId(id);
-    setApiKeySettingsError('');
-    try {
-      const updated = await updateCpaApiKeyAlias(id, keyAlias);
-      setApiKeySettings((current) => current.map((item) => (item.id === updated.id ? updated : item)));
-      setApiKeyOptions((current) => current.map((item) => (item.id === updated.id ? updated : item)));
-    } catch (error) {
-      if (error instanceof ApiError && error.status === 401) {
-        onAuthRequired?.();
-        return;
-      }
-      setApiKeySettingsError(error instanceof Error ? error.message : 'Failed to update CPA API key alias');
-    } finally {
-      setApiKeySettingsSavingId(null);
     }
   }, [onAuthRequired]);
 
@@ -733,11 +666,11 @@ export function UsagePage({ onAuthRequired }: { onAuthRequired?: () => void }) {
       return;
     }
     if (activeTab === 'settings') {
-      await Promise.all([loadApiKeySettings(), loadPricing()]);
+      await loadPricing();
       return;
     }
     await loadUsage();
-  }, [activeTab, loadApiKeySettings, loadPricing, loadUsage, refreshSub2API]);
+  }, [activeTab, loadPricing, loadUsage, refreshSub2API]);
 
   const refreshAutoRefreshTab = useCallback(async () => {
     await refreshAutoRefreshTabData({ activeTab, loadUsage, refreshSub2API });
@@ -811,20 +744,6 @@ export function UsagePage({ onAuthRequired }: { onAuthRequired?: () => void }) {
       void refreshSub2API();
     }
   }, [activeTab, refreshSub2API]);
-
-  useEffect(() => {
-    if (activeTab !== 'settings') {
-      apiKeySettingsRequestControllerRef.current?.abort();
-      apiKeySettingsRequestControllerRef.current = null;
-      setApiKeySettingsLoading(false);
-      return;
-    }
-    void loadApiKeySettings();
-    return () => {
-      apiKeySettingsRequestControllerRef.current?.abort();
-      apiKeySettingsRequestControllerRef.current = null;
-    };
-  }, [activeTab, loadApiKeySettings]);
 
   const lastSyncAt = useMemo(() => {
     if (!status?.last_run_at) return null;
@@ -961,160 +880,107 @@ export function UsagePage({ onAuthRequired }: { onAuthRequired?: () => void }) {
                 ))}
               </div>
 
-              <div className={styles.toolbarActionsRight}>
-                {showRangeControls && (
-                  <div className={styles.usageFilterBar}>
-                    <div className={styles.apiKeyFilterGroup}>
-                    <label className={`${styles.usageFilterField} ${styles.apiKeyFilterField}`.trim()}>
-                      <span className={styles.usageFilterLabel}>{t('usage_stats.api_key_filter')}</span>
-                      <Select
-                        value={selectedApiKeyId}
-                        options={apiKeySelectOptions}
-                        onChange={setSelectedApiKeyId}
-                        className={styles.apiKeySelectControl}
-                        ariaLabel={t('usage_stats.api_key_filter')}
-                        fullWidth
-                        dropdownMinWidth={180}
-                      />
-                    </label>
+              {showRangeControls && (
+                <div className={styles.tabBarControls}>
+                  <select
+                    className={styles.rangeSelectInline}
+                    value={timeRange}
+                    onChange={(e) => setTimeRange(e.target.value as UsageTimeRange)}
+                    aria-label={t('usage_stats.range_filter')}
+                  >
+                    {timeRangeOptions.map((opt) => (
+                      <option key={opt.value} value={opt.value}>{opt.label}</option>
+                    ))}
+                  </select>
+                  <div
+                    className={`${styles.customRangeInlineGroup} ${isCustomRange ? styles.customRangeFieldGroupOpen : ''}`.trim()}
+                    aria-hidden={!isCustomRange}
+                  >
+                    <input
+                      type="date"
+                      className={`input ${styles.customRangeInput}`}
+                      value={customTimeRange.start}
+                      min={customDateRangeBounds.min}
+                      max={customDateRangeBounds.max}
+                      disabled={!isCustomRange}
+                      onClick={handleCustomDateInputActivate}
+                      onFocus={handleCustomDateInputActivate}
+                      onKeyDown={handleCustomDateInputKeyDown}
+                      onPaste={(event) => event.preventDefault()}
+                      onChange={(event) => {
+                        const nextValue = event.target.value;
+                        if (!isCustomDateWithinBounds(nextValue, customDateRangeBounds)) return;
+                        setCustomTimeRange((current) => ({ ...current, start: nextValue }));
+                      }}
+                      aria-label={t('usage_stats.custom_start')}
+                    />
+                    <span aria-hidden="true">—</span>
+                    <input
+                      type="date"
+                      className={`input ${styles.customRangeInput}`}
+                      value={customTimeRange.end}
+                      min={customDateRangeBounds.min}
+                      max={customDateRangeBounds.max}
+                      disabled={!isCustomRange}
+                      onClick={handleCustomDateInputActivate}
+                      onFocus={handleCustomDateInputActivate}
+                      onKeyDown={handleCustomDateInputKeyDown}
+                      onPaste={(event) => event.preventDefault()}
+                      onChange={(event) => {
+                        const nextValue = event.target.value;
+                        if (!isCustomDateWithinBounds(nextValue, customDateRangeBounds)) return;
+                        setCustomTimeRange((current) => ({ ...current, end: nextValue }));
+                      }}
+                      aria-label={t('usage_stats.custom_end')}
+                    />
                   </div>
-                    <div className={styles.timeRangeGroup}>
-                    <label className={`${styles.usageFilterField} ${styles.rangeFilterField}`.trim()}>
-                      <span className={styles.usageFilterLabel}>{t('usage_stats.range_filter')}</span>
-                      <Select
-                        value={timeRange}
-                        options={timeRangeOptions}
-                        onChange={(value) => setTimeRange(value as UsageTimeRange)}
-                        className={styles.rangeSelectControl}
-                        ariaLabel={t('usage_stats.range_filter')}
-                        fullWidth
-                      />
-                    </label>
-                    <div
-                      className={`${styles.customRangeFieldGroup} ${isCustomRange ? styles.customRangeFieldGroupOpen : ''}`.trim()}
-                      aria-hidden={!isCustomRange}
-                    >
-                      <label className={styles.customRangeField}>
-                        <span className={styles.customRangeFieldLabel}>{t('usage_stats.custom_start')}</span>
-                        <input
-                          type="date"
-                          className={`input ${styles.customRangeInput}`}
-                          value={customTimeRange.start}
-                          min={customDateRangeBounds.min}
-                          max={customDateRangeBounds.max}
-                          disabled={!isCustomRange}
-                          onClick={handleCustomDateInputActivate}
-                          onFocus={handleCustomDateInputActivate}
-                          onKeyDown={handleCustomDateInputKeyDown}
-                          onPaste={(event) => event.preventDefault()}
-                          onChange={(event) => {
-                            const nextValue = event.target.value;
-                            if (!isCustomDateWithinBounds(nextValue, customDateRangeBounds)) return;
-                            setCustomTimeRange((current) => ({
-                              ...current,
-                              start: nextValue
-                            }));
-                          }}
-                          aria-label={t('usage_stats.custom_start')}
-                        />
-                      </label>
-                      <span className={styles.customRangeSeparator} aria-hidden="true">—</span>
-                      <label className={styles.customRangeField}>
-                        <span className={styles.customRangeFieldLabel}>{t('usage_stats.custom_end')}</span>
-                        <input
-                          type="date"
-                          className={`input ${styles.customRangeInput}`}
-                          value={customTimeRange.end}
-                          min={customDateRangeBounds.min}
-                          max={customDateRangeBounds.max}
-                          disabled={!isCustomRange}
-                          onClick={handleCustomDateInputActivate}
-                          onFocus={handleCustomDateInputActivate}
-                          onKeyDown={handleCustomDateInputKeyDown}
-                          onPaste={(event) => event.preventDefault()}
-                          onChange={(event) => {
-                            const nextValue = event.target.value;
-                            if (!isCustomDateWithinBounds(nextValue, customDateRangeBounds)) return;
-                            setCustomTimeRange((current) => ({
-                              ...current,
-                              end: nextValue
-                            }));
-                          }}
-                          aria-label={t('usage_stats.custom_end')}
-                        />
-                      </label>
-                    </div>
-                  </div>
-                    {isCustomRange && customRangeHint && (
-                      <span className={styles.customRangeHint}>{customRangeHint}</span>
+                  {isCustomRange && customRangeHint && <span className={styles.customRangeHint}>{customRangeHint}</span>}
+                  {isCustomRange && customRangeError && <span className={styles.customRangeError}>{customRangeError}</span>}
+                  <button
+                    type="button"
+                    className={`${styles.tabBarRefreshBtn} ${manualRefreshLoading ? styles.refreshPillLoading : ''}`.trim()}
+                    onClick={() => void handleManualRefresh().catch(() => {})}
+                    disabled={manualRefreshLoading}
+                    aria-busy={manualRefreshLoading}
+                  >
+                    {manualRefreshLoading ? (
+                      <span className={styles.refreshPillInner}>
+                        <LoadingSpinner size={12} className={styles.refreshSpinner} />
+                        <span>{t('common.loading')}</span>
+                      </span>
+                    ) : (
+                      <span className={styles.refreshPillInner}>
+                        <IconRefreshCw size={14} />
+                        <span>{t('usage_stats.refresh')}</span>
+                      </span>
                     )}
-                    {isCustomRange && customRangeError && (
-                      <span className={styles.customRangeError}>{customRangeError}</span>
-                    )}
-                  </div>
-                )}
-                <div className={styles.usageRefreshSlot}>
-                  <div className={styles.usageFilterActions}>
-                    <div className={styles.refreshSwitcher} role="group" aria-label={t('usage_stats.refresh')}>
-                      <button
-                        type="button"
-                        className={`${styles.refreshPill} ${styles.refreshPillActive} ${manualRefreshLoading ? styles.refreshPillLoading : ''}`.trim()}
-                        onClick={() => void handleManualRefresh().catch(() => {})}
-                        disabled={manualRefreshLoading}
-                        aria-busy={manualRefreshLoading}
-                      >
-                        {manualRefreshLoading ? (
-                          <span className={styles.refreshPillInner}>
-                            <LoadingSpinner size={12} className={styles.refreshSpinner} />
-                            <span>{t('common.loading')}</span>
-                          </span>
-                        ) : (
-                          <span className={styles.refreshPillInner}>
-                            <IconRefreshCw size={14} />
-                            <span>{t('usage_stats.refresh')}</span>
-                          </span>
-                        )}
-                      </button>
-                    </div>
-                  </div>
+                  </button>
                 </div>
-              </div>
+              )}
             </div>
 
-            {activeTab === 'overview' && error && <div className={styles.errorBox}>{error === 'AUTH_REQUIRED' ? t('auth.session_expired') : error}</div>}
-            {activeTab === 'settings' && pricingError && <div className={styles.errorBox}>{pricingError === 'AUTH_REQUIRED' ? t('auth.session_expired') : pricingError}</div>}
-            {activeTab === 'settings' && apiKeySettingsError && <div className={styles.errorBox}>{apiKeySettingsError}</div>}
-            {!(activeTab === 'overview' ? error : activeTab === 'settings' ? (pricingError || apiKeySettingsError) : '') && statusError && <div className={styles.errorBox}>{statusError}</div>}
+            {activeTab === 'overview' && error && <div className={styles.errorBox} role="alert">{error === 'AUTH_REQUIRED' ? t('auth.session_expired') : error}</div>}
+            {!(activeTab === 'overview' ? error : '') && statusError && <div className={styles.errorBox} role="alert">{statusError}</div>}
 
             {activeTab === 'overview' && (
-              <Sub2ApiOverviewPanel 
-                overview={sub2apiOverview} 
-                points={sub2apiPoints} 
-                models={sub2apiModels} 
-                quotaAccounts={sub2apiQuotaAccounts} 
-                usage={usage} 
-                loading={overviewDisplayLoading} 
+              <Sub2ApiOverviewPanel
+                overview={sub2apiOverview}
+                points={sub2apiPoints}
+                quotaAccounts={sub2apiQuotaAccounts}
+                usage={usage}
+                loading={overviewDisplayLoading}
+                error={sub2apiError}
+                onRetry={refreshSub2API}
               />
             )}
-            {activeTab === 'analysis' && <Sub2ApiAnalysisPanel models={sub2apiModels} />}
-            {activeTab === 'events' && <RequestEventsPanel events={sub2apiEvents} />}
-            {activeTab === 'ranking' && <TokenRankingCard rankings={sub2apiRankings} dimension={rankingDimension} onDimensionChange={loadRankings} />}
-            {activeTab === 'quotas' && <AccountQuotasCard accounts={sub2apiQuotaAccounts} />}
+            {activeTab === 'analysis' && <Sub2ApiAnalysisPanel models={sub2apiModels} points={sub2apiPoints} loading={loading} error={sub2apiError} onRetry={refreshSub2API} />}
+            {activeTab === 'events' && <RequestEventsPanel events={sub2apiEvents} loading={loading} error={sub2apiError} onRetry={refreshSub2API} />}
+            {activeTab === 'ranking' && <TokenRankingCard rankings={sub2apiRankings} dimension={rankingDimension} onDimensionChange={loadRankings} loading={loading} error={sub2apiError} onRetry={refreshSub2API} />}
+            {activeTab === 'quotas' && <AccountQuotasCard accounts={sub2apiQuotaAccounts} loading={loading} error={sub2apiError} onRetry={refreshSub2API} />}
 
             {activeTab === 'settings' && (
               <div className={styles.settingsSections}>
-                <ApiKeySettingsCard
-                  apiKeys={apiKeySettings}
-                  loading={apiKeySettingsLoading}
-                  savingId={apiKeySettingsSavingId}
-                  onSaveAlias={handleSaveApiKeyAlias}
-                />
-                <PriceSettingsCard
-                  modelNames={modelNames}
-                  modelPrices={modelPrices}
-                  onPricesChange={setModelPrices}
-                  loading={pricingLoading}
-                />
+                <ModelPricingReferenceCard />
               </div>
             )}
           </div>
