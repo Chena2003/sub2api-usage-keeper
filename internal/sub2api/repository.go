@@ -258,6 +258,37 @@ func (r *Repository) GetAccountUsage(ctx context.Context, since time.Time) ([]Ac
 	return rows, nil
 }
 
+func (r *Repository) GetFiveHourAccountUsage(ctx context.Context) ([]AccountUsageRow, error) {
+	db, err := r.database()
+	if err != nil {
+		return nil, fmt.Errorf("get sub2api five hour account usage: %w", err)
+	}
+
+	var rows []AccountUsageRow
+	err = db.WithContext(ctx).Raw(`
+		SELECT
+			account_id,
+			COUNT(*) AS total_requests,
+			COALESCE(SUM(input_tokens), 0) AS input_tokens,
+			COALESCE(SUM(output_tokens), 0) AS output_tokens,
+			COALESCE(SUM(cache_creation_tokens), 0) AS cache_creation_tokens,
+			COALESCE(SUM(cache_read_tokens), 0) AS cache_read_tokens,
+			COALESCE(SUM(total_cost), 0) AS total_cost,
+			COALESCE(SUM(actual_cost), 0) AS actual_cost,
+			COALESCE(AVG(duration_ms), 0) AS average_duration_ms,
+			MAX(created_at) AS last_request_at
+		FROM usage_logs
+		WHERE created_at >= now() - interval '5 hours'
+			AND account_id IS NOT NULL
+		GROUP BY account_id
+		ORDER BY total_requests DESC
+	`).Scan(&rows).Error
+	if err != nil {
+		return nil, fmt.Errorf("get sub2api five hour account usage: %w", err)
+	}
+	return rows, nil
+}
+
 func (r *Repository) GetRankings(ctx context.Context, dimension string, since time.Time, limit int) ([]RankingRow, error) {
 	limit = ClampDashboardLimit(limit, 20)
 
@@ -334,6 +365,33 @@ func (r *Repository) GetEvents(ctx context.Context, page int, limit int) ([]Usag
 		return nil, 0, fmt.Errorf("get sub2api events: %w", err)
 	}
 	return rows, total, nil
+}
+
+func (r *Repository) GetHealthBlocks(ctx context.Context, hours int) ([]HealthBlockRow, error) {
+	hours = ClampDashboardHours(hours)
+
+	db, err := r.database()
+	if err != nil {
+		return nil, fmt.Errorf("get sub2api health blocks: %w", err)
+	}
+
+	var rows []HealthBlockRow
+	err = db.WithContext(ctx).Raw(`
+		SELECT
+			date_trunc('hour', created_at) + (date_part('minute', created_at)::int / 15) * interval '15 minutes' AS bucket_start,
+			date_trunc('hour', created_at) + (date_part('minute', created_at)::int / 15 + 1) * interval '15 minutes' AS bucket_end,
+			COUNT(*) AS success_count,
+			0 AS failure_count,
+			COUNT(*) AS total_count
+		FROM usage_logs
+		WHERE created_at >= now() - (?::int * interval '1 hour')
+		GROUP BY bucket_start, bucket_end
+		ORDER BY bucket_start ASC
+	`, hours).Scan(&rows).Error
+	if err != nil {
+		return nil, fmt.Errorf("get sub2api health blocks: %w", err)
+	}
+	return rows, nil
 }
 
 func rankingColumn(dimension string) string {

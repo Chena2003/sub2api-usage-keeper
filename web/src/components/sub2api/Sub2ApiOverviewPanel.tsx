@@ -2,7 +2,7 @@ import { useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Line, Bar } from 'react-chartjs-2'
 import type { ChartData, ChartOptions } from 'chart.js'
-import type { Sub2ApiAccount, Sub2ApiOverview, Sub2ApiTimeseriesPoint } from '@/lib/sub2apiTypes'
+import type { Sub2ApiAccount, Sub2ApiOverview, Sub2ApiServiceHealth, Sub2ApiTimeseriesPoint } from '@/lib/sub2apiTypes'
 import { Panel } from '@/components/ui/Panel'
 import { Kpi } from '@/components/ui/Kpi'
 import { StatusPill } from '@/components/ui/StatusPill'
@@ -15,6 +15,7 @@ type Sub2ApiOverviewPanelProps = {
   points: Sub2ApiTimeseriesPoint[]
   quotaAccounts: Sub2ApiAccount[]
   usage?: UsageOverviewPayload | null
+  serviceHealth?: Sub2ApiServiceHealth | null
   loading?: boolean
   error?: string | null
   onRetry?: () => void
@@ -36,7 +37,7 @@ const isQuotaAtRisk = (account: Sub2ApiAccount) => {
   })
 }
 
-export function Sub2ApiOverviewPanel({ overview, points, quotaAccounts, usage, loading, error, onRetry }: Sub2ApiOverviewPanelProps) {
+export function Sub2ApiOverviewPanel({ overview, points, quotaAccounts, usage, serviceHealth, loading, error, onRetry }: Sub2ApiOverviewPanelProps) {
   const { t } = useTranslation()
   const hasData = Boolean(overview) || points.length > 0 || quotaAccounts.length > 0
   const quotaRiskCount = quotaAccounts.filter(isQuotaAtRisk).length
@@ -259,7 +260,7 @@ export function Sub2ApiOverviewPanel({ overview, points, quotaAccounts, usage, l
 
       {/* ── Full-width: Request Health Timeline ─────────────── */}
       <div className={styles.healthPanel}>
-        <RequestHealthTimelineCard usage={usage ?? null} loading={!!loading} />
+        <RequestHealthTimelineCard usage={usage ?? null} serviceHealth={serviceHealth} loading={!!loading} />
       </div>
 
       {/* ── Mini charts row (4 cols) ─────────────────────────── */}

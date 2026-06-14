@@ -353,10 +353,10 @@ describe('UsagePage toolbar styles', () => {
 
   it('uses a dedicated real-data Request Health Timeline card on Overview', () => {
     expect(sub2apiOverviewPanelSource).toContain("import { RequestHealthTimelineCard } from './RequestHealthTimelineCard'")
-    expect(sub2apiOverviewPanelSource).toContain('<RequestHealthTimelineCard usage={usage ?? null} loading={!!loading} />')
+    expect(sub2apiOverviewPanelSource).toContain('<RequestHealthTimelineCard usage={usage ?? null} serviceHealth={serviceHealth} loading={!!loading} />')
     expect(sub2apiOverviewPanelSource).not.toContain('ServiceHealthCard')
     expect(requestHealthTimelineCardSource).toContain('export function RequestHealthTimelineCard')
-    expect(requestHealthTimelineCardSource).toContain('usage?.service_health?.block_details')
+    expect(requestHealthTimelineCardSource).toContain('serviceHealth ?? usage?.service_health')
     expect(requestHealthTimelineCardSource).not.toContain('mockUsage')
     expect(requestHealthTimelineCardSource).not.toContain('Math.random')
     expect(usagePageSource).not.toContain('mockUsage')

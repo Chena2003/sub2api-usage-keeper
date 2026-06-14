@@ -118,3 +118,23 @@ export type Sub2ApiModelUsage = {
   actualCost: number
   averageDurationMS: number
 }
+
+export type Sub2ApiHealthBlock = {
+  start_time: string
+  end_time: string
+  success: number
+  failure: number
+  rate: number
+}
+
+export type Sub2ApiServiceHealth = {
+  total_success: number
+  total_failure: number
+  success_rate: number
+  rows: number
+  columns: number
+  bucket_seconds: number
+  window_start: string
+  window_end: string
+  block_details: Sub2ApiHealthBlock[]
+}

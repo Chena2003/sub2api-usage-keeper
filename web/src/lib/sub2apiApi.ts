@@ -6,6 +6,7 @@ import type {
   Sub2ApiOverview,
   Sub2ApiRanking,
   Sub2ApiRankingDimension,
+  Sub2ApiServiceHealth,
   Sub2ApiTimeseriesPoint,
 } from './sub2apiTypes'
 
@@ -75,4 +76,8 @@ export function fetchSub2ApiEvents({
     limit: String(limit),
   })
   return getJson<Sub2ApiEventsResponse>(`/events?${params.toString()}`)
+}
+
+export function fetchSub2ApiHealth(hours = 24): Promise<Sub2ApiServiceHealth> {
+  return getJson<Sub2ApiServiceHealth>(`/health?hours=${hours}`)
 }

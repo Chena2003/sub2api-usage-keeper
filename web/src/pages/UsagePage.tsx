@@ -462,6 +462,7 @@ export function UsagePage({ onAuthRequired }: { onAuthRequired?: () => void }) {
   const sub2apiRankings = useSub2ApiDashboardStore((state) => state.rankings);
   const sub2apiEvents = useSub2ApiDashboardStore((state) => state.events);
   const sub2apiQuotaAccounts = useSub2ApiDashboardStore((state) => state.quotaAccounts);
+  const sub2apiServiceHealth = useSub2ApiDashboardStore((state) => state.serviceHealth);
   const rankingDimension = useSub2ApiDashboardStore((state) => state.rankingDimension);
   const sub2apiError = useSub2ApiDashboardStore((state) => state.error);
   const refreshSub2API = useSub2ApiDashboardStore((state) => state.refresh);
@@ -968,6 +969,7 @@ export function UsagePage({ onAuthRequired }: { onAuthRequired?: () => void }) {
                 points={sub2apiPoints}
                 quotaAccounts={sub2apiQuotaAccounts}
                 usage={usage}
+                serviceHealth={sub2apiServiceHealth}
                 loading={overviewDisplayLoading}
                 error={sub2apiError}
                 onRetry={refreshSub2API}

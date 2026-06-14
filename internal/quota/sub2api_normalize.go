@@ -24,7 +24,7 @@ var publicCredentialKeyAllowlist = map[string]struct{}{
 	"plan_type":     {},
 }
 
-func NormalizeSub2APIAccount(row sub2api.AccountRow, usage *sub2api.AccountUsageRow) Sub2APIAccountQuota {
+func NormalizeSub2APIAccount(row sub2api.AccountRow, usage *sub2api.AccountUsageRow, fiveHourUsage *sub2api.AccountUsageRow) Sub2APIAccountQuota {
 	provider := strings.TrimSpace(row.Platform)
 	if provider == "" {
 		provider = "account"
@@ -44,7 +44,7 @@ func NormalizeSub2APIAccount(row sub2api.AccountRow, usage *sub2api.AccountUsage
 		LastUsedAt:          row.LastUsedAt,
 		CredentialKeys:      publicCredentialKeys(row.Credentials),
 		Usage:               normalizeSub2APIAccountUsage(usage),
-		FiveHourWindow:      buildFiveHourWindow(row, usage),
+		FiveHourWindow:      buildFiveHourWindow(row, fiveHourUsage),
 		WeeklyWindow:        buildWeeklyWindow(row, usage),
 	}
 }
@@ -148,15 +148,19 @@ func normalizeSub2APIAccountUsage(usage *sub2api.AccountUsageRow) Sub2APIAccount
 	}
 }
 
-func buildFiveHourWindow(row sub2api.AccountRow, usage *sub2api.AccountUsageRow) Sub2APIQuotaWindow {
+func buildFiveHourWindow(row sub2api.AccountRow, fiveHourUsage *sub2api.AccountUsageRow) Sub2APIQuotaWindow {
+	consumed := accountUsageTokens(fiveHourUsage)
+
 	limit := extractQuotaLimit(row.Credentials, "session_limit", "quota_limit", "limit", "quota")
-	consumed := accountUsageTokens(usage)
+	if limit <= 0 {
+		limit = planTypeFiveHourLimit(row.Credentials)
+	}
 
 	window := Sub2APIQuotaWindow{
 		Consumed: consumed,
 		Status:   normalizeWindowStatus(row.SessionWindowStatus),
 	}
-	
+
 	if limit > 0 {
 		intLimit := int64(limit)
 		window.Limit = &intLimit
@@ -180,22 +184,58 @@ func buildFiveHourWindow(row sub2api.AccountRow, usage *sub2api.AccountUsageRow)
 	return window
 }
 
+// planTypeFiveHourLimit returns the known 5-hour token limit based on plan_type.
+// OpenAI Plus: ~1M tokens per 5h window.
+// OpenAI Pro: ~5M tokens per 5h window.
+// Returns 0 if plan type is unknown.
+func planTypeFiveHourLimit(credentials json.RawMessage) float64 {
+	planType := strings.ToLower(strings.TrimSpace(sub2APIPlanType(credentials)))
+	switch planType {
+	case "plus":
+		return 1_000_000
+	case "pro":
+		return 5_000_000
+	case "team":
+		return 2_000_000
+	default:
+		return 0
+	}
+}
+
 func buildWeeklyWindow(row sub2api.AccountRow, usage *sub2api.AccountUsageRow) Sub2APIQuotaWindow {
 	limit := extractQuotaLimit(row.Credentials, "weekly_limit", "weekly_quota", "weekly_limit_usd")
 	if limit <= 0 {
+		limit = planTypeWeeklyLimit(row.Credentials)
+	}
+	if limit <= 0 {
 		return Sub2APIQuotaWindow{Status: "unknown"}
 	}
-	
-	// Assuming usage is total consumption. In a real system this should be weekly consumption.
+
 	consumed := accountUsageTokens(usage)
 	ratio := float64(consumed) / limit
-	
+
 	intLimit := int64(limit)
 	return Sub2APIQuotaWindow{
 		Consumed: consumed,
 		Limit:    &intLimit,
 		Ratio:    &ratio,
 		Status:   normalizeWindowStatus(row.SessionWindowStatus),
+	}
+}
+
+// planTypeWeeklyLimit returns the known weekly token limit based on plan_type.
+// Returns 0 if plan type is unknown.
+func planTypeWeeklyLimit(credentials json.RawMessage) float64 {
+	planType := strings.ToLower(strings.TrimSpace(sub2APIPlanType(credentials)))
+	switch planType {
+	case "plus":
+		return 10_000_000
+	case "pro":
+		return 50_000_000
+	case "team":
+		return 20_000_000
+	default:
+		return 0
 	}
 }
 

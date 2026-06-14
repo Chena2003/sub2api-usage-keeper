@@ -3,6 +3,7 @@ import {
   fetchSub2ApiAccountQuotas,
   fetchSub2ApiAccounts,
   fetchSub2ApiEvents,
+  fetchSub2ApiHealth,
   fetchSub2ApiModels,
   fetchSub2ApiOverview,
   fetchSub2ApiRankings,
@@ -15,6 +16,7 @@ import type {
   Sub2ApiOverview,
   Sub2ApiRanking,
   Sub2ApiRankingDimension,
+  Sub2ApiServiceHealth,
   Sub2ApiTimeseriesPoint,
 } from '../lib/sub2apiTypes'
 
@@ -26,6 +28,7 @@ type Sub2ApiDashboardState = {
   rankings: Sub2ApiRanking[]
   events: Sub2ApiEventsResponse
   quotaAccounts: Sub2ApiAccount[]
+  serviceHealth: Sub2ApiServiceHealth | null
   rankingDimension: Sub2ApiRankingDimension
   loading: boolean
   error: string | null
@@ -43,6 +46,7 @@ export const useSub2ApiDashboardStore = create<Sub2ApiDashboardState>((set, get)
   rankings: [],
   events: { events: [], total: 0, page: 1, limit: 100 },
   quotaAccounts: [],
+  serviceHealth: null,
   rankingDimension: 'user',
   loading: false,
   error: null,
@@ -50,7 +54,7 @@ export const useSub2ApiDashboardStore = create<Sub2ApiDashboardState>((set, get)
     const { rankingDimension } = get()
     set({ loading: true, error: null })
     try {
-      const [accounts, overview, points, models, rankings, events, quotaAccounts] = await Promise.all([
+      const [accounts, overview, points, models, rankings, events, quotaAccounts, serviceHealth] = await Promise.all([
         fetchSub2ApiAccounts(7),
         fetchSub2ApiOverview(7),
         fetchSub2ApiTimeseries(24),
@@ -58,8 +62,9 @@ export const useSub2ApiDashboardStore = create<Sub2ApiDashboardState>((set, get)
         fetchSub2ApiRankings(rankingDimension),
         fetchSub2ApiEvents({ page: 1, limit: 100 }),
         fetchSub2ApiAccountQuotas(7),
+        fetchSub2ApiHealth(24),
       ])
-      set({ accounts, overview, points, models, rankings, events, quotaAccounts, rankingDimension, loading: false })
+      set({ accounts, overview, points, models, rankings, events, quotaAccounts, serviceHealth, rankingDimension, loading: false })
     } catch (error) {
       set({ error: error instanceof Error ? error.message : 'Unknown error', loading: false })
     }

@@ -114,6 +114,13 @@ func (f *fakeSub2APIDashboardProvider) AccountQuotas(_ context.Context, days int
 	}, nil
 }
 
+func (f *fakeSub2APIDashboardProvider) ServiceHealth(_ context.Context, _ int) (quota.Sub2APIServiceHealth, error) {
+	return quota.Sub2APIServiceHealth{
+		Rows:         7,
+		BlockDetails: []quota.Sub2APIServiceHealthBlock{},
+	}, nil
+}
+
 func TestSub2APIAccountsRoute(t *testing.T) {
 	provider := &fakeSub2APIDashboardProvider{}
 	router := gin.New()

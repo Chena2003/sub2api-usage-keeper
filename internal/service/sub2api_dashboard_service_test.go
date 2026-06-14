@@ -68,6 +68,14 @@ func (f *fakeSub2APIReader) GetEvents(_ context.Context, page int, limit int) ([
 	return f.events, f.eventsTotal, nil
 }
 
+func (f *fakeSub2APIReader) GetFiveHourAccountUsage(_ context.Context) ([]sub2api.AccountUsageRow, error) {
+	return f.accountUsage, nil
+}
+
+func (f *fakeSub2APIReader) GetHealthBlocks(_ context.Context, _ int) ([]sub2api.HealthBlockRow, error) {
+	return nil, nil
+}
+
 func TestSub2APIDashboardAccountsMergeUsage(t *testing.T) {
 	reader := &fakeSub2APIReader{
 		accounts: []sub2api.AccountRow{{

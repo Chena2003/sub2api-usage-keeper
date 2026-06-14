@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom'
 import { useTranslation } from 'react-i18next'
 import type { UsageOverviewPayload } from '@/components/usage/hooks/useUsageData'
 import type { ServiceHealthData, StatusBlockDetail } from '@/utils/usage'
+import type { Sub2ApiServiceHealth } from '@/lib/sub2apiTypes'
 import { Panel } from '@/components/ui/Panel'
 import styles from '@/pages/UsagePage.module.scss'
 
@@ -34,6 +35,7 @@ interface ActiveTooltipState {
 
 export interface RequestHealthTimelineCardProps {
   usage: UsageOverviewPayload | null
+  serviceHealth?: Sub2ApiServiceHealth | null
   loading: boolean
 }
 
@@ -74,7 +76,7 @@ function RequestHealthTimelineTitle({ title, subtitle, eyebrow }: { title: strin
   )
 }
 
-export function RequestHealthTimelineCard({ usage, loading }: RequestHealthTimelineCardProps) {
+export function RequestHealthTimelineCard({ usage, serviceHealth, loading }: RequestHealthTimelineCardProps) {
   const { t } = useTranslation()
   const [activeTooltip, setActiveTooltip] = useState<ActiveTooltipState | null>(null)
   const gridRef = useRef<HTMLDivElement>(null)
@@ -82,7 +84,9 @@ export function RequestHealthTimelineCard({ usage, loading }: RequestHealthTimel
   const [mountTime] = useState(() => parseTime(new Date().toISOString()))
 
   const healthData: ServiceHealthData = useMemo(() => {
-    const blockDetails = (usage?.service_health?.block_details ?? [])
+    // Prefer dedicated serviceHealth prop; fall back to usage?.service_health
+    const sh = serviceHealth ?? usage?.service_health
+    const blockDetails = (sh?.block_details ?? [])
       .map((block) => ({
         startTime: parseTime(block.start_time),
         endTime: parseTime(block.end_time),
@@ -91,19 +95,19 @@ export function RequestHealthTimelineCard({ usage, loading }: RequestHealthTimel
         rate: Number(block.rate ?? -1),
       }))
       .filter((block) => block.startTime <= mountTime)
-    const rows = Number(usage?.service_health?.rows ?? 7) || 7
+    const rows = Number(sh?.rows ?? 7) || 7
     return {
-      totalSuccess: Number(usage?.service_health?.total_success ?? 0),
-      totalFailure: Number(usage?.service_health?.total_failure ?? 0),
-      successRate: Number(usage?.service_health?.success_rate ?? 0),
+      totalSuccess: Number(sh?.total_success ?? 0),
+      totalFailure: Number(sh?.total_failure ?? 0),
+      successRate: Number(sh?.success_rate ?? 0),
       rows,
-      columns: Number(usage?.service_health?.columns ?? Math.max(1, Math.ceil(blockDetails.length / rows))) || 1,
-      bucketSeconds: Number(usage?.service_health?.bucket_seconds ?? 0),
-      windowStart: parseTime(usage?.service_health?.window_start),
-      windowEnd: parseTime(usage?.service_health?.window_end),
+      columns: Number(sh?.columns ?? Math.max(1, Math.ceil(blockDetails.length / rows))) || 1,
+      bucketSeconds: Number(sh?.bucket_seconds ?? 0),
+      windowStart: parseTime(sh?.window_start),
+      windowEnd: parseTime(sh?.window_end),
       blockDetails,
     }
-  }, [usage, mountTime])
+  }, [usage, serviceHealth, mountTime])
 
   const hasData = healthData.totalSuccess + healthData.totalFailure > 0
 

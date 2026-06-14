@@ -4,6 +4,7 @@ import {
   fetchSub2ApiAccountQuotas,
   fetchSub2ApiAccounts,
   fetchSub2ApiEvents,
+  fetchSub2ApiHealth,
   fetchSub2ApiModels,
   fetchSub2ApiOverview,
   fetchSub2ApiRankings,
@@ -23,6 +24,7 @@ vi.mock('../lib/sub2apiApi', () => ({
   fetchSub2ApiAccountQuotas: vi.fn(),
   fetchSub2ApiAccounts: vi.fn(),
   fetchSub2ApiEvents: vi.fn(),
+  fetchSub2ApiHealth: vi.fn(),
   fetchSub2ApiModels: vi.fn(),
   fetchSub2ApiOverview: vi.fn(),
   fetchSub2ApiRankings: vi.fn(),
@@ -140,6 +142,7 @@ const mockedFetchSub2ApiModels = vi.mocked(fetchSub2ApiModels)
 const mockedFetchSub2ApiRankings = vi.mocked(fetchSub2ApiRankings)
 const mockedFetchSub2ApiEvents = vi.mocked(fetchSub2ApiEvents)
 const mockedFetchSub2ApiAccountQuotas = vi.mocked(fetchSub2ApiAccountQuotas)
+const mockedFetchSub2ApiHealth = vi.mocked(fetchSub2ApiHealth)
 
 function resetStore() {
   useSub2ApiDashboardStore.setState({
@@ -150,6 +153,7 @@ function resetStore() {
     rankings: [],
     events: { events: [], total: 0, page: 1, limit: 100 },
     quotaAccounts: [],
+    serviceHealth: null,
     rankingDimension: 'user',
     loading: false,
     error: null,
@@ -170,6 +174,7 @@ describe('useSub2ApiDashboardStore', () => {
     mockedFetchSub2ApiRankings.mockResolvedValue([ranking])
     mockedFetchSub2ApiEvents.mockResolvedValue(eventsResponse)
     mockedFetchSub2ApiAccountQuotas.mockResolvedValue([quotaAccount])
+    mockedFetchSub2ApiHealth.mockResolvedValue(null)
 
     await useSub2ApiDashboardStore.getState().refresh()
 
@@ -207,6 +212,7 @@ describe('useSub2ApiDashboardStore', () => {
     mockedFetchSub2ApiRankings.mockResolvedValue([ranking])
     mockedFetchSub2ApiEvents.mockResolvedValue(eventsResponse)
     mockedFetchSub2ApiAccountQuotas.mockResolvedValue([quotaAccount])
+    mockedFetchSub2ApiHealth.mockResolvedValue(null)
     useSub2ApiDashboardStore.setState({ rankingDimension: 'api_key' })
 
     await useSub2ApiDashboardStore.getState().refresh()

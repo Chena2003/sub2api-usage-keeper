@@ -28,7 +28,7 @@ func TestNormalizeSub2APIAccountRedactsSecrets(t *testing.T) {
 		RateLimitResetAt: &resetAt,
 	}
 
-	normalized := NormalizeSub2APIAccount(row, nil)
+	normalized := NormalizeSub2APIAccount(row, nil, nil)
 	serialized, err := json.Marshal(normalized)
 	if err != nil {
 		t.Fatalf("marshal normalized account: %v", err)
@@ -71,7 +71,7 @@ func TestNormalizeSub2APIAccountPublicCredentialKeysOnlyExposeAllowedKeys(t *tes
 		Credentials: credentials,
 	}
 
-	normalized := NormalizeSub2APIAccount(row, nil)
+	normalized := NormalizeSub2APIAccount(row, nil, nil)
 
 	if len(normalized.CredentialKeys) != 1 || normalized.CredentialKeys[0] != "plan_type" {
 		t.Fatalf("CredentialKeys = %#v, want []string{\"plan_type\"}", normalized.CredentialKeys)
@@ -88,7 +88,7 @@ func TestNormalizeSub2APIAccountKeepsSecretsOutOfPublicJSON(t *testing.T) {
 		Credentials: json.RawMessage(`{"access_token":"access-secret","refresh_token":"refresh-secret","api_key":"api-secret","email":"owner@example.com","plan_type":"pro","model_mapping":{"gpt-4":"gpt-4o"}}`),
 	}
 
-	account := NormalizeSub2APIAccount(row, nil)
+	account := NormalizeSub2APIAccount(row, nil, nil)
 	body, err := json.Marshal(account)
 	if err != nil {
 		t.Fatalf("marshal account: %v", err)
@@ -120,7 +120,7 @@ func TestNormalizeSub2APIAccountQuotaWindows(t *testing.T) {
 	}
 	usage := sub2api.AccountUsageRow{AccountID: 7, InputTokens: 10, OutputTokens: 5, CacheCreationTokens: 2, CacheReadTokens: 3}
 
-	account := NormalizeSub2APIAccount(row, &usage)
+	account := NormalizeSub2APIAccount(row, &usage, &usage)
 
 	if account.FiveHourWindow.RefreshAt == nil || !account.FiveHourWindow.RefreshAt.Equal(end) {
 		t.Fatalf("FiveHourWindow.RefreshAt = %#v, want %s", account.FiveHourWindow.RefreshAt, end)
@@ -147,7 +147,7 @@ func TestNormalizeSub2APIAccountUsageTotals(t *testing.T) {
 		ActualCost:          0.42,
 	}
 
-	normalized := NormalizeSub2APIAccount(row, &usage)
+	normalized := NormalizeSub2APIAccount(row, &usage, nil)
 
 	if normalized.Usage.TotalRequests != 42 {
 		t.Fatalf("Usage.TotalRequests = %d, want 42", normalized.Usage.TotalRequests)

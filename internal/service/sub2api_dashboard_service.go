@@ -12,11 +12,13 @@ import (
 type Sub2APIReader interface {
 	ListAccounts(context.Context) ([]sub2api.AccountRow, error)
 	GetAccountUsage(context.Context, time.Time) ([]sub2api.AccountUsageRow, error)
+	GetFiveHourAccountUsage(context.Context) ([]sub2api.AccountUsageRow, error)
 	GetDailyOverview(context.Context, int) ([]sub2api.UsageOverviewRow, error)
 	GetHourlyOverview(context.Context, int) ([]sub2api.UsageOverviewRow, error)
 	GetModelUsage(context.Context, time.Time, int) ([]sub2api.ModelUsageRow, error)
 	GetEvents(context.Context, int, int) ([]sub2api.UsageEventRow, int64, error)
 	GetRankings(context.Context, string, time.Time, int) ([]sub2api.RankingRow, error)
+	GetHealthBlocks(context.Context, int) ([]sub2api.HealthBlockRow, error)
 }
 
 type Sub2APIDashboardService struct {
@@ -44,10 +46,18 @@ func (s *Sub2APIDashboardService) Accounts(ctx context.Context, days int) ([]quo
 	if err != nil {
 		return nil, err
 	}
+	fiveHourRows, err := s.reader.GetFiveHourAccountUsage(ctx)
+	if err != nil {
+		return nil, err
+	}
 
 	usageByAccountID := make(map[int64]sub2api.AccountUsageRow, len(usageRows))
 	for _, usage := range usageRows {
 		usageByAccountID[usage.AccountID] = usage
+	}
+	fiveHourByAccountID := make(map[int64]sub2api.AccountUsageRow, len(fiveHourRows))
+	for _, usage := range fiveHourRows {
+		fiveHourByAccountID[usage.AccountID] = usage
 	}
 
 	result := make([]quota.Sub2APIAccountQuota, 0, len(accounts))
@@ -56,7 +66,11 @@ func (s *Sub2APIDashboardService) Accounts(ctx context.Context, days int) ([]quo
 		if row, ok := usageByAccountID[account.ID]; ok {
 			usage = &row
 		}
-		result = append(result, quota.NormalizeSub2APIAccount(account, usage))
+		var fiveHourUsage *sub2api.AccountUsageRow
+		if row, ok := fiveHourByAccountID[account.ID]; ok {
+			fiveHourUsage = &row
+		}
+		result = append(result, quota.NormalizeSub2APIAccount(account, usage, fiveHourUsage))
 	}
 	return result, nil
 }
@@ -144,6 +158,18 @@ func (s *Sub2APIDashboardService) Events(ctx context.Context, page int, limit in
 		Page:   page,
 		Limit:  limit,
 	}, nil
+}
+
+func (s *Sub2APIDashboardService) ServiceHealth(ctx context.Context, hours int) (quota.Sub2APIServiceHealth, error) {
+	if err := s.validate(); err != nil {
+		return quota.Sub2APIServiceHealth{}, err
+	}
+	hours = sub2api.ClampDashboardHours(hours)
+	blocks, err := s.reader.GetHealthBlocks(ctx, hours)
+	if err != nil {
+		return quota.Sub2APIServiceHealth{}, err
+	}
+	return quota.BuildSub2APIServiceHealth(blocks), nil
 }
 
 func (s *Sub2APIDashboardService) validate() error {

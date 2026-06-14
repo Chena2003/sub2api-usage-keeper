@@ -135,3 +135,11 @@ type UsageEventRow struct {
 func (r UsageEventRow) TotalTokens() int64 {
 	return r.InputTokens + r.OutputTokens + r.CacheCreationTokens + r.CacheReadTokens
 }
+
+type HealthBlockRow struct {
+	BucketStart  time.Time `gorm:"column:bucket_start"`
+	BucketEnd    time.Time `gorm:"column:bucket_end"`
+	SuccessCount int64     `gorm:"column:success_count"`
+	FailureCount int64     `gorm:"column:failure_count"`
+	TotalCount   int64     `gorm:"column:total_count"`
+}
