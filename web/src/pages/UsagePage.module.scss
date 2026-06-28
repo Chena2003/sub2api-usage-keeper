@@ -2799,7 +2799,8 @@
 
 .healthGridScroller {
   width: 100%;
-  overflow: hidden;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
 }
 
 .healthDateAxis {
