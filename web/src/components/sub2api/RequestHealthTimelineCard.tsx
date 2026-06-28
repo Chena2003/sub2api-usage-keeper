@@ -40,7 +40,8 @@ export interface RequestHealthTimelineCardProps {
 }
 
 function rateToColor(rate: number): string {
-  const t = Math.max(0, Math.min(1, rate))
+  // rate is 0–100 from backend; normalize to 0–1 for interpolation
+  const t = Math.max(0, Math.min(1, rate / 100))
   const segment = t < 0.5 ? 0 : 1
   const localT = segment === 0 ? t * 2 : (t - 0.5) * 2
   const from = COLOR_STOPS[segment]
@@ -243,7 +244,7 @@ export function RequestHealthTimelineCard({ usage, serviceHealth, loading }: Req
             <span className={styles.healthTooltipFailure}>
               {t('status_bar.failure_short')} {detail.failure}
             </span>
-            <span className={styles.healthTooltipRate}>({(detail.rate * 100).toFixed(1)}%)</span>
+            <span className={styles.healthTooltipRate}>({detail.rate.toFixed(1)}%)</span>
           </span>
         ) : (
           <span className={styles.healthTooltipStats}>{t('status_bar.no_requests')}</span>

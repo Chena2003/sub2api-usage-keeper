@@ -178,9 +178,9 @@ describe('useSub2ApiDashboardStore', () => {
 
     await useSub2ApiDashboardStore.getState().refresh()
 
-    expect(mockedFetchSub2ApiRankings).toHaveBeenCalledWith('user')
+    expect(mockedFetchSub2ApiRankings).toHaveBeenCalledWith('user', 1)
     expect(mockedFetchSub2ApiEvents).toHaveBeenCalledWith({ page: 1, limit: 100 })
-    expect(mockedFetchSub2ApiAccountQuotas).toHaveBeenCalledWith(7)
+    expect(mockedFetchSub2ApiAccountQuotas).toHaveBeenCalledWith(1)
     expect(useSub2ApiDashboardStore.getState()).toMatchObject({
       accounts: [account],
       overview,
@@ -199,7 +199,7 @@ describe('useSub2ApiDashboardStore', () => {
 
     await useSub2ApiDashboardStore.getState().loadRankings('api_key')
 
-    expect(mockedFetchSub2ApiRankings).toHaveBeenCalledWith('api_key')
+    expect(mockedFetchSub2ApiRankings).toHaveBeenCalledWith('api_key', 1)
     expect(useSub2ApiDashboardStore.getState().rankingDimension).toBe('api_key')
     expect(useSub2ApiDashboardStore.getState().rankings).toEqual([ranking])
   })
@@ -217,7 +217,7 @@ describe('useSub2ApiDashboardStore', () => {
 
     await useSub2ApiDashboardStore.getState().refresh()
 
-    expect(mockedFetchSub2ApiRankings).toHaveBeenCalledWith('api_key')
+    expect(mockedFetchSub2ApiRankings).toHaveBeenCalledWith('api_key', 1)
     expect(mockedFetchSub2ApiRankings).not.toHaveBeenCalledWith('user')
     expect(useSub2ApiDashboardStore.getState().rankingDimension).toBe('api_key')
   })
