@@ -169,7 +169,7 @@ func (s *Sub2APIDashboardService) ServiceHealth(ctx context.Context, hours int) 
 	if err != nil {
 		return quota.Sub2APIServiceHealth{}, err
 	}
-	return quota.BuildSub2APIServiceHealth(blocks), nil
+	return quota.BuildSub2APIServiceHealth(blocks, hours), nil
 }
 
 func (s *Sub2APIDashboardService) validate() error {
