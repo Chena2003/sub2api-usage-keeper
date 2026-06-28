@@ -1,122 +1,320 @@
-// AccountQuotasCard.module.scss
+// AccountQuotasCard.module.scss — cpa auth 风格三段式行 + 双窗口 utilization 条
+
+.subtitle {
+  margin: 0 0 16px;
+  max-width: 680px;
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--muted);
+}
+
+.countBadge {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 9px;
+  border-radius: var(--radius-pill);
+  border: 1px solid color-mix(in oklch, var(--accent) 28%, var(--border));
+  background: color-mix(in oklch, var(--accent) 8%, var(--surface));
+  color: color-mix(in oklch, var(--fg) 80%, var(--accent));
+  font-size: 11px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
 .list {
   display: flex;
   flex-direction: column;
-  gap: 18px;
 }
 
+// ── Column header (tablet+ only) ───────────────────────────────────────────
+.tableHeader {
+  display: grid;
+  grid-template-columns: 200px minmax(0, 448px) minmax(250px, 1fr);
+  column-gap: 18px;
+  padding: 0 4px 10px;
+  border-bottom: 1px solid var(--border);
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--muted);
+
+  @media (max-width: 1024px) {
+    display: none;
+  }
+}
+
+.headerMetrics {
+  display: grid;
+  grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr) minmax(0, 0.9fr) minmax(0, 0.9fr);
+  column-gap: 12px;
+}
+
+.headerQuota {
+  justify-self: start;
+}
+
+// ── Row ────────────────────────────────────────────────────────────────────
 .row {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  padding-bottom: 18px;
+  display: grid;
+  grid-template-columns: 200px minmax(0, 448px) minmax(250px, 1fr);
+  column-gap: 18px;
+  row-gap: 14px;
+  align-items: center;
+  padding: 16px 4px;
   border-bottom: 1px solid var(--border);
 
   &:last-child {
     border-bottom: none;
-    padding-bottom: 0;
+  }
+
+  &:hover {
+    background: color-mix(in oklch, var(--accent) 4%, transparent);
+  }
+
+  @media (max-width: 1024px) {
+    grid-template-columns: 1fr;
+    row-gap: 12px;
+    padding: 16px 2px;
   }
 }
 
-.rowInfo {
+// ── Identity segment ─────────────────────────────────────────────────────────
+.identity {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  min-width: 0;
+}
+
+.nameRow {
   display: flex;
   align-items: baseline;
   gap: 8px;
+  min-width: 0;
 }
 
-.rowName {
+.name {
   font-size: 13.5px;
   font-weight: 650;
   color: var(--fg);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.rowProvider {
+.badges {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.providerBadge,
+.planBadge {
+  display: inline-flex;
+  align-items: center;
+  min-height: 18px;
+  padding: 2px 7px;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--border);
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.3;
+}
+
+.providerBadge {
+  background: var(--surface-2);
+  color: var(--muted);
   font-family: var(--font-mono);
-  font-size: 12px;
+}
+
+.planBadge {
+  border-color: color-mix(in oklch, var(--accent-2) 34%, var(--border));
+  background: color-mix(in oklch, var(--accent-2) 10%, var(--surface));
+  color: color-mix(in oklch, var(--fg) 78%, var(--accent-2));
+  text-transform: capitalize;
+}
+
+.statusGroup {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.statusReset {
+  font-size: 11px;
   font-variant-numeric: tabular-nums;
   color: var(--muted);
 }
 
-.rowMetrics {
-  display: flex;
-  gap: 16px;
-  flex-wrap: wrap;
+.errorDot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--danger);
+  box-shadow: 0 0 0 3px color-mix(in oklch, var(--danger) 18%, transparent);
+}
+
+// ── Metric segment ───────────────────────────────────────────────────────────
+.metrics {
+  display: grid;
+  grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr) minmax(0, 0.9fr) minmax(0, 0.9fr);
+  column-gap: 12px;
+  row-gap: 6px;
+  align-items: baseline;
+  min-width: 0;
+
+  @media (max-width: 1024px) {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    column-gap: 14px;
+  }
 }
 
 .metric {
   display: flex;
   flex-direction: column;
   gap: 2px;
+  min-width: 0;
 }
 
 .metricLabel {
-  font-size: 12px;
+  font-size: 11px;
   color: var(--muted);
+
+  @media (min-width: 1025px) {
+    display: none;
+  }
 }
 
-.mono {
+.metricValue {
   font-family: var(--font-mono);
   font-variant-numeric: tabular-nums;
-  font-size: 12px;
+  font-size: 12.5px;
+  font-weight: 650;
   color: var(--fg);
+  overflow-wrap: anywhere;
 }
 
-.cost { color: color-mix(in oklch, var(--warn) 80%, var(--fg)); }
+.metricCost {
+  color: color-mix(in oklch, var(--warn) 80%, var(--fg));
+}
 
-// ── Quota window ──────────────────────────────────────────────────────────────
-.window {
+// ── Quota segment (dual utilization bars) ───────────────────────────────────
+.quotas {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(140px, 1fr));
+  gap: 14px;
+  min-width: 0;
+
+  @media (max-width: 1024px) {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  @media (max-width: 560px) {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 10px;
+  }
+}
+
+.quotaBlock {
   display: flex;
   flex-direction: column;
   gap: 6px;
+  min-width: 0;
 }
 
-.windowTop {
+.quotaHeader {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 8px;
+  font-size: 11px;
 }
 
-.windowLabel {
-  font-size: 12px;
+.quotaLabel {
   font-weight: 550;
   color: var(--fg);
-}
-
-.windowEmpty {
-  font-size: 12px;
-  color: var(--muted);
-}
-
-.progressShell {
-  height: 5px;
-  background: var(--surface-2);
-  border-radius: 3px;
   overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.progressFill {
+.quotaValueGroup {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  flex: 0 0 auto;
+  font-variant-numeric: tabular-nums;
+}
+
+.quotaReset {
+  color: var(--text-tertiary, var(--muted));
+  font-weight: 400;
+  white-space: nowrap;
+}
+
+.quotaPercent {
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.quotaTrack {
+  height: 8px;
+  overflow: hidden;
+  border-radius: var(--radius-pill);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+}
+
+.quotaFill {
+  display: block;
   height: 100%;
-  border-radius: 3px;
-  transition: width 300ms ease;
+  border-radius: inherit;
+  transition: width 220ms ease, background-color 220ms ease;
 }
 
-.fill_ok      { background: var(--ok); }
-.fill_warn    { background: var(--warn); }
-.fill_danger  { background: var(--danger); }
-.fill_neutral { background: var(--muted); }
+.fill_ok {
+  background: linear-gradient(90deg, color-mix(in oklch, var(--ok) 70%, black), var(--ok));
+}
 
-.windowMeta {
+.fill_warn {
+  background: linear-gradient(90deg, color-mix(in oklch, var(--warn) 72%, black), var(--warn));
+}
+
+.fill_danger {
+  background: linear-gradient(90deg, color-mix(in oklch, var(--danger) 72%, black), var(--danger));
+}
+
+.tone_ok {
+  color: color-mix(in oklch, var(--ok) 80%, var(--fg));
+}
+
+.tone_warn {
+  color: color-mix(in oklch, var(--warn) 80%, var(--fg));
+}
+
+.tone_danger {
+  color: var(--danger);
+}
+
+.quotaMeta {
   display: flex;
-  justify-content: space-between;
-  align-items: baseline;
-  gap: 8px;
-  font-size: 12px;
-  color: var(--muted);
-}
-
-.windowReset {
-  font-size: 12px;
+  justify-content: flex-end;
+  min-height: 13px;
+  font-size: 11px;
   font-variant-numeric: tabular-nums;
   color: var(--text-tertiary, var(--muted));
+}
+
+.quotaConsumed {
+  white-space: nowrap;
+}
+
+.quotaEmpty {
+  display: flex;
+  align-items: center;
+  min-height: 22px;
+  font-size: 12px;
+  color: var(--muted);
 }

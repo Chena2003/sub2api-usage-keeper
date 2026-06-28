@@ -1,6 +1,7 @@
 export type Sub2ApiRankingDimension = 'user' | 'api_key' | 'model' | 'account'
 
 export type Sub2ApiQuotaWindow = {
+  utilization?: number
   consumed: number
   limit?: number
   remaining?: number
@@ -67,6 +68,9 @@ export type Sub2ApiAccount = {
   displayName: string
   planType?: string
   status: string
+  statusDetail?: string
+  statusResetAt?: string
+  hasError?: boolean
   schedulable: boolean
   sessionWindowStatus?: string
   resetAt?: string

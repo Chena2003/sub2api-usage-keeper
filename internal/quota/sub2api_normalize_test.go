@@ -2,6 +2,7 @@ package quota
 
 import (
 	"encoding/json"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -133,6 +134,160 @@ func TestNormalizeSub2APIAccountQuotaWindows(t *testing.T) {
 	}
 	if account.WeeklyWindow.Status != "unknown" {
 		t.Fatalf("WeeklyWindow.Status = %q, want unknown", account.WeeklyWindow.Status)
+	}
+}
+
+func TestBuildFiveHourWindowReadsAnthropicExtraUtilization(t *testing.T) {
+	start := time.Date(2026, 5, 19, 8, 0, 0, 0, time.UTC)
+	end := start.Add(5 * time.Hour)
+	weeklyReset := float64(start.Add(72 * time.Hour).Unix())
+	row := sub2api.AccountRow{
+		ID:                  7,
+		Platform:            "claude",
+		Type:                "max",
+		Status:              "active",
+		Schedulable:         true,
+		SessionWindowStart:  &start,
+		SessionWindowEnd:    &end,
+		SessionWindowStatus: "active",
+		Extra: json.RawMessage(`{
+			"session_window_utilization": 0.42,
+			"passive_usage_7d_utilization": 0.10,
+			"passive_usage_7d_reset": ` + strconv.FormatFloat(weeklyReset, 'f', 0, 64) + `
+		}`),
+	}
+
+	account := NormalizeSub2APIAccount(row, nil, nil)
+
+	if account.FiveHourWindow.Utilization == nil || *account.FiveHourWindow.Utilization != 42 {
+		t.Fatalf("FiveHourWindow.Utilization = %#v, want 42", account.FiveHourWindow.Utilization)
+	}
+	if account.WeeklyWindow.Utilization == nil || *account.WeeklyWindow.Utilization != 10 {
+		t.Fatalf("WeeklyWindow.Utilization = %#v, want 10", account.WeeklyWindow.Utilization)
+	}
+	if account.WeeklyWindow.RefreshAt == nil {
+		t.Fatalf("WeeklyWindow.RefreshAt = nil, want unix %v", weeklyReset)
+	}
+}
+
+func TestBuildWindowsReadCodexExtraPercent(t *testing.T) {
+	row := sub2api.AccountRow{
+		ID:          9,
+		Platform:    "openai",
+		Type:        "oauth",
+		Status:      "active",
+		Schedulable: true,
+		Extra: json.RawMessage(`{
+			"codex_5h_used_percent": 73.5,
+			"codex_5h_reset_at": "2026-05-19T15:00:00Z",
+			"codex_7d_used_percent": 12,
+			"codex_7d_reset_at": "2026-05-25T00:00:00Z"
+		}`),
+	}
+
+	account := NormalizeSub2APIAccount(row, nil, nil)
+
+	if account.FiveHourWindow.Utilization == nil || *account.FiveHourWindow.Utilization != 73.5 {
+		t.Fatalf("FiveHourWindow.Utilization = %#v, want 73.5", account.FiveHourWindow.Utilization)
+	}
+	if account.WeeklyWindow.Utilization == nil || *account.WeeklyWindow.Utilization != 12 {
+		t.Fatalf("WeeklyWindow.Utilization = %#v, want 12", account.WeeklyWindow.Utilization)
+	}
+	wantReset := time.Date(2026, 5, 19, 15, 0, 0, 0, time.UTC)
+	if account.FiveHourWindow.RefreshAt == nil || !account.FiveHourWindow.RefreshAt.Equal(wantReset) {
+		t.Fatalf("FiveHourWindow.RefreshAt = %#v, want %s", account.FiveHourWindow.RefreshAt, wantReset)
+	}
+}
+
+func TestBuildFiveHourWindowFallsBackToSessionStatus(t *testing.T) {
+	start := time.Date(2026, 5, 19, 8, 0, 0, 0, time.UTC)
+	end := start.Add(5 * time.Hour)
+	row := sub2api.AccountRow{
+		ID:                  7,
+		Platform:            "claude",
+		Status:              "active",
+		Schedulable:         true,
+		SessionWindowStart:  &start,
+		SessionWindowEnd:    &end,
+		SessionWindowStatus: "allowed_warning",
+	}
+
+	account := NormalizeSub2APIAccount(row, nil, nil)
+
+	if account.FiveHourWindow.Utilization == nil || *account.FiveHourWindow.Utilization != 80 {
+		t.Fatalf("FiveHourWindow.Utilization = %#v, want 80 fallback", account.FiveHourWindow.Utilization)
+	}
+}
+
+func TestDeriveSub2APIStatusPriority(t *testing.T) {
+	past := time.Now().Add(-time.Hour)
+	future := time.Now().Add(time.Hour)
+
+	cases := []struct {
+		name         string
+		row          sub2api.AccountRow
+		wantDetail   string
+		wantHasReset bool
+		wantHasError bool
+	}{
+		{
+			name:         "error status",
+			row:          sub2api.AccountRow{Status: "error", Schedulable: true},
+			wantDetail:   "error",
+			wantHasError: true,
+		},
+		{
+			name:         "rate limited active",
+			row:          sub2api.AccountRow{Status: "active", Schedulable: true, RateLimitResetAt: &future},
+			wantDetail:   "rate_limited",
+			wantHasReset: true,
+		},
+		{
+			name:       "overloaded",
+			row:        sub2api.AccountRow{Status: "active", Schedulable: true, OverloadUntil: &future},
+			wantDetail: "overloaded", wantHasReset: true,
+		},
+		{
+			name:       "temp unschedulable",
+			row:        sub2api.AccountRow{Status: "active", Schedulable: true, TempUnschedulableUntil: &future},
+			wantDetail: "temp_unschedulable", wantHasReset: true,
+		},
+		{
+			name:       "expired rate limit ignored -> paused",
+			row:        sub2api.AccountRow{Status: "active", Schedulable: false, RateLimitResetAt: &past},
+			wantDetail: "paused",
+		},
+		{
+			name:       "inactive status",
+			row:        sub2api.AccountRow{Status: "disabled", Schedulable: true},
+			wantDetail: "inactive",
+		},
+		{
+			name:       "active",
+			row:        sub2api.AccountRow{Status: "active", Schedulable: true},
+			wantDetail: "active",
+		},
+		{
+			name:         "error message sets hasError but keeps schedule state",
+			row:          sub2api.AccountRow{Status: "active", Schedulable: true, ErrorMessage: "upstream 500"},
+			wantDetail:   "active",
+			wantHasError: true,
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			detail, resetAt, hasError := deriveSub2APIStatus(tc.row)
+			if detail != tc.wantDetail {
+				t.Fatalf("detail = %q, want %q", detail, tc.wantDetail)
+			}
+			if (resetAt != nil) != tc.wantHasReset {
+				t.Fatalf("resetAt present = %v, want %v", resetAt != nil, tc.wantHasReset)
+			}
+			if hasError != tc.wantHasError {
+				t.Fatalf("hasError = %v, want %v", hasError, tc.wantHasError)
+			}
+		})
 	}
 }
 

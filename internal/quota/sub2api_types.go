@@ -13,6 +13,7 @@ type Sub2APIAccountUsage struct {
 }
 
 type Sub2APIQuotaWindow struct {
+	Utilization *float64   `json:"utilization,omitempty"`
 	Consumed    int64      `json:"consumed"`
 	Limit       *int64     `json:"limit,omitempty"`
 	Remaining   *int64     `json:"remaining,omitempty"`
@@ -36,20 +37,20 @@ type Sub2APIRankingRow struct {
 }
 
 type Sub2APIEvent struct {
-	ID             int64     `json:"id"`
-	CreatedAt      time.Time `json:"createdAt"`
-	User           string    `json:"user"`
-	APIKey         string    `json:"apiKey"`
-	Model          string    `json:"model"`
-	RequestedModel string    `json:"requestedModel"`
-	UpstreamModel  string    `json:"upstreamModel"`
-	AccountID      int64     `json:"accountId"`
-	AccountName    string    `json:"accountName"`
-	Status         string    `json:"status"`
-	InputTokens    int64     `json:"inputTokens"`
-	OutputTokens   int64     `json:"outputTokens"`
-	CacheTokens    int64     `json:"cacheTokens"`
-	TotalTokens    int64     `json:"totalTokens"`
+	ID                   int64     `json:"id"`
+	CreatedAt            time.Time `json:"createdAt"`
+	User                 string    `json:"user"`
+	APIKey               string    `json:"apiKey"`
+	Model                string    `json:"model"`
+	RequestedModel       string    `json:"requestedModel"`
+	UpstreamModel        string    `json:"upstreamModel"`
+	AccountID            int64     `json:"accountId"`
+	AccountName          string    `json:"accountName"`
+	Status               string    `json:"status"`
+	InputTokens          int64     `json:"inputTokens"`
+	OutputTokens         int64     `json:"outputTokens"`
+	CacheTokens          int64     `json:"cacheTokens"`
+	TotalTokens          int64     `json:"totalTokens"`
 	ActualCost           float64   `json:"actualCost"`
 	DurationMS           int64     `json:"durationMs"`
 	FirstTokenDurationMS *int64    `json:"firstTokenDurationMs,omitempty"`
@@ -69,6 +70,9 @@ type Sub2APIAccountQuota struct {
 	DisplayName         string              `json:"displayName"`
 	PlanType            string              `json:"planType,omitempty"`
 	Status              string              `json:"status"`
+	StatusDetail        string              `json:"statusDetail"`
+	StatusResetAt       *time.Time          `json:"statusResetAt,omitempty"`
+	HasError            bool                `json:"hasError"`
 	Schedulable         bool                `json:"schedulable"`
 	SessionWindowStatus string              `json:"sessionWindowStatus,omitempty"`
 	ResetAt             *time.Time          `json:"resetAt,omitempty"`

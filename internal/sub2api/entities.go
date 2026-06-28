@@ -7,23 +7,28 @@ import (
 )
 
 type AccountRow struct {
-	ID                  int64           `json:"id" gorm:"column:id"`
-	Name                string          `json:"name" gorm:"column:name"`
-	Platform            string          `json:"platform" gorm:"column:platform"`
-	Type                string          `json:"type" gorm:"column:type"`
-	Status              string          `json:"status" gorm:"column:status"`
-	Schedulable         bool            `json:"schedulable" gorm:"column:schedulable"`
-	Credentials         json.RawMessage `json:"-" gorm:"column:credentials"`
-	RateLimitedAt       *time.Time      `json:"rateLimitedAt" gorm:"column:rate_limited_at"`
-	RateLimitResetAt    *time.Time      `json:"rateLimitResetAt" gorm:"column:rate_limit_reset_at"`
-	SessionWindowStart  *time.Time      `json:"sessionWindowStart" gorm:"column:session_window_start"`
-	SessionWindowEnd    *time.Time      `json:"sessionWindowEnd" gorm:"column:session_window_end"`
-	SessionWindowStatus string          `json:"sessionWindowStatus" gorm:"column:session_window_status"`
-	ExpiresAt           *time.Time      `json:"expiresAt" gorm:"column:expires_at"`
-	RateMultiplier      *float64        `json:"rateMultiplier" gorm:"column:rate_multiplier"`
-	LoadFactor          *int            `json:"loadFactor" gorm:"column:load_factor"`
-	LastUsedAt          *time.Time      `json:"lastUsedAt" gorm:"column:last_used_at"`
-	UpdatedAt           time.Time       `json:"updatedAt" gorm:"column:updated_at"`
+	ID                      int64           `json:"id" gorm:"column:id"`
+	Name                    string          `json:"name" gorm:"column:name"`
+	Platform                string          `json:"platform" gorm:"column:platform"`
+	Type                    string          `json:"type" gorm:"column:type"`
+	Status                  string          `json:"status" gorm:"column:status"`
+	Schedulable             bool            `json:"schedulable" gorm:"column:schedulable"`
+	Credentials             json.RawMessage `json:"-" gorm:"column:credentials"`
+	Extra                   json.RawMessage `json:"-" gorm:"column:extra"`
+	ErrorMessage            string          `json:"-" gorm:"column:error_message"`
+	RateLimitedAt           *time.Time      `json:"rateLimitedAt" gorm:"column:rate_limited_at"`
+	RateLimitResetAt        *time.Time      `json:"rateLimitResetAt" gorm:"column:rate_limit_reset_at"`
+	OverloadUntil           *time.Time      `json:"overloadUntil" gorm:"column:overload_until"`
+	TempUnschedulableUntil  *time.Time      `json:"tempUnschedulableUntil" gorm:"column:temp_unschedulable_until"`
+	TempUnschedulableReason string          `json:"-" gorm:"column:temp_unschedulable_reason"`
+	SessionWindowStart      *time.Time      `json:"sessionWindowStart" gorm:"column:session_window_start"`
+	SessionWindowEnd        *time.Time      `json:"sessionWindowEnd" gorm:"column:session_window_end"`
+	SessionWindowStatus     string          `json:"sessionWindowStatus" gorm:"column:session_window_status"`
+	ExpiresAt               *time.Time      `json:"expiresAt" gorm:"column:expires_at"`
+	RateMultiplier          *float64        `json:"rateMultiplier" gorm:"column:rate_multiplier"`
+	LoadFactor              *int            `json:"loadFactor" gorm:"column:load_factor"`
+	LastUsedAt              *time.Time      `json:"lastUsedAt" gorm:"column:last_used_at"`
+	UpdatedAt               time.Time       `json:"updatedAt" gorm:"column:updated_at"`
 }
 
 func (r AccountRow) CredentialKeys() []string {
@@ -42,6 +47,19 @@ func (r AccountRow) CredentialKeys() []string {
 	}
 	sort.Strings(keys)
 	return keys
+}
+
+// ExtraMap decodes the account's extra JSONB column into a map.
+// Returns nil when empty or malformed.
+func (r AccountRow) ExtraMap() map[string]any {
+	if len(r.Extra) == 0 {
+		return nil
+	}
+	var extra map[string]any
+	if err := json.Unmarshal(r.Extra, &extra); err != nil || len(extra) == 0 {
+		return nil
+	}
+	return extra
 }
 
 type UsageOverviewRow struct {

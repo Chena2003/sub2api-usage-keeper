@@ -5,7 +5,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"sort"
+	"strconv"
 	"strings"
+	"time"
 
 	"sub2api-usage-keeper/internal/sub2api"
 )
@@ -30,13 +32,18 @@ func NormalizeSub2APIAccount(row sub2api.AccountRow, usage *sub2api.AccountUsage
 		provider = "account"
 	}
 
+	statusDetail, statusResetAt, hasError := deriveSub2APIStatus(row)
+
 	return Sub2APIAccountQuota{
 		ID:                  row.ID,
 		Provider:            provider,
 		AccountType:         strings.TrimSpace(row.Type),
-		DisplayName:         sub2APIDisplayName(row.ID, provider, row.Type),
+		DisplayName:         sub2APIDisplayName(row.ID, row.Name, provider, row.Type),
 		PlanType:            sub2APIPlanType(row.Credentials),
 		Status:              normalizedSub2APIStatus(row.Status, row.Schedulable),
+		StatusDetail:        statusDetail,
+		StatusResetAt:       statusResetAt,
+		HasError:            hasError,
 		Schedulable:         row.Schedulable,
 		SessionWindowStatus: strings.TrimSpace(row.SessionWindowStatus),
 		ResetAt:             row.RateLimitResetAt,
@@ -45,7 +52,34 @@ func NormalizeSub2APIAccount(row sub2api.AccountRow, usage *sub2api.AccountUsage
 		CredentialKeys:      publicCredentialKeys(row.Credentials),
 		Usage:               normalizeSub2APIAccountUsage(usage),
 		FiveHourWindow:      buildFiveHourWindow(row, fiveHourUsage),
-		WeeklyWindow:        buildWeeklyWindow(row, usage),
+		WeeklyWindow:        buildWeeklyWindow(row),
+	}
+}
+
+// deriveSub2APIStatus mirrors the gateway's AccountStatusIndicator priority:
+// error -> rate-limited(429) -> overloaded(529) -> temp-unschedulable -> paused
+// -> inactive -> active. Transient states carry their recovery time. The raw
+// error_message / temp_unschedulable_reason text is intentionally NOT exposed.
+func deriveSub2APIStatus(row sub2api.AccountRow) (detail string, resetAt *time.Time, hasError bool) {
+	now := time.Now()
+	status := strings.TrimSpace(strings.ToLower(row.Status))
+	hasError = status == "error" || strings.TrimSpace(row.ErrorMessage) != ""
+
+	switch {
+	case status == "error":
+		return "error", nil, hasError
+	case row.RateLimitResetAt != nil && row.RateLimitResetAt.After(now):
+		return "rate_limited", row.RateLimitResetAt, hasError
+	case row.OverloadUntil != nil && row.OverloadUntil.After(now):
+		return "overloaded", row.OverloadUntil, hasError
+	case row.TempUnschedulableUntil != nil && row.TempUnschedulableUntil.After(now):
+		return "temp_unschedulable", row.TempUnschedulableUntil, hasError
+	case !row.Schedulable:
+		return "paused", nil, hasError
+	case status != "active" && status != "":
+		return "inactive", nil, hasError
+	default:
+		return "active", nil, hasError
 	}
 }
 
@@ -112,7 +146,10 @@ func isAllowedPublicCredentialKey(key string) bool {
 	return ok
 }
 
-func sub2APIDisplayName(id int64, provider string, accountType string) string {
+func sub2APIDisplayName(id int64, name string, provider string, accountType string) string {
+	if n := strings.TrimSpace(name); n != "" {
+		return n
+	}
 	provider = strings.TrimSpace(provider)
 	accountType = strings.TrimSpace(accountType)
 	if accountType == "" {
@@ -148,112 +185,171 @@ func normalizeSub2APIAccountUsage(usage *sub2api.AccountUsageRow) Sub2APIAccount
 	}
 }
 
+// buildFiveHourWindow reports the upstream-provided 5-hour utilization (0-100%).
+// Source of truth is account.extra, persisted by the gateway from the provider
+// /usage API — never an inferred token limit. Consumed tokens (from usage_logs)
+// are kept only as a window stat. No extra data -> status "unknown", no fake bar.
 func buildFiveHourWindow(row sub2api.AccountRow, fiveHourUsage *sub2api.AccountUsageRow) Sub2APIQuotaWindow {
-	consumed := accountUsageTokens(fiveHourUsage)
-
-	limit := extractQuotaLimit(row.Credentials, "session_limit", "quota_limit", "limit", "quota")
-	if limit <= 0 {
-		limit = planTypeFiveHourLimit(row.Credentials)
-	}
+	extra := row.ExtraMap()
+	platform := strings.ToLower(strings.TrimSpace(row.Platform))
 
 	window := Sub2APIQuotaWindow{
-		Consumed: consumed,
+		Consumed: accountUsageTokens(fiveHourUsage),
 		Status:   normalizeWindowStatus(row.SessionWindowStatus),
 	}
-
-	if limit > 0 {
-		intLimit := int64(limit)
-		window.Limit = &intLimit
-		ratio := float64(consumed) / limit
-		window.Ratio = &ratio
-	}
-
 	if row.SessionWindowStart != nil {
 		window.WindowStart = row.SessionWindowStart
 	}
-	if row.SessionWindowEnd != nil {
-		window.WindowEnd = row.SessionWindowEnd
-		window.RefreshAt = row.SessionWindowEnd
+
+	if isOpenAIPlatform(platform) {
+		// Codex stores percent directly (0-100).
+		if pct, ok := extraFloat(extra, "codex_5h_used_percent"); ok {
+			window.Utilization = &pct
+		}
+		if reset, ok := extraResetTime(extra, "codex_5h_reset_at"); ok {
+			window.WindowEnd = reset
+			window.RefreshAt = reset
+		}
+	} else {
+		// Anthropic stores a 0-1 ratio.
+		if ratio, ok := extraFloat(extra, "session_window_utilization"); ok {
+			pct := ratio * 100
+			window.Utilization = &pct
+		}
+		if row.SessionWindowEnd != nil {
+			window.WindowEnd = row.SessionWindowEnd
+			window.RefreshAt = row.SessionWindowEnd
+		}
 	}
+
+	// Fall back to session window status when no explicit utilization is stored.
+	if window.Utilization == nil {
+		if fallback, ok := sessionStatusUtilization(row.SessionWindowStatus); ok {
+			window.Utilization = &fallback
+		}
+	}
+
 	if row.RateLimitResetAt != nil {
 		window.RefreshAt = row.RateLimitResetAt
 	}
 	if row.RateLimitedAt != nil {
 		window.Status = "rate_limited"
 	}
+	if window.Utilization == nil && window.Consumed == 0 && window.RefreshAt == nil {
+		window.Status = "unknown"
+	}
 	return window
 }
 
-// planTypeFiveHourLimit returns the known 5-hour token limit based on plan_type.
-// OpenAI Plus: ~1M tokens per 5h window.
-// OpenAI Pro: ~5M tokens per 5h window.
-// Returns 0 if plan type is unknown.
-func planTypeFiveHourLimit(credentials json.RawMessage) float64 {
-	planType := strings.ToLower(strings.TrimSpace(sub2APIPlanType(credentials)))
-	switch planType {
-	case "plus":
-		return 1_000_000
-	case "pro":
-		return 5_000_000
-	case "team":
-		return 2_000_000
-	default:
-		return 0
-	}
-}
+// buildWeeklyWindow reports the upstream-provided 7-day utilization (0-100%) from
+// account.extra. No extra data -> status "unknown", no fabricated limit.
+func buildWeeklyWindow(row sub2api.AccountRow) Sub2APIQuotaWindow {
+	extra := row.ExtraMap()
+	platform := strings.ToLower(strings.TrimSpace(row.Platform))
 
-func buildWeeklyWindow(row sub2api.AccountRow, usage *sub2api.AccountUsageRow) Sub2APIQuotaWindow {
-	limit := extractQuotaLimit(row.Credentials, "weekly_limit", "weekly_quota", "weekly_limit_usd")
-	if limit <= 0 {
-		limit = planTypeWeeklyLimit(row.Credentials)
-	}
-	if limit <= 0 {
-		return Sub2APIQuotaWindow{Status: "unknown"}
-	}
+	window := Sub2APIQuotaWindow{Status: "unknown"}
 
-	consumed := accountUsageTokens(usage)
-	ratio := float64(consumed) / limit
-
-	intLimit := int64(limit)
-	return Sub2APIQuotaWindow{
-		Consumed: consumed,
-		Limit:    &intLimit,
-		Ratio:    &ratio,
-		Status:   normalizeWindowStatus(row.SessionWindowStatus),
-	}
-}
-
-// planTypeWeeklyLimit returns the known weekly token limit based on plan_type.
-// Returns 0 if plan type is unknown.
-func planTypeWeeklyLimit(credentials json.RawMessage) float64 {
-	planType := strings.ToLower(strings.TrimSpace(sub2APIPlanType(credentials)))
-	switch planType {
-	case "plus":
-		return 10_000_000
-	case "pro":
-		return 50_000_000
-	case "team":
-		return 20_000_000
-	default:
-		return 0
-	}
-}
-
-func extractQuotaLimit(credentials json.RawMessage, keys ...string) float64 {
-	fields := credentialFields(credentials)
-	if fields == nil {
-		return 0
-	}
-	for _, key := range keys {
-		if v, ok := fields[key].(float64); ok && v > 0 {
-			return v
+	if isOpenAIPlatform(platform) {
+		if pct, ok := extraFloat(extra, "codex_7d_used_percent"); ok {
+			window.Utilization = &pct
+			window.Status = normalizeWindowStatus(row.SessionWindowStatus)
+		}
+		if reset, ok := extraResetTime(extra, "codex_7d_reset_at"); ok {
+			window.WindowEnd = reset
+			window.RefreshAt = reset
+		}
+	} else {
+		if ratio, ok := extraFloat(extra, "passive_usage_7d_utilization"); ok {
+			pct := ratio * 100
+			window.Utilization = &pct
+			window.Status = normalizeWindowStatus(row.SessionWindowStatus)
+		}
+		if reset, ok := extraResetTime(extra, "passive_usage_7d_reset"); ok {
+			window.WindowEnd = reset
+			window.RefreshAt = reset
 		}
 	}
-	return 0
+
+	return window
 }
 
-func buildUnknownQuotaWindow() Sub2APIQuotaWindow {
-	return Sub2APIQuotaWindow{Status: "unknown"}
+func isOpenAIPlatform(platform string) bool {
+	return platform == "openai" || platform == "codex"
+}
+
+// extraFloat reads a numeric value from the decoded extra map.
+// Handles json.Number, float64, and numeric strings.
+func extraFloat(extra map[string]any, key string) (float64, bool) {
+	if extra == nil {
+		return 0, false
+	}
+	raw, ok := extra[key]
+	if !ok {
+		return 0, false
+	}
+	switch v := raw.(type) {
+	case float64:
+		return v, true
+	case json.Number:
+		if f, err := v.Float64(); err == nil {
+			return f, true
+		}
+	case string:
+		if f, err := strconv.ParseFloat(strings.TrimSpace(v), 64); err == nil {
+			return f, true
+		}
+	}
+	return 0, false
+}
+
+// extraResetTime reads a reset timestamp stored either as a unix epoch
+// (seconds) or an RFC3339 string.
+func extraResetTime(extra map[string]any, key string) (*time.Time, bool) {
+	if extra == nil {
+		return nil, false
+	}
+	raw, ok := extra[key]
+	if !ok {
+		return nil, false
+	}
+	switch v := raw.(type) {
+	case float64:
+		if v > 0 {
+			t := time.Unix(int64(v), 0).UTC()
+			return &t, true
+		}
+	case json.Number:
+		if f, err := v.Float64(); err == nil && f > 0 {
+			t := time.Unix(int64(f), 0).UTC()
+			return &t, true
+		}
+	case string:
+		s := strings.TrimSpace(v)
+		if s == "" {
+			return nil, false
+		}
+		if t, err := time.Parse(time.RFC3339, s); err == nil {
+			return &t, true
+		}
+		if f, err := strconv.ParseFloat(s, 64); err == nil && f > 0 {
+			t := time.Unix(int64(f), 0).UTC()
+			return &t, true
+		}
+	}
+	return nil, false
+}
+
+// sessionStatusUtilization mirrors the gateway fallback used when the provider
+// has not reported a utilization value yet.
+func sessionStatusUtilization(status string) (float64, bool) {
+	switch strings.TrimSpace(strings.ToLower(status)) {
+	case "rejected":
+		return 100, true
+	case "allowed_warning":
+		return 80, true
+	default:
+		return 0, false
+	}
 }
 
 func normalizeWindowStatus(value string) string {
@@ -355,19 +451,19 @@ func NormalizeSub2APIEvents(rows []sub2api.UsageEventRow) []Sub2APIEvent {
 	for _, row := range rows {
 		cacheTokens := row.CacheCreationTokens + row.CacheReadTokens
 		events = append(events, Sub2APIEvent{
-			ID:             row.ID,
-			CreatedAt:      row.CreatedAt,
-			User:           maskedSub2APIUser(row.User),
-			APIKey:         maskedSub2APIKey(row.APIKey),
-			Model:          row.Model,
-			RequestedModel: row.RequestedModel,
-			UpstreamModel:  row.UpstreamModel,
-			AccountID:      row.AccountID,
-			AccountName:    row.AccountName,
-			Status:         row.Status,
-			InputTokens:    row.InputTokens,
-			OutputTokens:   row.OutputTokens,
-			CacheTokens:    cacheTokens,
+			ID:                   row.ID,
+			CreatedAt:            row.CreatedAt,
+			User:                 maskedSub2APIUser(row.User),
+			APIKey:               maskedSub2APIKey(row.APIKey),
+			Model:                row.Model,
+			RequestedModel:       row.RequestedModel,
+			UpstreamModel:        row.UpstreamModel,
+			AccountID:            row.AccountID,
+			AccountName:          row.AccountName,
+			Status:               row.Status,
+			InputTokens:          row.InputTokens,
+			OutputTokens:         row.OutputTokens,
+			CacheTokens:          cacheTokens,
 			TotalTokens:          row.TotalTokens(),
 			ActualCost:           row.ActualCost,
 			DurationMS:           row.DurationMS,
