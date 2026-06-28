@@ -2701,6 +2701,7 @@
   --health-grid-columns: 96;
   --health-grid-rows: 7;
   --health-grid-gap: 3px;
+  --health-grid-min-width: 960px;
 }
 
 .healthHeader {
@@ -2997,7 +2998,6 @@
     padding: 14px;
     gap: 10px;
     --health-grid-gap: 2px;
-    --health-grid-min-width: 960px;
   }
 
 
