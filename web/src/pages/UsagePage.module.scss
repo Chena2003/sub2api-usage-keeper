@@ -2700,7 +2700,6 @@
   box-shadow: var(--shadow-card);
   --health-grid-columns: 96;
   --health-grid-rows: 7;
-  --health-block-size: 11px;
   --health-grid-gap: 3px;
 }
 
@@ -2805,10 +2804,11 @@
 
 .healthDateAxis {
   display: grid;
-  grid-template-columns: repeat(var(--health-grid-columns), var(--health-block-size, 11px));
+  grid-template-columns: repeat(var(--health-grid-columns), minmax(0, 1fr));
   gap: 0 var(--health-grid-gap);
   margin-bottom: 4px;
-  height: 14px;
+  min-width: var(--health-grid-min-width, 0);
+  max-width: calc(var(--health-grid-columns) * (16px + var(--health-grid-gap)));
 }
 
 .healthDateLabel {
@@ -2821,19 +2821,20 @@
 
 .healthGrid {
   display: grid;
-  max-width: 100%;
+  width: 100%;
   gap: var(--health-grid-gap);
-  grid-template-columns: repeat(var(--health-grid-columns), var(--health-block-size, 11px));
-  grid-template-rows: repeat(var(--health-grid-rows), var(--health-block-size, 11px));
+  grid-template-columns: repeat(var(--health-grid-columns), minmax(0, 1fr));
+  grid-template-rows: repeat(var(--health-grid-rows), auto);
   grid-auto-flow: column;
+  min-width: var(--health-grid-min-width, 0);
+  max-width: calc(var(--health-grid-columns) * (16px + var(--health-grid-gap)));
 }
 
 .healthBlockWrapper {
   position: relative;
   cursor: pointer;
   -webkit-tap-highlight-color: transparent;
-  width: var(--health-block-size, 11px);
-  height: var(--health-block-size, 11px);
+  aspect-ratio: 1;
 
   &:focus-visible {
     outline: 2px solid var(--accent);
@@ -2996,22 +2997,9 @@
     padding: 14px;
     gap: 10px;
     --health-grid-gap: 2px;
-    --health-block-size: 9px;
+    --health-grid-min-width: 540px;
   }
 
-  .healthGridScroller {
-    overflow-x: auto;
-    -webkit-overflow-scrolling: touch;
-  }
-
-  .healthGrid {
-    min-width: 540px;
-  }
-
-  .healthBlockWrapper {
-    width: var(--health-block-size, 9px);
-    height: var(--health-block-size, 9px);
-  }
 
   .healthTooltip {
     font-size: 10px;
