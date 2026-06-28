@@ -369,7 +369,7 @@ func (r *Repository) GetEvents(ctx context.Context, page int, limit int) ([]Usag
 		SELECT
 			e.id,
 			e.created_at,
-			COALESCE(CAST(e.user_id AS TEXT), '') AS user_identifier,
+			COALESCE(NULLIF(eu.email, ''), CAST(e.user_id AS TEXT), '') AS user_identifier,
 			COALESCE(CAST(e.api_key_id AS TEXT), '') AS api_key_label,
 			COALESCE(e.model, '') AS model,
 			'' AS requested_model,
@@ -385,6 +385,7 @@ func (r *Repository) GetEvents(ctx context.Context, page int, limit int) ([]Usag
 			COALESCE(e.duration_ms, 0) AS duration_ms,
 			0 AS first_token_ms
 		FROM ops_error_logs e
+		LEFT JOIN users eu ON e.user_id = eu.id
 		ORDER BY created_at DESC
 		LIMIT ? OFFSET ?
 	`, limit, (page-1)*limit).Scan(&rows).Error
