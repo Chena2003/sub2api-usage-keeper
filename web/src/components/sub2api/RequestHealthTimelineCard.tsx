@@ -274,6 +274,29 @@ export function RequestHealthTimelineCard({ usage, serviceHealth, loading }: Req
     [healthData.columns, healthData.rows]
   )
 
+  // Compute date labels positioned above columns where a new day starts.
+  const dateLabels = useMemo(() => {
+    const { blockDetails, rows, columns } = healthData
+    if (columns <= 0 || blockDetails.length === 0) return []
+    const labels: { col: number; label: string }[] = []
+    let lastDay = ''
+    for (let c = 0; c < columns; c++) {
+      const blockIdx = c * rows // first block in column c
+      if (blockIdx >= blockDetails.length) break
+      const ts = blockDetails[blockIdx].startTime
+      if (!ts) continue
+      const d = new Date(ts)
+      const dayKey = `${d.getMonth()}-${d.getDate()}`
+      if (dayKey !== lastDay) {
+        lastDay = dayKey
+        const month = String(d.getMonth() + 1).padStart(2, '0')
+        const day = String(d.getDate()).padStart(2, '0')
+        labels.push({ col: c, label: `${month}/${day}` })
+      }
+    }
+    return labels
+  }, [healthData])
+
   return (
     <div className={styles.healthCard}>
       <div className={styles.healthHeader}>
@@ -305,6 +328,14 @@ export function RequestHealthTimelineCard({ usage, serviceHealth, loading }: Req
         {loading ? (
           <Panel.Loading rows={3} />
         ) : (
+        <>
+        {dateLabels.length > 0 && (
+          <div className={styles.healthDateAxis} style={gridStyle} aria-hidden="true">
+            {dateLabels.map(({ col, label }) => (
+              <span key={col} className={styles.healthDateLabel} style={{ gridColumn: col + 1 }}>{label}</span>
+            ))}
+          </div>
+        )}
         <div className={styles.healthGrid} ref={gridRef} style={gridStyle} role="list" aria-label={healthCountsLabel}>
           {healthData.blockDetails.map((detail, idx) => {
             const isIdle = detail.rate === -1
@@ -337,6 +368,7 @@ export function RequestHealthTimelineCard({ usage, serviceHealth, loading }: Req
             )
           })}
         </div>
+        </>
         )}
       </div>
       <div className={styles.healthLegend}>

@@ -2802,6 +2802,22 @@
   overflow: hidden;
 }
 
+.healthDateAxis {
+  display: grid;
+  grid-template-columns: repeat(var(--health-grid-columns), var(--health-block-size, 11px));
+  gap: 0 var(--health-grid-gap);
+  margin-bottom: 4px;
+  height: 14px;
+}
+
+.healthDateLabel {
+  font-size: 10px;
+  line-height: 14px;
+  color: var(--text-tertiary);
+  white-space: nowrap;
+  user-select: none;
+}
+
 .healthGrid {
   display: grid;
   max-width: 100%;
