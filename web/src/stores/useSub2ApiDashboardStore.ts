@@ -66,7 +66,7 @@ export const useSub2ApiDashboardStore = create<Sub2ApiDashboardState>((set, get)
         fetchSub2ApiRankings(rankingDimension, days),
         fetchSub2ApiEvents({ page: 1, limit: 100 }),
         fetchSub2ApiAccountQuotas(days),
-        fetchSub2ApiHealth(hours),
+        fetchSub2ApiHealth(168),
       ])
       set({ accounts, overview, points, models, rankings, events, quotaAccounts, serviceHealth, rankingDimension, loading: false })
     } catch (error) {
