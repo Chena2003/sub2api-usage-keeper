@@ -387,6 +387,13 @@ export const getOverviewHourWindowHours = ({ timeRange, filterWindow }: { timeRa
   return Math.min(Math.max(Math.ceil(filterWindow.windowMinutes / 60), 1), 24);
 };
 
+/** Hours for the sub2api dashboard store (timeseries + health), not capped at 24. */
+export const getSub2ApiDashboardHours = (timeRange: UsageTimeRange): number => {
+  if (isTodayTimeRange(timeRange) || isYesterdayTimeRange(timeRange)) return 24;
+  if (timeRange !== 'custom') return HOUR_WINDOW_BY_TIME_RANGE[timeRange] ?? 24;
+  return 24;
+};
+
 export const getPreferredOverviewChartPeriod = ({ windowMinutes }: { windowMinutes?: number }): 'hour' | 'day' => (
   windowMinutes !== undefined && windowMinutes > 24 * 60 ? 'day' : 'hour'
 );
@@ -465,8 +472,9 @@ export function UsagePage({ onAuthRequired }: { onAuthRequired?: () => void }) {
   const sub2apiServiceHealth = useSub2ApiDashboardStore((state) => state.serviceHealth);
   const rankingDimension = useSub2ApiDashboardStore((state) => state.rankingDimension);
   const sub2apiError = useSub2ApiDashboardStore((state) => state.error);
-  const refreshSub2API = useSub2ApiDashboardStore((state) => state.refresh);
+  const refreshSub2APIRaw = useSub2ApiDashboardStore((state) => state.refresh);
   const loadRankings = useSub2ApiDashboardStore((state) => state.loadRankings);
+  const refreshSub2API = useCallback(() => refreshSub2APIRaw({ hours: getSub2ApiDashboardHours(timeRange) }), [refreshSub2APIRaw, timeRange]);
   const tabOptions = useMemo(() => getUsageTabOptions(t), [t]);
   const timeRangeOptions = useMemo(() => getTimeRangeOptions(t), [t]);
   const themeOptions = useMemo(

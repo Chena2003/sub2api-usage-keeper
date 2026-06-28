@@ -270,9 +270,6 @@ export function RequestHealthTimelineCard({ usage, serviceHealth, loading }: Req
     () => ({
       '--health-grid-columns': String(healthData.columns),
       '--health-grid-rows': String(healthData.rows),
-      '--health-grid-aspect-columns': String(healthData.columns),
-      '--health-grid-aspect-rows': String(healthData.rows),
-      '--health-grid-width': '100%',
     }) as React.CSSProperties,
     [healthData.columns, healthData.rows]
   )

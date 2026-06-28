@@ -32,7 +32,7 @@ type Sub2ApiDashboardState = {
   rankingDimension: Sub2ApiRankingDimension
   loading: boolean
   error: string | null
-  refresh: () => Promise<void>
+  refresh: (opts?: { hours?: number }) => Promise<void>
   loadRankings: (dimension?: Sub2ApiRankingDimension) => Promise<void>
   loadEvents: (params?: { page?: number; limit?: number }) => Promise<void>
   loadAccountQuotas: (days?: number) => Promise<void>
@@ -50,19 +50,20 @@ export const useSub2ApiDashboardStore = create<Sub2ApiDashboardState>((set, get)
   rankingDimension: 'user',
   loading: false,
   error: null,
-  refresh: async () => {
+  refresh: async (opts) => {
     const { rankingDimension } = get()
+    const hours = opts?.hours ?? 24
     set({ loading: true, error: null })
     try {
       const [accounts, overview, points, models, rankings, events, quotaAccounts, serviceHealth] = await Promise.all([
         fetchSub2ApiAccounts(7),
         fetchSub2ApiOverview(7),
-        fetchSub2ApiTimeseries(24),
+        fetchSub2ApiTimeseries(hours),
         fetchSub2ApiModels(7, 20),
         fetchSub2ApiRankings(rankingDimension),
         fetchSub2ApiEvents({ page: 1, limit: 100 }),
         fetchSub2ApiAccountQuotas(7),
-        fetchSub2ApiHealth(24),
+        fetchSub2ApiHealth(hours),
       ])
       set({ accounts, overview, points, models, rankings, events, quotaAccounts, serviceHealth, rankingDimension, loading: false })
     } catch (error) {
