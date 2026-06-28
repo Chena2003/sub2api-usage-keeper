@@ -121,6 +121,12 @@ func (f *fakeSub2APIDashboardProvider) ServiceHealth(_ context.Context, _ int) (
 	}, nil
 }
 
+func (f *fakeSub2APIDashboardProvider) RankingTrend(_ context.Context, dimension string, days int, limit int) ([]quota.Sub2APIRankingTrendPoint, string, error) {
+	return []quota.Sub2APIRankingTrendPoint{
+		{Bucket: "2026-06-28", Name: "user@example.com", Tokens: 1000},
+	}, "day", nil
+}
+
 func TestSub2APIAccountsRoute(t *testing.T) {
 	provider := &fakeSub2APIDashboardProvider{}
 	router := gin.New()

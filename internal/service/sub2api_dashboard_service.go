@@ -18,6 +18,7 @@ type Sub2APIReader interface {
 	GetModelUsage(context.Context, time.Time, int) ([]sub2api.ModelUsageRow, error)
 	GetEvents(context.Context, int, int) ([]sub2api.UsageEventRow, int64, error)
 	GetRankings(context.Context, string, time.Time, int) ([]sub2api.RankingRow, error)
+	GetRankingTrend(context.Context, string, time.Time, string, int) ([]sub2api.RankingTrendRow, error)
 	GetHealthBlocks(context.Context, int) ([]sub2api.HealthBlockRow, error)
 }
 
@@ -140,6 +141,27 @@ func (s *Sub2APIDashboardService) Rankings(ctx context.Context, dimension string
 		return nil, err
 	}
 	return quota.NormalizeSub2APIRankings(dimension, rows), nil
+}
+
+func (s *Sub2APIDashboardService) RankingTrend(ctx context.Context, dimension string, days int, limit int) ([]quota.Sub2APIRankingTrendPoint, string, error) {
+	if err := s.validate(); err != nil {
+		return nil, "", err
+	}
+	dimension = normalizeSub2APIRankingDimension(dimension)
+	limit = normalizeLimit(limit, 12)
+
+	granularity := "YYYY-MM-DD"
+	granularityLabel := "day"
+	if days <= 2 {
+		granularity = "YYYY-MM-DD HH24:00"
+		granularityLabel = "hour"
+	}
+
+	rows, err := s.reader.GetRankingTrend(ctx, dimension, sinceDays(s.currentTime(), days), granularity, limit)
+	if err != nil {
+		return nil, "", err
+	}
+	return quota.NormalizeSub2APIRankingTrend(dimension, rows), granularityLabel, nil
 }
 
 func (s *Sub2APIDashboardService) Events(ctx context.Context, page int, limit int) (quota.Sub2APIEventsResponse, error) {

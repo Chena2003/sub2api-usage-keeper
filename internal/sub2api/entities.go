@@ -161,3 +161,9 @@ type HealthBlockRow struct {
 	FailureCount int64     `gorm:"column:failure_count"`
 	TotalCount   int64     `gorm:"column:total_count"`
 }
+
+type RankingTrendRow struct {
+	Bucket string `json:"bucket" gorm:"column:bucket"`
+	Name   string `json:"name" gorm:"column:name"`
+	Tokens int64  `json:"tokens" gorm:"column:tokens"`
+}

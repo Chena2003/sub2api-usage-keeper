@@ -76,6 +76,10 @@ func (f *fakeSub2APIReader) GetHealthBlocks(_ context.Context, _ int) ([]sub2api
 	return nil, nil
 }
 
+func (f *fakeSub2APIReader) GetRankingTrend(_ context.Context, _ string, _ time.Time, _ string, _ int) ([]sub2api.RankingTrendRow, error) {
+	return nil, nil
+}
+
 func TestSub2APIDashboardAccountsMergeUsage(t *testing.T) {
 	reader := &fakeSub2APIReader{
 		accounts: []sub2api.AccountRow{{

@@ -7,6 +7,7 @@ import {
   fetchSub2ApiModels,
   fetchSub2ApiOverview,
   fetchSub2ApiRankings,
+  fetchSub2ApiRankingTrend,
   fetchSub2ApiTimeseries,
 } from '../lib/sub2apiApi'
 import type {
@@ -16,6 +17,7 @@ import type {
   Sub2ApiOverview,
   Sub2ApiRanking,
   Sub2ApiRankingDimension,
+  Sub2ApiRankingTrendResponse,
   Sub2ApiServiceHealth,
   Sub2ApiTimeseriesPoint,
 } from '../lib/sub2apiTypes'
@@ -26,6 +28,7 @@ type Sub2ApiDashboardState = {
   points: Sub2ApiTimeseriesPoint[]
   models: Sub2ApiModelUsage[]
   rankings: Sub2ApiRanking[]
+  rankingTrend: Sub2ApiRankingTrendResponse | null
   events: Sub2ApiEventsResponse
   quotaAccounts: Sub2ApiAccount[]
   serviceHealth: Sub2ApiServiceHealth | null
@@ -45,6 +48,7 @@ export const useSub2ApiDashboardStore = create<Sub2ApiDashboardState>((set, get)
   points: [],
   models: [],
   rankings: [],
+  rankingTrend: null,
   events: { events: [], total: 0, page: 1, limit: 100 },
   quotaAccounts: [],
   serviceHealth: null,
@@ -58,25 +62,29 @@ export const useSub2ApiDashboardStore = create<Sub2ApiDashboardState>((set, get)
     const days = Math.max(1, Math.ceil(hours / 24))
     set({ loading: true, error: null, currentDays: days })
     try {
-      const [accounts, overview, points, models, rankings, events, quotaAccounts, serviceHealth] = await Promise.all([
+      const [accounts, overview, points, models, rankings, rankingTrend, events, quotaAccounts, serviceHealth] = await Promise.all([
         fetchSub2ApiAccounts(days),
         fetchSub2ApiOverview(days),
         fetchSub2ApiTimeseries(hours),
         fetchSub2ApiModels(days, 20),
         fetchSub2ApiRankings(rankingDimension, days),
+        fetchSub2ApiRankingTrend(rankingDimension, days, 12),
         fetchSub2ApiEvents({ page: 1, limit: 100 }),
         fetchSub2ApiAccountQuotas(days),
         fetchSub2ApiHealth(168),
       ])
-      set({ accounts, overview, points, models, rankings, events, quotaAccounts, serviceHealth, rankingDimension, loading: false })
+      set({ accounts, overview, points, models, rankings, rankingTrend, events, quotaAccounts, serviceHealth, rankingDimension, loading: false })
     } catch (error) {
       set({ error: error instanceof Error ? error.message : 'Unknown error', loading: false })
     }
   },
   loadRankings: async (dimension = 'user') => {
     const { currentDays } = get()
-    const rankings = await fetchSub2ApiRankings(dimension, currentDays)
-    set({ rankings, rankingDimension: dimension })
+    const [rankings, rankingTrend] = await Promise.all([
+      fetchSub2ApiRankings(dimension, currentDays),
+      fetchSub2ApiRankingTrend(dimension, currentDays, 12),
+    ])
+    set({ rankings, rankingTrend, rankingDimension: dimension })
   },
   loadEvents: async (params = {}) => {
     const events = await fetchSub2ApiEvents(params)

@@ -446,6 +446,25 @@ func NormalizeSub2APIRankings(dimension string, rows []sub2api.RankingRow) []Sub
 	return rankings
 }
 
+func NormalizeSub2APIRankingTrend(dimension string, rows []sub2api.RankingTrendRow) []Sub2APIRankingTrendPoint {
+	points := make([]Sub2APIRankingTrendPoint, 0, len(rows))
+	for _, row := range rows {
+		name := row.Name
+		if dimension == "user" {
+			name = maskedSub2APIUser(row.Name)
+		}
+		if dimension == "api_key" {
+			name = maskedSub2APIKey(row.Name)
+		}
+		points = append(points, Sub2APIRankingTrendPoint{
+			Bucket: row.Bucket,
+			Name:   name,
+			Tokens: row.Tokens,
+		})
+	}
+	return points
+}
+
 func NormalizeSub2APIEvents(rows []sub2api.UsageEventRow) []Sub2APIEvent {
 	events := make([]Sub2APIEvent, 0, len(rows))
 	for _, row := range rows {

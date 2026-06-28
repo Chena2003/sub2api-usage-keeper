@@ -315,8 +315,9 @@ func (r *Repository) GetRankings(ctx context.Context, dimension string, since ti
 			COALESCE(SUM(l.actual_cost), 0) AS actual_cost
 		FROM usage_logs l
 		LEFT JOIN users u ON l.user_id = u.id
+		LEFT JOIN accounts a ON l.account_id = a.id
 		WHERE l.created_at >= ?
-		GROUP BY name
+		GROUP BY 1
 		ORDER BY total_requests DESC
 		LIMIT ?
 	`, column)
@@ -437,8 +438,57 @@ func rankingColumn(dimension string) string {
 	case "model":
 		return "l.model"
 	case "account":
-		return "CAST(l.account_id AS TEXT)"
+		return "COALESCE(NULLIF(a.name, ''), CAST(l.account_id AS TEXT))"
 	default:
 		return "COALESCE(NULLIF(u.email, ''), CAST(l.user_id AS TEXT))"
 	}
+}
+
+func rankingTrendGranularity(days int) string {
+	if days <= 2 {
+		return "YYYY-MM-DD HH24:00"
+	}
+	return "YYYY-MM-DD"
+}
+
+func (r *Repository) GetRankingTrend(ctx context.Context, dimension string, since time.Time, granularity string, limit int) ([]RankingTrendRow, error) {
+	limit = ClampDashboardLimit(limit, 12)
+
+	db, err := r.database()
+	if err != nil {
+		return nil, fmt.Errorf("get sub2api ranking trend: %w", err)
+	}
+
+	column := rankingColumn(dimension)
+
+	var rows []RankingTrendRow
+	query := fmt.Sprintf(`
+		WITH top_entities AS (
+			SELECT %s AS entity_name
+			FROM usage_logs l
+			LEFT JOIN users u ON l.user_id = u.id
+			LEFT JOIN accounts a ON l.account_id = a.id
+			WHERE l.created_at >= ?
+			GROUP BY 1
+			ORDER BY SUM(COALESCE(l.input_tokens, 0) + COALESCE(l.output_tokens, 0) + COALESCE(l.cache_creation_tokens, 0) + COALESCE(l.cache_read_tokens, 0)) DESC
+			LIMIT ?
+		)
+		SELECT
+			TO_CHAR(l.created_at, '%s') AS bucket,
+			%s AS name,
+			COALESCE(SUM(COALESCE(l.input_tokens, 0) + COALESCE(l.output_tokens, 0) + COALESCE(l.cache_creation_tokens, 0) + COALESCE(l.cache_read_tokens, 0)), 0) AS tokens
+		FROM usage_logs l
+		LEFT JOIN users u ON l.user_id = u.id
+		LEFT JOIN accounts a ON l.account_id = a.id
+		WHERE l.created_at >= ?
+			AND %s IN (SELECT entity_name FROM top_entities)
+		GROUP BY 1, 2
+		ORDER BY bucket ASC, tokens DESC
+	`, column, granularity, column, column)
+
+	err = db.WithContext(ctx).Raw(query, since, limit, since).Scan(&rows).Error
+	if err != nil {
+		return nil, fmt.Errorf("get sub2api ranking trend: %w", err)
+	}
+	return rows, nil
 }

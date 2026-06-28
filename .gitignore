@@ -4,6 +4,9 @@
 .worktrees/
 plans/
 
+# build output
+/server
+
 # local environment files
 .env
 .env.*

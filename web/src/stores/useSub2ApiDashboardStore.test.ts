@@ -8,6 +8,7 @@ import {
   fetchSub2ApiModels,
   fetchSub2ApiOverview,
   fetchSub2ApiRankings,
+  fetchSub2ApiRankingTrend,
   fetchSub2ApiTimeseries,
 } from '../lib/sub2apiApi'
 import type {
@@ -28,6 +29,7 @@ vi.mock('../lib/sub2apiApi', () => ({
   fetchSub2ApiModels: vi.fn(),
   fetchSub2ApiOverview: vi.fn(),
   fetchSub2ApiRankings: vi.fn(),
+  fetchSub2ApiRankingTrend: vi.fn(),
   fetchSub2ApiTimeseries: vi.fn(),
 }))
 
@@ -140,6 +142,7 @@ const mockedFetchSub2ApiOverview = vi.mocked(fetchSub2ApiOverview)
 const mockedFetchSub2ApiTimeseries = vi.mocked(fetchSub2ApiTimeseries)
 const mockedFetchSub2ApiModels = vi.mocked(fetchSub2ApiModels)
 const mockedFetchSub2ApiRankings = vi.mocked(fetchSub2ApiRankings)
+const mockedFetchSub2ApiRankingTrend = vi.mocked(fetchSub2ApiRankingTrend)
 const mockedFetchSub2ApiEvents = vi.mocked(fetchSub2ApiEvents)
 const mockedFetchSub2ApiAccountQuotas = vi.mocked(fetchSub2ApiAccountQuotas)
 const mockedFetchSub2ApiHealth = vi.mocked(fetchSub2ApiHealth)
@@ -172,6 +175,7 @@ describe('useSub2ApiDashboardStore', () => {
     mockedFetchSub2ApiTimeseries.mockResolvedValue([point])
     mockedFetchSub2ApiModels.mockResolvedValue([model])
     mockedFetchSub2ApiRankings.mockResolvedValue([ranking])
+    mockedFetchSub2ApiRankingTrend.mockResolvedValue({ points: [], granularity: 'day' })
     mockedFetchSub2ApiEvents.mockResolvedValue(eventsResponse)
     mockedFetchSub2ApiAccountQuotas.mockResolvedValue([quotaAccount])
     mockedFetchSub2ApiHealth.mockResolvedValue(null)
@@ -196,6 +200,7 @@ describe('useSub2ApiDashboardStore', () => {
 
   it('loads rankings for the selected dimension and updates state', async () => {
     mockedFetchSub2ApiRankings.mockResolvedValue([ranking])
+    mockedFetchSub2ApiRankingTrend.mockResolvedValue({ points: [], granularity: 'day' })
 
     await useSub2ApiDashboardStore.getState().loadRankings('api_key')
 
@@ -210,6 +215,7 @@ describe('useSub2ApiDashboardStore', () => {
     mockedFetchSub2ApiTimeseries.mockResolvedValue([point])
     mockedFetchSub2ApiModels.mockResolvedValue([model])
     mockedFetchSub2ApiRankings.mockResolvedValue([ranking])
+    mockedFetchSub2ApiRankingTrend.mockResolvedValue({ points: [], granularity: 'day' })
     mockedFetchSub2ApiEvents.mockResolvedValue(eventsResponse)
     mockedFetchSub2ApiAccountQuotas.mockResolvedValue([quotaAccount])
     mockedFetchSub2ApiHealth.mockResolvedValue(null)

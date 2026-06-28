@@ -6,6 +6,7 @@ import type {
   Sub2ApiOverview,
   Sub2ApiRanking,
   Sub2ApiRankingDimension,
+  Sub2ApiRankingTrendResponse,
   Sub2ApiServiceHealth,
   Sub2ApiTimeseriesPoint,
 } from './sub2apiTypes'
@@ -80,4 +81,12 @@ export function fetchSub2ApiEvents({
 
 export function fetchSub2ApiHealth(hours = 24): Promise<Sub2ApiServiceHealth> {
   return getJson<Sub2ApiServiceHealth>(`/health?hours=${hours}`)
+}
+
+export async function fetchSub2ApiRankingTrend(
+  dimension: Sub2ApiRankingDimension = 'user',
+  days = 7,
+  limit = 12,
+): Promise<Sub2ApiRankingTrendResponse> {
+  return getJson<Sub2ApiRankingTrendResponse>(`/rankings-trend?dimension=${dimension}&days=${days}&limit=${limit}`)
 }

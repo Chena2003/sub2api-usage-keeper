@@ -30,7 +30,7 @@ import {
   useUsageData,
   usePricingData
 } from '@/components/usage';
-import { AccountQuotasCard, RequestEventsPanel, Sub2ApiOverviewPanel, TokenRankingCard, ModelPricingReferenceCard } from '@/components/sub2api';
+import { AccountQuotasCard, RequestEventsPanel, Sub2ApiOverviewPanel, TokenRankingCard, RankingTrendChart, ModelPricingReferenceCard } from '@/components/sub2api';
 import { useSub2ApiDashboardStore } from '@/stores/useSub2ApiDashboardStore';
 import { buildUsageRangeQuery } from '@/utils/usage/rangeQuery';
 import {
@@ -467,6 +467,7 @@ export function UsagePage({ onAuthRequired }: { onAuthRequired?: () => void }) {
   const sub2apiPoints = useSub2ApiDashboardStore((state) => state.points);
   const sub2apiModels = useSub2ApiDashboardStore((state) => state.models);
   const sub2apiRankings = useSub2ApiDashboardStore((state) => state.rankings);
+  const sub2apiRankingTrend = useSub2ApiDashboardStore((state) => state.rankingTrend);
   const sub2apiEvents = useSub2ApiDashboardStore((state) => state.events);
   const sub2apiQuotaAccounts = useSub2ApiDashboardStore((state) => state.quotaAccounts);
   const sub2apiServiceHealth = useSub2ApiDashboardStore((state) => state.serviceHealth);
@@ -985,7 +986,10 @@ export function UsagePage({ onAuthRequired }: { onAuthRequired?: () => void }) {
             )}
             {activeTab === 'analysis' && <Sub2ApiAnalysisPanel models={sub2apiModels} points={sub2apiPoints} loading={loading} error={sub2apiError} onRetry={refreshSub2API} />}
             {activeTab === 'events' && <RequestEventsPanel events={sub2apiEvents} loading={loading} error={sub2apiError} onRetry={refreshSub2API} />}
-            {activeTab === 'ranking' && <TokenRankingCard rankings={sub2apiRankings} dimension={rankingDimension} onDimensionChange={loadRankings} loading={loading} error={sub2apiError} onRetry={refreshSub2API} />}
+            {activeTab === 'ranking' && <>
+              <RankingTrendChart data={sub2apiRankingTrend} dimension={rankingDimension} loading={loading} />
+              <TokenRankingCard rankings={sub2apiRankings} dimension={rankingDimension} onDimensionChange={loadRankings} loading={loading} error={sub2apiError} onRetry={refreshSub2API} />
+            </>}
             {activeTab === 'quotas' && <AccountQuotasCard accounts={sub2apiQuotaAccounts} loading={loading} error={sub2apiError} onRetry={refreshSub2API} />}
 
             {activeTab === 'settings' && (

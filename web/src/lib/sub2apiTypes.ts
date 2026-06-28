@@ -142,3 +142,14 @@ export type Sub2ApiServiceHealth = {
   window_end: string
   block_details: Sub2ApiHealthBlock[]
 }
+
+export type Sub2ApiRankingTrendPoint = {
+  bucket: string
+  name: string
+  tokens: number
+}
+
+export type Sub2ApiRankingTrendResponse = {
+  points: Sub2ApiRankingTrendPoint[]
+  granularity: 'hour' | 'day'
+}

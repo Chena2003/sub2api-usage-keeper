@@ -20,6 +20,7 @@ type Sub2APIDashboardProvider interface {
 	Models(context.Context, int, int) ([]sub2api.ModelUsageRow, error)
 	Events(context.Context, int, int) (quota.Sub2APIEventsResponse, error)
 	Rankings(context.Context, string, int, int) ([]quota.Sub2APIRankingRow, error)
+	RankingTrend(context.Context, string, int, int) ([]quota.Sub2APIRankingTrendPoint, string, error)
 	ServiceHealth(context.Context, int) (quota.Sub2APIServiceHealth, error)
 }
 
@@ -127,6 +128,21 @@ func registerSub2APIDashboardRoutes(router gin.IRoutes, provider Sub2APIDashboar
 		}
 
 		c.JSON(http.StatusOK, gin.H{"rankings": rankings})
+	})
+
+	router.GET("/sub2api/rankings-trend", func(c *gin.Context) {
+		if provider == nil {
+			writeInternalError(c, "sub2api dashboard provider is not configured", nil)
+			return
+		}
+
+		points, granularity, err := provider.RankingTrend(c.Request.Context(), normalizeRankingDimension(c.Query("dimension")), sub2APIDaysQuery(c), sub2APILimitQuery(c, 12))
+		if err != nil {
+			writeInternalError(c, "get sub2api ranking trend failed", err)
+			return
+		}
+
+		c.JSON(http.StatusOK, gin.H{"points": points, "granularity": granularity})
 	})
 
 	router.GET("/sub2api/health", func(c *gin.Context) {

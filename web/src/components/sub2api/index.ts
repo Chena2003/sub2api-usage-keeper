@@ -1,5 +1,6 @@
 export { Sub2ApiOverviewPanel } from './Sub2ApiOverviewPanel'
 export { TokenRankingCard } from './TokenRankingCard'
+export { RankingTrendChart } from './RankingTrendChart'
 export { AccountQuotasCard } from './AccountQuotasCard'
 export { RequestEventsPanel } from './RequestEventsPanel'
 export { ModelPricingReferenceCard } from './ModelPricingReferenceCard'

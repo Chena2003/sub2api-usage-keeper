@@ -172,6 +172,21 @@ func TestRepositoryRankingsAndEventsUseSub2APIUsageLogColumns(t *testing.T) {
 	}
 
 	if err := db.Exec(`
+		CREATE TABLE accounts (
+			id INTEGER PRIMARY KEY,
+			name TEXT
+		)
+	`).Error; err != nil {
+		t.Fatalf("create accounts table: %v", err)
+	}
+
+	if err := db.Exec(`
+		INSERT INTO accounts (id, name) VALUES (?, ?)
+	`, 3, "test-account-3").Error; err != nil {
+		t.Fatalf("insert account: %v", err)
+	}
+
+	if err := db.Exec(`
 		INSERT INTO users (id, email) VALUES (?, ?)
 	`, 42, "user42@example.com").Error; err != nil {
 		t.Fatalf("insert user: %v", err)
@@ -195,6 +210,14 @@ func TestRepositoryRankingsAndEventsUseSub2APIUsageLogColumns(t *testing.T) {
 	}
 	if len(rankings) != 1 || rankings[0].Name != "user42@example.com" || rankings[0].TotalRequests != 1 {
 		t.Fatalf("GetRankings() = %+v, want one user_id ranking", rankings)
+	}
+
+	accountRankings, err := repository.GetRankings(context.Background(), "account", time.Now().Add(-24*time.Hour), 5)
+	if err != nil {
+		t.Fatalf("GetRankings(account) error = %v", err)
+	}
+	if len(accountRankings) != 1 || accountRankings[0].Name != "test-account-3" {
+		t.Fatalf("GetRankings(account) = %+v, want account name 'test-account-3'", accountRankings)
 	}
 
 	events, total, err := repository.GetEvents(context.Background(), 1, 5)

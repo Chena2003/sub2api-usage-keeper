@@ -36,6 +36,12 @@ type Sub2APIRankingRow struct {
 	Share         float64 `json:"share"`
 }
 
+type Sub2APIRankingTrendPoint struct {
+	Bucket string `json:"bucket"`
+	Name   string `json:"name"`
+	Tokens int64  `json:"tokens"`
+}
+
 type Sub2APIEvent struct {
 	ID                   int64     `json:"id"`
 	CreatedAt            time.Time `json:"createdAt"`
