@@ -7,10 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"sub2api-usage-keeper/internal/entities"
-	"sub2api-usage-keeper/internal/redact"
 	"sub2api-usage-keeper/internal/repository/dto"
-	"sub2api-usage-keeper/internal/service"
 	servicedto "sub2api-usage-keeper/internal/service/dto"
 )
 
@@ -19,19 +16,6 @@ type usageAnalysisStub struct {
 	err           error
 	lastFilter    servicedto.UsageFilter
 	analysisCalls int
-}
-
-type usageAnalysisAPIKeyStub struct {
-	rows []entities.CPAAPIKey
-	err  error
-}
-
-func (s usageAnalysisAPIKeyStub) ListCPAAPIKeys(context.Context) ([]entities.CPAAPIKey, error) {
-	return s.rows, s.err
-}
-
-func (s usageAnalysisAPIKeyStub) UpdateCPAAPIKeyAlias(context.Context, int64, string) (entities.CPAAPIKey, error) {
-	return entities.CPAAPIKey{}, service.ErrInvalidID
 }
 
 func (s *usageAnalysisStub) GetUsageWithFilter(context.Context, servicedto.UsageFilter) (*dto.StatisticsSnapshot, error) {
@@ -86,7 +70,7 @@ func TestUsageAnalysisReturnsAggregatedRows(t *testing.T) {
 			Requests:    2,
 		}},
 	}}
-	router := NewRouter(nil, nil, provider, nil, AuthConfig{}, nil, "")
+	router := NewRouter(nil, provider, "")
 	req := httptest.NewRequest(http.MethodGet, "/api/v1/usage/analysis?range=24h", nil)
 	resp := httptest.NewRecorder()
 
@@ -102,7 +86,7 @@ func TestUsageAnalysisReturnsAggregatedRows(t *testing.T) {
 	if !contains(body, `"api_key_composition":[`) || !contains(body, `"model_composition":[`) {
 		t.Fatalf("expected composition payloads in response body: %s", body)
 	}
-	if !contains(body, `"key":"prov**er-a"`) || !contains(body, `"label":"prov**er-a"`) {
+	if !contains(body, `"key":"prov**er-a"`) || !contains(body, `"label":"provider-a"`) {
 		t.Fatalf("expected redacted api key composition in response body: %s", body)
 	}
 	if !contains(body, `"model":"claude-sonnet"`) || !contains(body, `"intensity":1`) {
@@ -116,63 +100,5 @@ func TestUsageAnalysisReturnsAggregatedRows(t *testing.T) {
 	}
 	if provider.lastFilter.StartTime == nil || provider.lastFilter.EndTime == nil {
 		t.Fatalf("expected resolved time bounds in filter, got %+v", provider.lastFilter)
-	}
-}
-
-func TestUsageAnalysisUsesCPAAPIKeyOptionLabels(t *testing.T) {
-	bucket := time.Date(2026, 4, 22, 10, 0, 0, 0, time.Local)
-	lastSyncedAt := time.Date(2026, 5, 13, 10, 0, 0, 0, time.Local)
-	provider := &usageAnalysisStub{analysis: &servicedto.AnalysisSnapshot{
-		Granularity: servicedto.AnalysisGranularityHourly,
-		TokenUsage:  []servicedto.AnalysisTokenUsageBucket{{Bucket: bucket, TotalTokens: 42, Requests: 2}},
-		APIKeyComposition: []servicedto.AnalysisCompositionItem{{
-			Key:         "sk-alpha123456",
-			TotalTokens: 42,
-			Requests:    2,
-		}},
-		ModelComposition: []servicedto.AnalysisCompositionItem{{Key: "claude-sonnet", TotalTokens: 42, Requests: 2}},
-		Heatmap: []servicedto.AnalysisHeatmapCell{{
-			APIKey:      "sk-alpha123456",
-			Model:       "claude-sonnet",
-			TotalTokens: 42,
-			Requests:    2,
-		}},
-	}}
-	router := NewRouter(nil, nil, provider, nil, AuthConfig{}, nil, "", OptionalProviders{CPAAPIKeys: usageAnalysisAPIKeyStub{rows: []entities.CPAAPIKey{{
-		ID:           1,
-		APIKey:       "sk-alpha123456",
-		DisplayKey:   "sk-*********123456",
-		KeyAlias:     "Primary Key",
-		LastSyncedAt: &lastSyncedAt,
-	}}}})
-	req := httptest.NewRequest(http.MethodGet, "/api/v1/usage/analysis?range=24h&api_key_id=1", nil)
-	resp := httptest.NewRecorder()
-
-	router.ServeHTTP(resp, req)
-
-	if resp.Code != http.StatusOK {
-		t.Fatalf("expected status 200, got %d", resp.Code)
-	}
-	body := resp.Body.String()
-	if !contains(body, `"key":"1"`) || !contains(body, `"label":"Primary Key"`) || !contains(body, `"api_key":"Primary Key"`) {
-		t.Fatalf("expected analysis payload to use CPA API key id and display label, got %s", body)
-	}
-	if contains(body, "sk-alpha123456") || contains(body, redact.APIAlias("sk-alpha123456")) {
-		t.Fatalf("expected raw and alias key values to stay hidden when a CPA key label exists, got %s", body)
-	}
-	if provider.lastFilter.APIKeyID != "1" {
-		t.Fatalf("expected API key id to pass into usage filter, got %+v", provider.lastFilter)
-	}
-}
-
-func TestUsageAnalysisRequiresAuthWhenEnabled(t *testing.T) {
-	router := NewRouter(nil, nil, &usageAnalysisStub{}, nil, AuthConfig{Enabled: true, LoginPassword: "secret", SessionTTL: time.Hour}, nil, "")
-	req := httptest.NewRequest(http.MethodGet, "/api/v1/usage/analysis", nil)
-	resp := httptest.NewRecorder()
-
-	router.ServeHTTP(resp, req)
-
-	if resp.Code != http.StatusUnauthorized {
-		t.Fatalf("expected status 401, got %d", resp.Code)
 	}
 }

@@ -52,7 +52,7 @@ func TestQuotaCacheReturnsCachedCurrentPageQuota(t *testing.T) {
 	provider := &quotaProviderStub{cacheResponse: quota.CacheResponse{
 		Items: []quota.CheckResponse{{ID: "auth-1", Quota: []quota.QuotaRow{{Key: "rate_limit.secondary_window", Label: "Weekly", PlanType: "plus"}}}},
 	}}
-	router := NewRouter(nil, nil, nil, nil, AuthConfig{}, nil, "", OptionalProviders{Quota: provider})
+	router := NewRouter(nil, nil, "", OptionalProviders{Quota: provider})
 
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/quota/cache", strings.NewReader(`{"auth_indexes":["auth-1","auth-2"]}`))
 	req.Header.Set("Content-Type", "application/json")
@@ -73,7 +73,7 @@ func TestQuotaCacheReturnsCachedCurrentPageQuota(t *testing.T) {
 
 func TestQuotaCacheAllowsMoreThanRefreshLimit(t *testing.T) {
 	provider := &quotaProviderStub{}
-	router := NewRouter(nil, nil, nil, nil, AuthConfig{}, nil, "", OptionalProviders{Quota: provider})
+	router := NewRouter(nil, nil, "", OptionalProviders{Quota: provider})
 	authIndexes := make([]string, 21)
 	for i := range authIndexes {
 		authIndexes[i] = "auth-" + strconv.Itoa(i+1)
@@ -102,7 +102,7 @@ func TestQuotaRefreshCreatesTasksForCurrentPageAuthIndexes(t *testing.T) {
 		Accepted: 2,
 		Limit:    2,
 	}}
-	router := NewRouter(nil, nil, nil, nil, AuthConfig{}, nil, "", OptionalProviders{Quota: provider})
+	router := NewRouter(nil, nil, "", OptionalProviders{Quota: provider})
 
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/quota/refresh", strings.NewReader(`{"auth_indexes":["auth-1","auth-2"]}`))
 	req.Header.Set("Content-Type", "application/json")
@@ -126,7 +126,7 @@ func TestQuotaRefreshCreatesTasksForCurrentPageAuthIndexes(t *testing.T) {
 
 func TestQuotaRefreshAllowsCurrentPageSizeWithoutOuterTwentyLimit(t *testing.T) {
 	provider := &quotaProviderStub{refreshResponse: quota.RefreshResponse{Accepted: 25, Limit: 25}}
-	router := NewRouter(nil, nil, nil, nil, AuthConfig{}, nil, "", OptionalProviders{Quota: provider})
+	router := NewRouter(nil, nil, "", OptionalProviders{Quota: provider})
 	authIndexes := make([]string, 0, 25)
 	for i := 0; i < 25; i++ {
 		authIndexes = append(authIndexes, `"auth"`)
@@ -147,7 +147,7 @@ func TestQuotaRefreshAllowsCurrentPageSizeWithoutOuterTwentyLimit(t *testing.T) 
 
 func TestQuotaRefreshRejectsEmptyAuthIndexes(t *testing.T) {
 	provider := &quotaProviderStub{}
-	router := NewRouter(nil, nil, nil, nil, AuthConfig{}, nil, "", OptionalProviders{Quota: provider})
+	router := NewRouter(nil, nil, "", OptionalProviders{Quota: provider})
 
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/quota/refresh", strings.NewReader(`{"auth_indexes":[]}`))
 	req.Header.Set("Content-Type", "application/json")
@@ -169,7 +169,7 @@ func TestQuotaRefreshTaskReturnsCachedQuota(t *testing.T) {
 		Status:    quota.RefreshTaskStatusCompleted,
 		Quota:     &quota.CheckResponse{ID: "auth-1", Quota: []quota.QuotaRow{{Key: "rate_limit.primary_window", Label: "5h", PlanType: "pro"}}},
 	}}
-	router := NewRouter(nil, nil, nil, nil, AuthConfig{}, nil, "", OptionalProviders{Quota: provider})
+	router := NewRouter(nil, nil, "", OptionalProviders{Quota: provider})
 
 	req := httptest.NewRequest(http.MethodGet, "/api/v1/quota/refresh/task-1", nil)
 	resp := httptest.NewRecorder()
@@ -189,7 +189,7 @@ func TestQuotaRefreshTaskReturnsCachedQuota(t *testing.T) {
 
 func TestQuotaRefreshTaskMapsNotFoundTo404(t *testing.T) {
 	provider := &quotaProviderStub{taskErr: quota.ErrTaskNotFound}
-	router := NewRouter(nil, nil, nil, nil, AuthConfig{}, nil, "", OptionalProviders{Quota: provider})
+	router := NewRouter(nil, nil, "", OptionalProviders{Quota: provider})
 
 	req := httptest.NewRequest(http.MethodGet, "/api/v1/quota/refresh/missing-task", nil)
 	resp := httptest.NewRecorder()
@@ -201,7 +201,7 @@ func TestQuotaRefreshTaskMapsNotFoundTo404(t *testing.T) {
 }
 
 func TestQuotaDoesNotExposeProviderSpecificEndpoints(t *testing.T) {
-	router := NewRouter(nil, nil, nil, nil, AuthConfig{}, nil, "", OptionalProviders{Quota: &quotaProviderStub{}})
+	router := NewRouter(nil, nil, "", OptionalProviders{Quota: &quotaProviderStub{}})
 	paths := []string{
 		"/api/v1/quota/antigravity",
 		"/api/v1/quota/codex",

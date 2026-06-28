@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"sub2api-usage-keeper/internal/config"
-	"sub2api-usage-keeper/internal/poller"
 	"sub2api-usage-keeper/internal/sub2api"
 
 	"github.com/gin-gonic/gin"
@@ -109,22 +108,15 @@ func TestRunStartsMaintenanceOnly(t *testing.T) {
 		close(backupStarted)
 		return false
 	}
-	statusProvider := &appRunStub{started: make(chan struct{})}
 	app := &App{
 		Config:            &cfg,
 		Router:            gin.New(),
-		Poller:            statusProvider,
 		Maintenance:       maintenance,
 		BackupMaintenance: backupRunner,
 	}
 
 	if err := app.Run(); err == nil {
 		t.Fatal("expected Run to return an error for invalid port")
-	}
-	select {
-	case <-statusProvider.started:
-		t.Fatal("expected poller status provider not to be started as a background runner")
-	default:
 	}
 	select {
 	case <-maintenanceStarted:
@@ -169,23 +161,6 @@ func TestRunCancelsBackgroundTasksWhenRouterStops(t *testing.T) {
 	case <-time.After(time.Second):
 		t.Fatal("expected database backup runner context to be canceled")
 	}
-}
-
-type appRunStub struct {
-	started chan struct{}
-}
-
-func (s *appRunStub) Run(context.Context) error {
-	close(s.started)
-	return nil
-}
-
-func (s *appRunStub) Status() poller.Status {
-	return poller.Status{}
-}
-
-func (s *appRunStub) SyncNow(context.Context) error {
-	return nil
 }
 
 func installSub2APITestRepository(t *testing.T) {
@@ -234,6 +209,5 @@ func testAppConfig(t *testing.T) config.Config {
 		LogLevel:             "info",
 		LogFileEnabled:       false,
 		LogRetentionDays:     7,
-		AuthSessionTTL:       time.Hour,
 	}
 }

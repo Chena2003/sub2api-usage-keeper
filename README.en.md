@@ -1,67 +1,98 @@
 # Sub2API Usage Keeper
 
-[中文说明](./README.md)
+[![Go](https://img.shields.io/badge/Go-1.22+-00ADD8?logo=go&logoColor=white)](https://go.dev)
+[![React](https://img.shields.io/badge/React-18+-61DAFB?logo=react&logoColor=black)](https://react.dev)
+[![License](https://img.shields.io/badge/License-MIT-green.svg)](./LICENSE)
+[![Docker](https://img.shields.io/badge/Docker-Ready-2496ED?logo=docker&logoColor=white)](./Dockerfile)
 
-Sub2API Usage Keeper is a standalone sidecar dashboard for Sub2API account status, quota-safe account metadata, and global usage statistics.
+English | [中文](./README.md)
+
+Sub2API Usage Keeper is a standalone sidecar dashboard for [Sub2API](https://github.com/xLmile/sub2api) usage statistics, account status monitoring, and ranking analysis.
+
+This project is inspired by [CPA Usage Keeper](https://github.com/willxup/cpa-usage-keeper) and adapts its architecture and design patterns for the Sub2API data model and deployment scenarios.
+
+## Preview
+
+<p float="left">
+  <img src="docs/screenshots/overview.png" width="49%" alt="Overview Panel" />
+  <img src="docs/screenshots/ranking.png" width="49%" alt="Rankings" />
+</p>
 
 ## Features
 
-- Reads account and aggregate usage data from an existing Sub2API PostgreSQL database
-- Shows total accounts, active accounts, request volume, token usage, cost, and model ranking
-- Shows upstream account status (Active/Paused/Error/Rate Limited/Overloaded/Temp Unschedulable), plan, reset countdown, and recent 7-day usage
-- Account Quotas page: three-segment row layout with identity/metrics/dual quota bars (5h + 7d), reading real utilization from upstream `accounts.extra`
-- Never returns raw Sub2API credentials to browser APIs
-- Uses local SQLite for dashboard-owned data, logs, and backups
-- Optional password login protection
-- Docker / Docker Compose deployment
+- 📊 **Usage Overview** — Request volume, token consumption, cost statistics with daily/hourly granularity
+- 📈 **Trend Charts** — Top 12 usage trend line charts by model/user/API Key/account
+- 🏆 **Rankings** — Token ranking across four dimensions: user, API Key, model, account
+- 🖥️ **Account Status** — Upstream account states (Active/Paused/Error/Rate Limited, etc.), plan type, reset countdown
+- 📋 **Account Quotas** — Three-segment layout showing identity/metrics/dual quota bars (5h + 7d) with real utilization data
+- 🩺 **Health Monitoring** — Request success rate timeline, 15-minute granularity health blocks
+- 📝 **Event Logs** — Per-request details with pagination and filtering
+- 🔒 **Data Masking** — Browser APIs never expose raw credentials; emails and user identifiers are automatically masked
+- 🌙 **Dark Mode** — Automatic light/dark theme switching
+- 🌐 **Multi-language** — Chinese / English / Traditional Chinese
+- 🐳 **Containerized** — One-command Docker deployment with multi-stage builds
 
-## Docker with existing Sub2API
+## Tech Stack
 
-1. Ensure the dashboard container can reach `sub2api-postgres` on the same Docker network.
-2. Set `SUB2API_DATABASE_URL` to a read-only Postgres user when possible.
-3. Start the dashboard on `127.0.0.1:8082` and expose it through Caddy, Nginx, or Cloudflare.
+| Layer | Technology |
+|-------|-----------|
+| Backend | Go 1.22, Gin, GORM, SQLite |
+| Frontend | React 18, TypeScript, Vite, Chart.js, Zustand |
+| Data Source | Sub2API PostgreSQL (read-only connection) |
+| Deployment | Docker, Docker Compose |
+
+## Quick Start
+
+### Docker Deployment (Recommended)
+
+Ensure the dashboard container can reach the Sub2API PostgreSQL database (same Docker network).
 
 ```bash
+# 1. Configure
 cp .env.example .env
-vim .env
+vim .env  # Set SUB2API_DATABASE_URL
+
+# 2. Build and start
 docker build -t sub2api-usage-keeper:latest .
 docker compose -f docker-compose.example.yml up -d
 ```
 
+### Attach to Existing Sub2API
+
+```bash
+docker run -d \
+  --name sub2api-usage-keeper \
+  --restart unless-stopped \
+  --network <your-sub2api-network> \
+  -p 127.0.0.1:8082:8080 \
+  --env-file .env \
+  -v ./data:/data \
+  sub2api-usage-keeper:latest
+```
+
+> Bind to `127.0.0.1` and expose HTTPS through Caddy / Nginx / Cloudflare.
+
 ## Configuration
 
 | Variable | Required | Default | Description |
-| --- | --- | --- | --- |
-| `SUB2API_DATABASE_URL` | Yes | - | Sub2API PostgreSQL connection string, for example `postgres://sub2api:password@sub2api-postgres:5432/sub2api?sslmode=disable` |
-| `AUTH_ENABLED` | No | `false` | Enable login protection |
-| `LOGIN_PASSWORD` | When auth is enabled | - | Dashboard login password |
-| `AUTH_SESSION_TTL` | No | `168h` | Session lifetime |
-| `APP_PORT` | No | `8080` | HTTP listen port |
-| `APP_BASE_PATH` | No | root path | Subpath prefix such as `/usage`; empty means `/` |
-| `TZ` | No | `Asia/Shanghai` | Project timezone |
-| `WORK_DIR` | No | `./data` | Application work directory for database, logs, and backups |
-| `PUBLIC_MODE` | No | `true` | Enable user-facing public dashboard mode |
-| `QUOTA_REFRESH_INTERVAL` | No | `5m` | Quota/status refresh interval |
-| `REQUEST_TIMEOUT` | No | `30s` | External request timeout |
-| `LOG_LEVEL` | No | `info` | Log level |
-| `LOG_FILE_ENABLED` | No | `true` | Write persistent log files |
-| `LOG_RETENTION_DAYS` | No | `7` | Log retention days; `0` disables cleanup |
-| `BACKUP_ENABLED` | No | `true` | Enable SQLite database backups |
-| `BACKUP_INTERVAL` | No | `24h` | Database backup interval |
-| `BACKUP_RETENTION_DAYS` | No | `7` | Backup retention days |
-
-## Security notes
-
-The browser API never returns Sub2API account credentials. Account emails, access tokens, refresh tokens, ID tokens, API keys, passwords, session keys, and token/secret-like fields are removed from responses. Only explicitly allowed display-safe credential keys, such as `plan_type` and `model_mapping`, are exposed.
-
-Production recommendations:
-
-- Use a read-only PostgreSQL user for the Sub2API database connection.
-
-The default deployment is a no-password public dashboard (`AUTH_ENABLED=false`). Browser APIs expose statistics, account status, and rankings, but never return raw tokens, passwords, email addresses, or credential secret fields. If access control is required, put it at Cloudflare Access, Nginx Basic Auth, or another reverse-proxy layer.
-
-- Terminate HTTPS at your reverse proxy.
-- Bind the container port to `127.0.0.1` instead of exposing it directly to the internet.
+|----------|:--------:|---------|-------------|
+| `SUB2API_DATABASE_URL` | ✅ | — | Sub2API PostgreSQL connection string |
+| `AUTH_ENABLED` | | `false` | Enable login protection |
+| `LOGIN_PASSWORD` | When auth enabled | — | Dashboard login password |
+| `AUTH_SESSION_TTL` | | `168h` | Session lifetime |
+| `APP_PORT` | | `8080` | HTTP listen port |
+| `APP_BASE_PATH` | | `/` | Subpath prefix, e.g. `/usage` |
+| `TZ` | | `Asia/Shanghai` | Timezone |
+| `WORK_DIR` | | `./data` | Data directory (SQLite, logs, backups) |
+| `PUBLIC_MODE` | | `true` | Public dashboard mode |
+| `QUOTA_REFRESH_INTERVAL` | | `5m` | Quota/status refresh interval |
+| `REQUEST_TIMEOUT` | | `30s` | External request timeout |
+| `LOG_LEVEL` | | `info` | Log level |
+| `LOG_FILE_ENABLED` | | `true` | Write persistent log files |
+| `LOG_RETENTION_DAYS` | | `7` | Log retention days |
+| `BACKUP_ENABLED` | | `true` | Enable SQLite backups |
+| `BACKUP_INTERVAL` | | `24h` | Backup interval |
+| `BACKUP_RETENTION_DAYS` | | `7` | Backup retention days |
 
 ## Development
 
@@ -72,32 +103,74 @@ The default deployment is a no-password public dashboard (`AUTH_ENABLED=false`).
 - npm
 - A reachable Sub2API PostgreSQL database
 
-### Run locally
+### Run Backend
 
 ```bash
 cp .env.example .env
+# Edit SUB2API_DATABASE_URL to point at your database
 go run ./cmd/server/main.go
 ```
 
-Frontend dev server:
+### Run Frontend Dev Server
 
 ```bash
-npm --prefix ./web ci
-npm --prefix ./web run dev -- --host 127.0.0.1
+cd web
+npm ci
+npm run dev -- --host 127.0.0.1
 ```
 
-## Verification
+Visit http://127.0.0.1:5173
+
+### Verification
 
 ```bash
+# All-in-one
+make verify
+
+# Or run individually
 go test ./cmd/... ./internal/...
-npm --prefix ./web run test
+npm --prefix ./web test -- --run
 npm --prefix ./web run lint
 npm --prefix ./web run typecheck
 npm --prefix ./web run build
 ```
 
-Or run:
+## Project Structure
 
-```bash
-make verify
 ```
+sub2api-usage-keeper/
+├── cmd/server/          # Application entrypoint
+├── internal/
+│   ├── api/             # HTTP routes and handlers
+│   ├── app/             # Application bootstrap and DI
+│   ├── quota/           # Quota calculation and type definitions
+│   ├── service/         # Business logic layer
+│   └── sub2api/         # Sub2API database access and entities
+├── web/
+│   ├── src/
+│   │   ├── components/  # React components
+│   │   ├── lib/         # API calls and utilities
+│   │   ├── pages/       # Page components
+│   │   └── stores/      # Zustand state management
+│   └── ...
+├── Dockerfile           # Multi-stage build
+├── docker-compose.example.yml
+└── .env.example
+```
+
+## Security
+
+- Browser APIs **never return** raw credentials (emails, access tokens, refresh tokens, passwords, session keys, etc.)
+- User emails are automatically masked: local part > 5 chars retains first 3 and last 2; short local parts keep only the first character; domain remains visible
+- Non-email user identifiers are hash-masked
+- Use a read-only PostgreSQL user in production
+- Bind container ports to `127.0.0.1` and terminate HTTPS at the reverse proxy
+
+## Acknowledgments
+
+- [CPA Usage Keeper](https://github.com/willxup/cpa-usage-keeper) — The reference implementation that inspired this project's architecture and frontend design
+- [Sub2API](https://github.com/xLmile/sub2api) — The upstream AI API gateway
+
+## License
+
+[MIT](./LICENSE)

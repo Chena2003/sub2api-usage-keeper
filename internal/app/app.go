@@ -10,10 +10,8 @@ import (
 	"time"
 
 	"sub2api-usage-keeper/internal/api"
-	"sub2api-usage-keeper/internal/auth"
 	"sub2api-usage-keeper/internal/config"
 	"sub2api-usage-keeper/internal/logging"
-	"sub2api-usage-keeper/internal/poller"
 	"sub2api-usage-keeper/internal/repository"
 	"sub2api-usage-keeper/internal/service"
 	"sub2api-usage-keeper/internal/sub2api"
@@ -27,12 +25,6 @@ import (
 // Runner 是 App 后台任务的最小接口，具体语义由字段名和实现方法表达。
 type Runner interface {
 	Run(ctx context.Context) error
-}
-
-// StatusProvider 只提供前端状态和手动同步入口，不作为后台 runner 启动。
-type StatusProvider interface {
-	Status() poller.Status
-	SyncNow(ctx context.Context) error
 }
 
 type Options struct {
@@ -56,7 +48,6 @@ type App struct {
 	DB                *gorm.DB
 	Sub2APIRepository *sub2api.Repository
 	Router            *gin.Engine
-	Poller            StatusProvider
 	Maintenance       *StorageCleanupRunner
 	BackupMaintenance *DatabaseBackupRunner
 	LogCloser         io.Closer
@@ -111,13 +102,6 @@ func NewWithConfig(cfg config.Config) (*App, error) {
 	}
 
 	usageService := service.NewUsageService(db)
-	sessionManager := auth.NewSessionManager(cfg.AuthSessionTTL)
-	authHandler := api.NewAuthHandler(api.AuthConfig{
-		Enabled:       cfg.AuthEnabled,
-		LoginPassword: cfg.LoginPassword,
-		SessionTTL:    cfg.AuthSessionTTL,
-		BasePath:      cfg.AppBasePath,
-	}, sessionManager)
 
 	return &App{
 		Config:            &cfg,
@@ -128,16 +112,7 @@ func NewWithConfig(cfg config.Config) (*App, error) {
 		LogCloser:         logCloser,
 		Router: api.NewRouter(
 			webui.Static,
-			nil,
 			usageService,
-			nil,
-			api.AuthConfig{
-				Enabled:       cfg.AuthEnabled,
-				LoginPassword: cfg.LoginPassword,
-				SessionTTL:    cfg.AuthSessionTTL,
-				BasePath:      cfg.AppBasePath,
-			},
-			authHandler,
 			cfg.AppBasePath,
 			api.OptionalProviders{Sub2APIDashboard: sub2apiDashboardService},
 		),

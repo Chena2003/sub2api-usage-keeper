@@ -6,9 +6,7 @@ import (
 	"net/http/httptest"
 	"testing"
 	"testing/fstest"
-	"time"
 
-	"sub2api-usage-keeper/internal/poller"
 	"sub2api-usage-keeper/internal/version"
 
 	"github.com/gin-gonic/gin"
@@ -23,16 +21,8 @@ func testStaticFS(t *testing.T, files map[string]string) fs.FS {
 	return staticFS
 }
 
-type statusStub struct {
-	status poller.Status
-}
-
-func (s statusStub) Status() poller.Status {
-	return s.status
-}
-
 func TestHealthzReturnsOK(t *testing.T) {
-	router := NewRouter(nil, nil, nil, nil, AuthConfig{}, nil, "")
+	router := NewRouter(nil, nil, "")
 	req := httptest.NewRequest(http.MethodGet, "/healthz", nil)
 	resp := httptest.NewRecorder()
 
@@ -44,7 +34,7 @@ func TestHealthzReturnsOK(t *testing.T) {
 }
 
 func TestRouterDoesNotTrustForwardedClientIPByDefault(t *testing.T) {
-	router := NewRouter(nil, nil, nil, nil, AuthConfig{}, nil, "")
+	router := NewRouter(nil, nil, "")
 	router.GET("/client-ip", func(c *gin.Context) {
 		c.String(http.StatusOK, c.ClientIP())
 	})
@@ -60,25 +50,12 @@ func TestRouterDoesNotTrustForwardedClientIPByDefault(t *testing.T) {
 	}
 }
 
-func TestStatusReturnsPollerState(t *testing.T) {
-	previousLocal := time.Local
-	location, err := time.LoadLocation("Asia/Shanghai")
-	if err != nil {
-		t.Fatalf("load location: %v", err)
-	}
-	t.Cleanup(func() { time.Local = previousLocal })
-	time.Local = location
+func TestStatusReturnsRunningAndVersion(t *testing.T) {
+	previousVersion := version.Version
+	t.Cleanup(func() { version.Version = previousVersion })
+	version.Version = "v1.2.3"
 
-	lastRunAt := time.Date(2026, 4, 16, 12, 0, 0, 0, time.UTC)
-	router := NewRouter(nil, statusStub{status: poller.Status{
-		Running:     true,
-		SyncRunning: false,
-		LastRunAt:   lastRunAt,
-		LastError:   "boom",
-		LastWarning: "metadata unavailable",
-		LastStatus:  "completed_with_warnings",
-	}}, nil, nil, AuthConfig{}, nil, "")
-
+	router := NewRouter(nil, nil, "")
 	req := httptest.NewRequest(http.MethodGet, "/api/v1/status", nil)
 	resp := httptest.NewRecorder()
 	router.ServeHTTP(resp, req)
@@ -87,49 +64,13 @@ func TestStatusReturnsPollerState(t *testing.T) {
 		t.Fatalf("expected status 200, got %d", resp.Code)
 	}
 	body := resp.Body.String()
-	if !(contains(body, `"running":true`) && contains(body, `"sync_running":false`) && contains(body, `"last_error":"boom"`) && contains(body, `"last_warning":"metadata unavailable"`) && contains(body, `"last_status":"completed_with_warnings"`) && contains(body, `"last_run_at":"2026-04-16T20:00:00+08:00"`)) {
+	if !contains(body, `"running":true`) || !contains(body, `"version":"v1.2.3"`) || !contains(body, `"timezone":`) {
 		t.Fatalf("unexpected response body: %s", body)
 	}
 }
 
-func TestStatusReturnsProjectTimezone(t *testing.T) {
-	previousLocal := time.Local
-	location, err := time.LoadLocation("Asia/Shanghai")
-	if err != nil {
-		t.Fatalf("load location: %v", err)
-	}
-	t.Cleanup(func() { time.Local = previousLocal })
-	time.Local = location
-
-	router := NewRouter(nil, nil, nil, nil, AuthConfig{}, nil, "")
-	req := httptest.NewRequest(http.MethodGet, "/api/v1/status", nil)
-	resp := httptest.NewRecorder()
-	router.ServeHTTP(resp, req)
-
-	if resp.Code != http.StatusOK {
-		t.Fatalf("expected status 200, got %d", resp.Code)
-	}
-	if body := resp.Body.String(); !contains(body, `"timezone":"Asia/Shanghai"`) {
-		t.Fatalf("expected status response to include project timezone, got %s", body)
-	}
-}
-
-func TestStatusReturnsEmptyStateWithoutProvider(t *testing.T) {
-	router := NewRouter(nil, nil, nil, nil, AuthConfig{}, nil, "")
-	req := httptest.NewRequest(http.MethodGet, "/api/v1/status", nil)
-	resp := httptest.NewRecorder()
-	router.ServeHTTP(resp, req)
-
-	if resp.Code != http.StatusOK {
-		t.Fatalf("expected status 200, got %d", resp.Code)
-	}
-	if body := resp.Body.String(); !contains(body, `"running":false`) || !contains(body, `"sync_running":false`) || !contains(body, `"timezone":`) {
-		t.Fatalf("unexpected response body: %s", body)
-	}
-}
-
-func TestNewRouterExposesSub2APIDashboardWhenAuthDisabled(t *testing.T) {
-	router := NewRouter(nil, nil, nil, nil, AuthConfig{Enabled: false}, nil, "", OptionalProviders{
+func TestNewRouterExposesSub2APIDashboardRoutes(t *testing.T) {
+	router := NewRouter(nil, nil, "", OptionalProviders{
 		Sub2APIDashboard: &fakeSub2APIDashboardProvider{},
 	})
 	req := httptest.NewRequest(http.MethodGet, "/api/v1/sub2api/overview", nil)
@@ -145,46 +86,8 @@ func TestNewRouterExposesSub2APIDashboardWhenAuthDisabled(t *testing.T) {
 	}
 }
 
-func TestStatusReturnsVersionAndUpdateCheckFlag(t *testing.T) {
-	previousVersion := version.Version
-	t.Cleanup(func() { version.Version = previousVersion })
-	version.Version = "v1.2.3"
-
-	router := NewRouter(nil, nil, nil, nil, AuthConfig{}, nil, "")
-	req := httptest.NewRequest(http.MethodGet, "/api/v1/status", nil)
-	resp := httptest.NewRecorder()
-	router.ServeHTTP(resp, req)
-
-	if resp.Code != http.StatusOK {
-		t.Fatalf("expected status 200, got %d", resp.Code)
-	}
-	body := resp.Body.String()
-	if !contains(body, `"version":"v1.2.3"`) || !contains(body, `"updateCheckEnabled":true`) {
-		t.Fatalf("unexpected response body: %s", body)
-	}
-}
-
-func TestStatusHidesUpdateCheckForDevVersion(t *testing.T) {
-	previousVersion := version.Version
-	t.Cleanup(func() { version.Version = previousVersion })
-	version.Version = "dev"
-
-	router := NewRouter(nil, nil, nil, nil, AuthConfig{}, nil, "")
-	req := httptest.NewRequest(http.MethodGet, "/api/v1/status", nil)
-	resp := httptest.NewRecorder()
-	router.ServeHTTP(resp, req)
-
-	if resp.Code != http.StatusOK {
-		t.Fatalf("expected status 200, got %d", resp.Code)
-	}
-	body := resp.Body.String()
-	if !contains(body, `"version":"dev"`) || !contains(body, `"updateCheckEnabled":false`) {
-		t.Fatalf("unexpected response body: %s", body)
-	}
-}
-
 func TestManualSyncRouteIsNotRegistered(t *testing.T) {
-	router := NewRouter(nil, statusStub{}, nil, nil, AuthConfig{}, nil, "")
+	router := NewRouter(nil, nil, "")
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/sync", nil)
 	resp := httptest.NewRecorder()
 
@@ -196,11 +99,7 @@ func TestManualSyncRouteIsNotRegistered(t *testing.T) {
 }
 
 func TestSubpathRoutesOnlyServePrefixedEndpoints(t *testing.T) {
-	lastRunAt := time.Date(2026, 4, 16, 12, 0, 0, 0, time.UTC)
-	router := NewRouter(nil, statusStub{status: poller.Status{
-		Running:   true,
-		LastRunAt: lastRunAt,
-	}}, nil, nil, AuthConfig{BasePath: "/cpa"}, nil, "/cpa")
+	router := NewRouter(nil, nil, "/cpa")
 
 	for _, testCase := range []struct {
 		path       string
@@ -226,7 +125,7 @@ func TestSubpathStaticRoutesServeOnlyUnderPrefix(t *testing.T) {
 		"assets/app.js": "console.log('ok')",
 	})
 
-	router := NewRouter(staticFS, nil, nil, nil, AuthConfig{BasePath: "/cpa"}, nil, "/cpa")
+	router := NewRouter(staticFS, nil, "/cpa")
 
 	for _, testCase := range []struct {
 		path       string
@@ -270,7 +169,7 @@ func TestRootStaticRouteInjectsEmptyBasePath(t *testing.T) {
 		"index.html": `<html><head><script>window.__APP_BASE_PATH__ = "__APP_BASE_PATH__";</script></head><body>app</body></html>`,
 	})
 
-	router := NewRouter(staticFS, nil, nil, nil, AuthConfig{}, nil, "")
+	router := NewRouter(staticFS, nil, "")
 	resp := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
 	router.ServeHTTP(resp, req)
@@ -289,7 +188,7 @@ func TestStaticHTMLResponsesBypassCache(t *testing.T) {
 		"assets/app.js": "console.log('ok')",
 	})
 
-	router := NewRouter(staticFS, nil, nil, nil, AuthConfig{}, nil, "/cpa")
+	router := NewRouter(staticFS, nil, "/cpa")
 	resp := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodGet, "/cpa/dashboard", nil)
 	router.ServeHTTP(resp, req)
@@ -305,7 +204,7 @@ func TestStaticAssetResponsesUseLongCache(t *testing.T) {
 		"assets/app.js": "console.log('ok')",
 	})
 
-	router := NewRouter(staticFS, nil, nil, nil, AuthConfig{}, nil, "/cpa")
+	router := NewRouter(staticFS, nil, "/cpa")
 	resp := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodGet, "/cpa/assets/app.js", nil)
 	router.ServeHTTP(resp, req)

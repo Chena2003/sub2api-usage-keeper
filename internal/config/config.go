@@ -38,16 +38,6 @@ type Config struct {
 	TLSKeyFile string
 	// Sub2APIDatabaseURL 是 Sub2API PostgreSQL 数据库连接地址。
 	Sub2APIDatabaseURL string
-	CPABaseURL             string
-	CPAManagementKey       string
-	RedisQueueAddr         string
-	RedisQueueTLS          bool
-	RedisQueueKey          string
-	RedisQueueBatchSize    int
-	RedisQueueIdleInterval time.Duration
-	RedisQueueErrorBackoff time.Duration
-	MetadataSyncInterval   time.Duration
-	TLSSkipVerify          bool
 	// QuotaRefreshInterval 是刷新 Sub2API quota 数据的间隔。
 	QuotaRefreshInterval time.Duration
 	// PublicMode 控制是否启用公开访问模式。
@@ -74,12 +64,6 @@ type Config struct {
 	LogDir string
 	// LogRetentionDays 是日志保留天数，0 表示不自动清理。
 	LogRetentionDays int
-	// AuthEnabled 控制是否启用登录保护。
-	AuthEnabled bool
-	// LoginPassword 是启用登录保护时使用的登录密码。
-	LoginPassword string
-	// AuthSessionTTL 是登录 session 有效时长。
-	AuthSessionTTL time.Duration
 }
 
 type LoadOptions struct {
@@ -158,18 +142,6 @@ func Load(options LoadOptions) (*Config, error) {
 		return nil, fmt.Errorf("LOG_RETENTION_DAYS must be non-negative")
 	}
 
-	authSessionTTL, err := getDuration("AUTH_SESSION_TTL", 7*24*time.Hour)
-	if err != nil {
-		return nil, err
-	}
-	if authSessionTTL <= 0 {
-		return nil, fmt.Errorf("AUTH_SESSION_TTL must be positive")
-	}
-
-	authEnabled, err := getBool("AUTH_ENABLED", false)
-	if err != nil {
-		return nil, err
-	}
 	tlsEnabled, err := getBool("TLS_ENABLED", false)
 	if err != nil {
 		return nil, err
@@ -202,15 +174,9 @@ func Load(options LoadOptions) (*Config, error) {
 		LogFileEnabled:       logFileEnabled,
 		LogDir:               filepath.Join(workDir, workDirLogsName),
 		LogRetentionDays:     logRetentionDays,
-		AuthEnabled:          authEnabled,
-		LoginPassword:        strings.TrimSpace(os.Getenv("LOGIN_PASSWORD")),
-		AuthSessionTTL:       authSessionTTL,
 	}
 	if cfg.Sub2APIDatabaseURL == "" {
 		return nil, fmt.Errorf("SUB2API_DATABASE_URL is required")
-	}
-	if cfg.AuthEnabled && cfg.LoginPassword == "" {
-		return nil, fmt.Errorf("LOGIN_PASSWORD is required when AUTH_ENABLED is true")
 	}
 	if cfg.TLSEnabled {
 		if cfg.TLSCertFile == "" {

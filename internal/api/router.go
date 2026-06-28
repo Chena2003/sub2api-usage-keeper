@@ -12,19 +12,12 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
-	"sub2api-usage-keeper/internal/poller"
 	"sub2api-usage-keeper/internal/quota"
 	"sub2api-usage-keeper/internal/service"
-	"sub2api-usage-keeper/internal/timeutil"
-	"sub2api-usage-keeper/internal/updatecheck"
 	"sub2api-usage-keeper/internal/version"
 )
 
 const appBasePathPlaceholder = "__APP_BASE_PATH__"
-
-type StatusProvider interface {
-	Status() poller.Status
-}
 
 type QuotaProvider interface {
 	GetCachedQuota(context.Context, quota.CacheRequest) (quota.CacheResponse, error)
@@ -35,17 +28,13 @@ type QuotaProvider interface {
 type OptionalProviders struct {
 	UsageIdentity    service.UsageIdentityProvider
 	Quota            QuotaProvider
-	CPAAPIKeys       service.CPAAPIKeyProvider
+	Pricing          service.PricingProvider
 	Sub2APIDashboard Sub2APIDashboardProvider
 }
 
 func NewRouter(
 	staticFS fs.FS,
-	statusProvider StatusProvider,
 	usageProvider service.UsageProvider,
-	pricingProvider service.PricingProvider,
-	authConfig AuthConfig,
-	authHandler *authHandler,
 	basePath string,
 	optionalProviders ...OptionalProviders,
 ) *gin.Engine {
@@ -61,32 +50,23 @@ func NewRouter(
 		c.JSON(http.StatusOK, gin.H{"message": "ok"})
 	})
 
-	authGroup := apiV1.Group("/auth")
-	if authHandler == nil {
-		authHandler = NewAuthHandler(authConfig, nil)
-	}
-	authHandler.registerRoutes(authGroup)
-
 	var usageIdentityProvider service.UsageIdentityProvider
 	var quotaProvider QuotaProvider
-	var cpaAPIKeyProvider service.CPAAPIKeyProvider
+	var pricingProvider service.PricingProvider
 	var sub2apiDashboardProvider Sub2APIDashboardProvider
 	if len(optionalProviders) > 0 {
 		usageIdentityProvider = optionalProviders[0].UsageIdentity
 		quotaProvider = optionalProviders[0].Quota
-		cpaAPIKeyProvider = optionalProviders[0].CPAAPIKeys
+		pricingProvider = optionalProviders[0].Pricing
 		sub2apiDashboardProvider = optionalProviders[0].Sub2APIDashboard
 	}
 
 	dashboardRoutes := apiV1.Group("")
-	dashboardRoutes.Use(authHandler.middleware())
-	registerStatusRoutes(dashboardRoutes, statusProvider)
-	registerUpdateRoutes(dashboardRoutes, nil)
+	registerStatusRoutes(dashboardRoutes)
 	registerUsageOverviewRoute(dashboardRoutes, usageProvider)
-	registerUsageAnalysisRoute(dashboardRoutes, usageProvider, cpaAPIKeyProvider)
+	registerUsageAnalysisRoute(dashboardRoutes, usageProvider)
 	registerUsageEventsRoute(dashboardRoutes, usageProvider, usageIdentityProvider)
 	registerUsageIdentityRoutes(dashboardRoutes, usageIdentityProvider)
-	registerCPAAPIKeyRoutes(dashboardRoutes, cpaAPIKeyProvider)
 	registerPricingRoutes(dashboardRoutes, pricingProvider)
 	registerQuotaRoutes(dashboardRoutes, quotaProvider)
 	registerSub2APIDashboardRoutes(dashboardRoutes, sub2apiDashboardProvider)
@@ -216,42 +196,18 @@ func stripBasePath(basePath, requestPath string) (string, bool) {
 }
 
 type statusResponse struct {
-	Running            bool       `json:"running"`
-	SyncRunning        bool       `json:"sync_running"`
-	Timezone           string     `json:"timezone"`
-	Version            string     `json:"version"`
-	UpdateCheckEnabled bool       `json:"updateCheckEnabled"`
-	LastRunAt          *time.Time `json:"last_run_at,omitempty"`
-	LastError          string     `json:"last_error,omitempty"`
-	LastWarning        string     `json:"last_warning,omitempty"`
-	LastStatus         string     `json:"last_status,omitempty"`
+	Running   bool       `json:"running"`
+	Timezone  string     `json:"timezone"`
+	Version   string     `json:"version"`
+	LastRunAt *time.Time `json:"last_run_at,omitempty"`
 }
 
-func registerStatusRoutes(router gin.IRoutes, statusProvider StatusProvider) {
+func registerStatusRoutes(router gin.IRoutes) {
 	router.GET("/status", func(c *gin.Context) {
-		if statusProvider == nil {
-			c.JSON(http.StatusOK, buildStatusResponse(poller.Status{}))
-			return
-		}
-
-		c.JSON(http.StatusOK, buildStatusResponse(statusProvider.Status()))
+		c.JSON(http.StatusOK, statusResponse{
+			Running:  true,
+			Timezone: time.Local.String(),
+			Version:  version.Version,
+		})
 	})
-}
-
-func buildStatusResponse(status poller.Status) statusResponse {
-	response := statusResponse{
-		Running:            status.Running,
-		SyncRunning:        status.SyncRunning,
-		Timezone:           time.Local.String(),
-		Version:            version.Version,
-		UpdateCheckEnabled: updatecheck.IsStableVersion(version.Version),
-		LastError:          status.LastError,
-		LastWarning:        status.LastWarning,
-		LastStatus:         status.LastStatus,
-	}
-	if !status.LastRunAt.IsZero() {
-		lastRunAt := timeutil.NormalizeStorageTime(status.LastRunAt)
-		response.LastRunAt = &lastRunAt
-	}
-	return response
 }

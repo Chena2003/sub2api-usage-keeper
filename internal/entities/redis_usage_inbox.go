@@ -2,7 +2,8 @@ package entities
 
 import "time"
 
-// RedisUsageInbox 是从 CPA Redis queue 拉取后等待解码/入库的原始消息实体。
+// RedisUsageInbox is retained only for database migration compatibility.
+// The Redis queue ingestion pipeline has been removed.
 type RedisUsageInbox struct {
 	ID            int64  `gorm:"primaryKey;index:idx_redis_usage_inboxes_status_id,priority:2"`
 	QueueKey      string `gorm:"not null"`

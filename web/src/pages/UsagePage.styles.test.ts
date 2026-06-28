@@ -3,7 +3,6 @@ import { describe, expect, it } from 'vitest'
 
 const usagePageStyles = readFileSync(new URL('./UsagePage.module.scss', import.meta.url), 'utf8')
 const usagePageSource = readFileSync(new URL('./UsagePage.tsx', import.meta.url), 'utf8')
-const loginPageSource = readFileSync(new URL('./LoginPage.tsx', import.meta.url), 'utf8')
 const indexHtmlSource = readFileSync(new URL('../../index.html', import.meta.url), 'utf8')
 const requestEventsSource = readFileSync(new URL('../components/usage/RequestEventsDetailsCard.tsx', import.meta.url), 'utf8')
 const sub2apiRequestEventsSource = readFileSync(new URL('../components/sub2api/RequestEventsPanel.tsx', import.meta.url), 'utf8')
@@ -34,9 +33,7 @@ describe('UsagePage toolbar styles', () => {
     expect(indexHtmlSource).toContain('<title>Sub2API Usage Keeper</title>')
     expect(indexHtmlSource).not.toContain('CPA USAGE KEEPER')
     expect(usagePageSource).toContain('Sub2API Usage Keeper')
-    expect(loginPageSource).toContain('Sub2API Usage Keeper')
     expect(usagePageSource).not.toContain('CPA Usage Keeper')
-    expect(loginPageSource).not.toContain('CPA Usage Keeper')
   })
 
   it('keeps visible range controls content-sized in narrow layouts', () => {

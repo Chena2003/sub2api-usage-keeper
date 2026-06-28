@@ -1,4 +1,4 @@
-import { type AnalysisResponse, type AuthSessionResponse, type CpaApiKeyOptionsResponse, type CpaApiKeySettingsItem, type CpaApiKeysResponse, type PricingEntry, type PricingResponse, type StatusResponse, type UpdateCheckResponse, type UsageEventModelFilterOptionsResponse, type UsageEventSourceFilterOptionsResponse, type UsedModelsResponse, type UsageIdentitiesPageResponse, type UsageIdentitiesResponse, type UsageEventsResponse, type UsageIdentityAuthType, type UsageOverviewResponse, type UsageQuotaCacheResponse, type UsageQuotaRefreshResponse, type UsageQuotaRefreshTaskResponse } from './types'
+import { type AnalysisResponse, type CpaApiKeyOptionsResponse, type CpaApiKeySettingsItem, type CpaApiKeysResponse, type PricingEntry, type PricingResponse, type StatusResponse, type UpdateCheckResponse, type UsageEventModelFilterOptionsResponse, type UsageEventSourceFilterOptionsResponse, type UsedModelsResponse, type UsageIdentitiesPageResponse, type UsageIdentitiesResponse, type UsageEventsResponse, type UsageIdentityAuthType, type UsageOverviewResponse, type UsageQuotaCacheResponse, type UsageQuotaRefreshResponse, type UsageQuotaRefreshTaskResponse } from './types'
 
 export class ApiError extends Error {
   status: number
@@ -48,27 +48,6 @@ async function apiFetch(input: RequestInfo | URL, init?: RequestInit): Promise<R
     credentials: 'include',
     ...init,
   })
-}
-
-export async function getSession(signal?: AbortSignal): Promise<AuthSessionResponse> {
-  const response = await apiFetch(apiPath('/auth/session'), { signal })
-  if (!response.ok) {
-    await parseApiError(response, `Failed to load auth session: ${response.status}`)
-  }
-  return response.json()
-}
-
-export async function login(password: string): Promise<void> {
-  const response = await apiFetch(apiPath('/auth/login'), {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({ password }),
-  })
-  if (!response.ok) {
-    await parseApiError(response, `Failed to login: ${response.status}`)
-  }
 }
 
 export async function fetchUsageOverview(range: string, start?: string, end?: string, signal?: AbortSignal, apiKeyId?: string): Promise<UsageOverviewResponse> {

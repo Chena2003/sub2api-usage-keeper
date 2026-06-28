@@ -34,9 +34,6 @@ func TestOpenDatabaseAutoMigratesCoreTables(t *testing.T) {
 	if !db.Migrator().HasTable("usage_events") {
 		t.Fatal("expected usage_events table to exist")
 	}
-	if !db.Migrator().HasTable("redis_usage_inboxes") {
-		t.Fatal("expected redis_usage_inboxes table to exist")
-	}
 }
 
 func TestOpenDatabaseCreatesFreshDatabaseFromCurrentSchemaWithoutRunningMigrations(t *testing.T) {
@@ -249,13 +246,6 @@ func TestDatabaseTimeFieldsUseProjectTimezoneRFC3339Nano(t *testing.T) {
 	if _, err := UpsertModelPriceSetting(db, dto.ModelPriceSettingInput{Model: "claude-sonnet", PromptPricePer1M: 1}); err != nil {
 		t.Fatalf("UpsertModelPriceSetting returned error: %v", err)
 	}
-	inboxRows, err := InsertRedisUsageInboxMessages(db, []dto.RedisInboxInsert{{QueueKey: "queue", RawMessage: `{"request_id":"event-storage-time"}`, PoppedAt: storageTime}})
-	if err != nil {
-		t.Fatalf("InsertRedisUsageInboxMessages returned error: %v", err)
-	}
-	if err := MarkRedisUsageInboxProcessed(db, inboxRows[0].ID, "event-storage-time", storageTime); err != nil {
-		t.Fatalf("MarkRedisUsageInboxProcessed returned error: %v", err)
-	}
 	activeStart := storageTime
 	activeUntil := storageTime.Add(time.Hour)
 	if err := ReplaceUsageIdentitiesForAuthType(context.Background(), db, []entities.UsageIdentity{{
@@ -282,10 +272,6 @@ func TestDatabaseTimeFieldsUseProjectTimezoneRFC3339Nano(t *testing.T) {
 		{table: "usage_events", field: "created_at", where: "event_key = 'event-storage-time'"},
 		{table: "model_price_settings", field: "created_at", where: "model = 'claude-sonnet'"},
 		{table: "model_price_settings", field: "updated_at", where: "model = 'claude-sonnet'"},
-		{table: "redis_usage_inboxes", field: "popped_at", where: "usage_event_key = 'event-storage-time'"},
-		{table: "redis_usage_inboxes", field: "processed_at", where: "usage_event_key = 'event-storage-time'"},
-		{table: "redis_usage_inboxes", field: "created_at", where: "usage_event_key = 'event-storage-time'"},
-		{table: "redis_usage_inboxes", field: "updated_at", where: "usage_event_key = 'event-storage-time'"},
 		{table: "usage_identities", field: "active_start", where: "identity = 'auth-1'"},
 		{table: "usage_identities", field: "active_until", where: "identity = 'auth-1'"},
 		{table: "usage_identities", field: "first_used_at", where: "identity = 'auth-1'"},
@@ -300,7 +286,7 @@ func TestDatabaseTimeFieldsUseProjectTimezoneRFC3339Nano(t *testing.T) {
 	}
 }
 
-func TestCleanupStorageCleansRedisInboxAndVacuums(t *testing.T) {
+func TestCleanupStorageCleansHealthStatsAndVacuums(t *testing.T) {
 	previousLocal := time.Local
 	location, err := time.LoadLocation("Asia/Shanghai")
 	if err != nil {
@@ -311,16 +297,6 @@ func TestCleanupStorageCleansRedisInboxAndVacuums(t *testing.T) {
 	db := openTestDatabase(t)
 	now := time.Date(2026, 4, 27, 2, 30, 0, 0, time.UTC)
 
-	inboxRows, err := InsertRedisUsageInboxMessages(db, []dto.RedisInboxInsert{
-		{QueueKey: "queue", RawMessage: `{"request_id":"processed-old"}`, PoppedAt: now.AddDate(0, 0, -2)},
-		{QueueKey: "queue", RawMessage: `{"request_id":"pending"}`, PoppedAt: now.AddDate(0, 0, -2)},
-	})
-	if err != nil {
-		t.Fatalf("InsertRedisUsageInboxMessages returned error: %v", err)
-	}
-	if err := db.Model(&entities.RedisUsageInbox{}).Where("id = ?", inboxRows[0].ID).Updates(map[string]any{"status": RedisUsageInboxStatusProcessed, "processed_at": time.Date(2026, 4, 26, 15, 59, 59, 0, time.UTC)}).Error; err != nil {
-		t.Fatalf("seed processed inbox row: %v", err)
-	}
 	if err := db.Create(&[]entities.UsageOverviewHealthStat{
 		{BucketStart: now.Add(-9 * 24 * time.Hour), SpanSeconds: 900, APIGroupKey: "old", SuccessCount: 1},
 		{BucketStart: now.Add(-7 * 24 * time.Hour), SpanSeconds: 900, APIGroupKey: "fresh", SuccessCount: 1},
@@ -328,21 +304,11 @@ func TestCleanupStorageCleansRedisInboxAndVacuums(t *testing.T) {
 		t.Fatalf("seed health stats: %v", err)
 	}
 
-	result, err := CleanupStorage(db, now)
+	_, err = CleanupStorage(db, now)
 	if err != nil {
 		t.Fatalf("CleanupStorage returned error: %v", err)
 	}
-	if result.RedisInbox.ProcessedDeleted != 1 {
-		t.Fatalf("unexpected cleanup result: %+v", result)
-	}
 
-	var inboxRemaining []entities.RedisUsageInbox
-	if err := db.Order("id asc").Find(&inboxRemaining).Error; err != nil {
-		t.Fatalf("load remaining inbox rows: %v", err)
-	}
-	if len(inboxRemaining) != 1 || inboxRemaining[0].ID != inboxRows[1].ID {
-		t.Fatalf("expected only pending inbox row to remain, got %+v", inboxRemaining)
-	}
 	var healthRemaining []entities.UsageOverviewHealthStat
 	if err := db.Order("api_group_key asc").Find(&healthRemaining).Error; err != nil {
 		t.Fatalf("load remaining health stats: %v", err)

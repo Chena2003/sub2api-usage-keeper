@@ -14,10 +14,7 @@ var configEnvKeys = []string{
 	"APP_PORT", "APP_BASE_PATH", "WORK_DIR", "SUB2API_DATABASE_URL", "QUOTA_REFRESH_INTERVAL", "PUBLIC_MODE",
 	"SQLITE_PATH", "BACKUP_ENABLED", "BACKUP_DIR", "BACKUP_INTERVAL", "BACKUP_RETENTION_DAYS",
 	"REQUEST_TIMEOUT", "LOG_LEVEL", "LOG_FILE_ENABLED", "LOG_DIR", "LOG_RETENTION_DAYS",
-	"AUTH_ENABLED", "LOGIN_PASSWORD", "AUTH_SESSION_TTL", "TZ", "TLS_ENABLED", "TLS_CERT_FILE", "TLS_KEY_FILE",
-	"CPA_BASE_URL", "CPA_MANAGEMENT_KEY", "POLL_INTERVAL", "USAGE_SYNC_MODE", "REDIS_QUEUE_ADDR",
-	"REDIS_QUEUE_TLS", "REDIS_QUEUE_KEY", "REDIS_QUEUE_BATCH_SIZE", "REDIS_QUEUE_IDLE_INTERVAL",
-	"REDIS_QUEUE_ERROR_BACKOFF", "REDIS_METADATA_SYNC_INTERVAL", "TLS_SKIP_VERIFY",
+	"TZ", "TLS_ENABLED", "TLS_CERT_FILE", "TLS_KEY_FILE",
 }
 
 func TestMain(m *testing.M) {
@@ -134,12 +131,6 @@ func TestLoadFromEnvAppliesDefaults(t *testing.T) {
 	}
 	if cfg.SQLitePath != filepath.Join("data", "app.db") {
 		t.Fatalf("expected default sqlite path data/app.db, got %s", cfg.SQLitePath)
-	}
-	if cfg.AuthEnabled {
-		t.Fatal("expected auth to be disabled by default")
-	}
-	if cfg.AuthSessionTTL != 7*24*time.Hour {
-		t.Fatalf("expected default auth session ttl 168h, got %s", cfg.AuthSessionTTL)
 	}
 	if !cfg.LogFileEnabled {
 		t.Fatal("expected log file output to be enabled by default")
@@ -341,8 +332,6 @@ func TestLoadRequiresSub2APIDatabaseURL(t *testing.T) {
 
 func TestLoadSub2APISettings(t *testing.T) {
 	t.Setenv("SUB2API_DATABASE_URL", testSub2APIDatabaseURL)
-	t.Setenv("AUTH_ENABLED", "true")
-	t.Setenv("LOGIN_PASSWORD", "secret")
 	t.Setenv("QUOTA_REFRESH_INTERVAL", "10m")
 	t.Setenv("PUBLIC_MODE", "true")
 
@@ -359,16 +348,6 @@ func TestLoadSub2APISettings(t *testing.T) {
 	}
 	if !cfg.PublicMode {
 		t.Fatal("expected public mode to be true")
-	}
-}
-
-func TestLoadFromEnvRequiresLoginPasswordWhenAuthEnabled(t *testing.T) {
-	setRequiredSub2APIEnv(t)
-	t.Setenv("AUTH_ENABLED", "true")
-
-	_, err := LoadFromEnv()
-	if err == nil || err.Error() != "LOGIN_PASSWORD is required when AUTH_ENABLED is true" {
-		t.Fatalf("expected LOGIN_PASSWORD required error, got %v", err)
 	}
 }
 
@@ -395,9 +374,6 @@ func TestLoadFromEnvParsesOverrides(t *testing.T) {
 	t.Setenv("LOG_LEVEL", "debug")
 	t.Setenv("LOG_FILE_ENABLED", "false")
 	t.Setenv("LOG_RETENTION_DAYS", "14")
-	t.Setenv("AUTH_ENABLED", "true")
-	t.Setenv("LOGIN_PASSWORD", "top-secret")
-	t.Setenv("AUTH_SESSION_TTL", "12h")
 	t.Setenv("QUOTA_REFRESH_INTERVAL", "30m")
 	t.Setenv("PUBLIC_MODE", "false")
 
@@ -406,7 +382,7 @@ func TestLoadFromEnvParsesOverrides(t *testing.T) {
 		t.Fatalf("LoadFromEnv returned error: %v", err)
 	}
 
-	if cfg.AppPort != "9090" || cfg.AppBasePath != "/sub2api" || cfg.WorkDir != "/tmp/work" || cfg.SQLitePath != filepath.Join("/tmp/work", "app.db") || cfg.BackupEnabled || cfg.BackupDir != filepath.Join("/tmp/work", "backups") || cfg.BackupInterval != 2*time.Hour || cfg.BackupRetentionDays != 7 || cfg.RequestTimeout != 15*time.Second || cfg.LogLevel != "debug" || cfg.LogFileEnabled || cfg.LogDir != filepath.Join("/tmp/work", "logs") || cfg.LogRetentionDays != 14 || !cfg.AuthEnabled || cfg.LoginPassword != "top-secret" || cfg.AuthSessionTTL != 12*time.Hour || cfg.QuotaRefreshInterval != 30*time.Minute || cfg.PublicMode {
+	if cfg.AppPort != "9090" || cfg.AppBasePath != "/sub2api" || cfg.WorkDir != "/tmp/work" || cfg.SQLitePath != filepath.Join("/tmp/work", "app.db") || cfg.BackupEnabled || cfg.BackupDir != filepath.Join("/tmp/work", "backups") || cfg.BackupInterval != 2*time.Hour || cfg.BackupRetentionDays != 7 || cfg.RequestTimeout != 15*time.Second || cfg.LogLevel != "debug" || cfg.LogFileEnabled || cfg.LogDir != filepath.Join("/tmp/work", "logs") || cfg.LogRetentionDays != 14 || cfg.QuotaRefreshInterval != 30*time.Minute || cfg.PublicMode {
 		t.Fatalf("unexpected config override result: %+v", cfg)
 	}
 }
@@ -469,12 +445,3 @@ func TestLoadFromEnvRejectsInvalidBasePath(t *testing.T) {
 	}
 }
 
-func TestLoadFromEnvRejectsNonPositiveAuthSessionTTL(t *testing.T) {
-	setRequiredSub2APIEnv(t)
-	t.Setenv("AUTH_SESSION_TTL", "0s")
-
-	_, err := LoadFromEnv()
-	if err == nil || err.Error() != "AUTH_SESSION_TTL must be positive" {
-		t.Fatalf("expected AUTH_SESSION_TTL validation error, got %v", err)
-	}
-}
