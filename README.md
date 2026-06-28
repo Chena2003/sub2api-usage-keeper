@@ -8,7 +8,8 @@ Sub2API Usage Keeper 是一个独立 sidecar dashboard，用于展示 Sub2API �
 
 - 读取现有 Sub2API PostgreSQL 数据库中的账号与 usage 聚合数据
 - 展示总账号、可用账号、请求量、Token 消耗、成本和模型排行
-- 展示所有上游账号的状态、计划、reset 时间和近 7 天用量
+- 展示所有上游账号的状态（Active/Paused/Error/Rate Limited/Overloaded/Temp Unschedulable）、计划、reset 倒计时和近 7 天用量
+- 账号额度页面：三段式行布局展示身份/指标/双窗口额度条（5h + 7d），读取上游 `accounts.extra` 中的真实 utilization 使用率
 - 浏览器 API 不返回 Sub2API 原始 credentials
 - 本地 SQLite 存储 dashboard 自有数据、日志和备份
 - 可选密码登录保护

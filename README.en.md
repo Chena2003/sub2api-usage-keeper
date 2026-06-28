@@ -8,7 +8,8 @@ Sub2API Usage Keeper is a standalone sidecar dashboard for Sub2API account statu
 
 - Reads account and aggregate usage data from an existing Sub2API PostgreSQL database
 - Shows total accounts, active accounts, request volume, token usage, cost, and model ranking
-- Shows upstream account status, plan, reset time, and recent 7-day usage
+- Shows upstream account status (Active/Paused/Error/Rate Limited/Overloaded/Temp Unschedulable), plan, reset countdown, and recent 7-day usage
+- Account Quotas page: three-segment row layout with identity/metrics/dual quota bars (5h + 7d), reading real utilization from upstream `accounts.extra`
 - Never returns raw Sub2API credentials to browser APIs
 - Uses local SQLite for dashboard-owned data, logs, and backups
 - Optional password login protection
