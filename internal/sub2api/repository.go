@@ -337,7 +337,9 @@ func (r *Repository) GetEvents(ctx context.Context, page int, limit int) ([]Usag
 	}
 
 	var total int64
-	if err := db.WithContext(ctx).Raw(`SELECT COUNT(*) FROM usage_logs`).Scan(&total).Error; err != nil {
+	if err := db.WithContext(ctx).Raw(`
+		SELECT (SELECT COUNT(*) FROM usage_logs) + (SELECT COUNT(*) FROM ops_error_logs)
+	`).Scan(&total).Error; err != nil {
 		return nil, 0, fmt.Errorf("get sub2api events: %w", err)
 	}
 
@@ -363,7 +365,27 @@ func (r *Repository) GetEvents(ctx context.Context, page int, limit int) ([]Usag
 			COALESCE(l.first_token_ms, 0) AS first_token_ms
 		FROM usage_logs l
 		LEFT JOIN users u ON l.user_id = u.id
-		ORDER BY l.created_at DESC
+		UNION ALL
+		SELECT
+			e.id,
+			e.created_at,
+			COALESCE(CAST(e.user_id AS TEXT), '') AS user_identifier,
+			COALESCE(CAST(e.api_key_id AS TEXT), '') AS api_key_label,
+			COALESCE(e.model, '') AS model,
+			'' AS requested_model,
+			'' AS upstream_model,
+			COALESCE(e.account_id, 0) AS account_id,
+			COALESCE(CAST(e.account_id AS TEXT), '') AS account_name,
+			'error' AS status,
+			0 AS input_tokens,
+			0 AS output_tokens,
+			0 AS cache_creation_tokens,
+			0 AS cache_read_tokens,
+			0 AS actual_cost,
+			COALESCE(e.duration_ms, 0) AS duration_ms,
+			0 AS first_token_ms
+		FROM ops_error_logs e
+		ORDER BY created_at DESC
 		LIMIT ? OFFSET ?
 	`, limit, (page-1)*limit).Scan(&rows).Error
 	if err != nil {
@@ -382,17 +404,25 @@ func (r *Repository) GetHealthBlocks(ctx context.Context, hours int) ([]HealthBl
 
 	var rows []HealthBlockRow
 	err = db.WithContext(ctx).Raw(`
+		WITH combined AS (
+			SELECT created_at, true AS is_success
+			FROM usage_logs
+			WHERE created_at >= now() - (?::int * interval '1 hour')
+			UNION ALL
+			SELECT created_at, false AS is_success
+			FROM ops_error_logs
+			WHERE created_at >= now() - (?::int * interval '1 hour')
+		)
 		SELECT
 			date_trunc('hour', created_at) + (date_part('minute', created_at)::int / 15) * interval '15 minutes' AS bucket_start,
 			date_trunc('hour', created_at) + (date_part('minute', created_at)::int / 15 + 1) * interval '15 minutes' AS bucket_end,
-			COUNT(*) AS success_count,
-			0 AS failure_count,
+			COUNT(*) FILTER (WHERE is_success) AS success_count,
+			COUNT(*) FILTER (WHERE NOT is_success) AS failure_count,
 			COUNT(*) AS total_count
-		FROM usage_logs
-		WHERE created_at >= now() - (?::int * interval '1 hour')
+		FROM combined
 		GROUP BY bucket_start, bucket_end
 		ORDER BY bucket_start ASC
-	`, hours).Scan(&rows).Error
+	`, hours, hours).Scan(&rows).Error
 	if err != nil {
 		return nil, fmt.Errorf("get sub2api health blocks: %w", err)
 	}

@@ -158,6 +158,20 @@ func TestRepositoryRankingsAndEventsUseSub2APIUsageLogColumns(t *testing.T) {
 	}
 
 	if err := db.Exec(`
+		CREATE TABLE ops_error_logs (
+			id INTEGER PRIMARY KEY,
+			created_at DATETIME NOT NULL,
+			user_id INTEGER,
+			api_key_id INTEGER,
+			account_id INTEGER,
+			model TEXT,
+			duration_ms INTEGER
+		)
+	`).Error; err != nil {
+		t.Fatalf("create ops_error_logs table: %v", err)
+	}
+
+	if err := db.Exec(`
 		INSERT INTO users (id, email) VALUES (?, ?)
 	`, 42, "user42@example.com").Error; err != nil {
 		t.Fatalf("insert user: %v", err)
