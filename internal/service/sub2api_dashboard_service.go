@@ -116,6 +116,42 @@ func (s *Sub2APIDashboardService) Overview(ctx context.Context, days int) (quota
 	return overview, nil
 }
 
+func (s *Sub2APIDashboardService) OverviewByHours(ctx context.Context, hours int) (quota.Sub2APIOverview, error) {
+	if err := s.validate(); err != nil {
+		return quota.Sub2APIOverview{}, err
+	}
+
+	accounts, err := s.reader.ListAccounts(ctx)
+	if err != nil {
+		return quota.Sub2APIOverview{}, err
+	}
+	rows, err := s.reader.GetHourlyOverview(ctx, normalizeHours(hours))
+	if err != nil {
+		return quota.Sub2APIOverview{}, err
+	}
+
+	overview := quota.Sub2APIOverview{AccountCount: int64(len(accounts))}
+	for _, account := range accounts {
+		if account.Status == "active" {
+			overview.ActiveAccountCount++
+		}
+	}
+	for _, row := range rows {
+		cacheTokens := row.CacheCreationTokens + row.CacheReadTokens
+		overview.TotalRequests += row.TotalRequests
+		overview.InputTokens += row.InputTokens
+		overview.OutputTokens += row.OutputTokens
+		overview.CacheTokens += cacheTokens
+		overview.ActualCost += row.ActualCost
+		overview.AccountCost += row.AccountCost
+		if row.ActiveUsers > overview.ActiveUsers {
+			overview.ActiveUsers = row.ActiveUsers
+		}
+	}
+	overview.TotalTokens = overview.InputTokens + overview.OutputTokens + overview.CacheTokens
+	return overview, nil
+}
+
 func (s *Sub2APIDashboardService) Hourly(ctx context.Context, hours int) ([]sub2api.UsageOverviewRow, error) {
 	if err := s.validate(); err != nil {
 		return nil, err

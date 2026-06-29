@@ -50,6 +50,14 @@ func (f *fakeSub2APIDashboardProvider) Overview(_ context.Context, days int) (qu
 	}, nil
 }
 
+func (f *fakeSub2APIDashboardProvider) OverviewByHours(_ context.Context, hours int) (quota.Sub2APIOverview, error) {
+	return quota.Sub2APIOverview{
+		AccountCount:       1,
+		ActiveAccountCount: 1,
+		TotalRequests:      10,
+	}, nil
+}
+
 func (f *fakeSub2APIDashboardProvider) Hourly(_ context.Context, hours int) ([]sub2api.UsageOverviewRow, error) {
 	f.hourlyHours = hours
 	return []sub2api.UsageOverviewRow{

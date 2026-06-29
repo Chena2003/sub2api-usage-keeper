@@ -34,8 +34,14 @@ export async function fetchSub2ApiAccounts(days = 7): Promise<Sub2ApiAccount[]> 
   return body.accounts
 }
 
-export function fetchSub2ApiOverview(days = 7): Promise<Sub2ApiOverview> {
-  return getJson<Sub2ApiOverview>(`/overview?days=${days}`)
+export function fetchSub2ApiOverview(days?: number, hours?: number): Promise<Sub2ApiOverview> {
+  const params = new URLSearchParams()
+  if (hours !== undefined) {
+    params.set('hours', String(hours))
+  } else {
+    params.set('days', String(days ?? 7))
+  }
+  return getJson<Sub2ApiOverview>(`/overview?${params.toString()}`)
 }
 
 export async function fetchSub2ApiTimeseries(hours = 24): Promise<Sub2ApiTimeseriesPoint[]> {

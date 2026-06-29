@@ -16,6 +16,7 @@ type Sub2APIDashboardProvider interface {
 	Accounts(context.Context, int) ([]quota.Sub2APIAccountQuota, error)
 	AccountQuotas(context.Context, int) ([]quota.Sub2APIAccountQuota, error)
 	Overview(context.Context, int) (quota.Sub2APIOverview, error)
+	OverviewByHours(context.Context, int) (quota.Sub2APIOverview, error)
 	Hourly(context.Context, int) ([]sub2api.UsageOverviewRow, error)
 	Models(context.Context, int, int) ([]sub2api.ModelUsageRow, error)
 	Events(context.Context, int, int) (quota.Sub2APIEventsResponse, error)
@@ -61,7 +62,14 @@ func registerSub2APIDashboardRoutes(router gin.IRoutes, provider Sub2APIDashboar
 			return
 		}
 
-		overview, err := provider.Overview(c.Request.Context(), sub2APIDaysQuery(c))
+		var overview quota.Sub2APIOverview
+		var err error
+		if hoursStr := c.Query("hours"); hoursStr != "" {
+			hours, _ := strconv.Atoi(hoursStr)
+			overview, err = provider.OverviewByHours(c.Request.Context(), hours)
+		} else {
+			overview, err = provider.Overview(c.Request.Context(), sub2APIDaysQuery(c))
+		}
 		if err != nil {
 			writeInternalError(c, "get sub2api overview failed", err)
 			return

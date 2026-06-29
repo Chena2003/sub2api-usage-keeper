@@ -36,6 +36,7 @@ type Sub2ApiDashboardState = {
   currentDays: number
   loading: boolean
   error: string | null
+  _refreshVersion: number
   refresh: (opts?: { hours?: number }) => Promise<void>
   loadRankings: (dimension?: Sub2ApiRankingDimension) => Promise<void>
   loadEvents: (params?: { page?: number; limit?: number }) => Promise<void>
@@ -56,15 +57,17 @@ export const useSub2ApiDashboardStore = create<Sub2ApiDashboardState>((set, get)
   currentDays: 7,
   loading: false,
   error: null,
+  _refreshVersion: 0,
   refresh: async (opts) => {
-    const { rankingDimension } = get()
+    const { rankingDimension, _refreshVersion } = get()
+    const version = _refreshVersion + 1
     const hours = opts?.hours ?? 24
     const days = Math.max(1, Math.ceil(hours / 24))
-    set({ loading: true, error: null, currentDays: days })
+    set({ _refreshVersion: version, loading: true, error: null, currentDays: days })
     try {
       const [accounts, overview, points, models, rankings, rankingTrend, events, quotaAccounts, serviceHealth] = await Promise.all([
         fetchSub2ApiAccounts(days),
-        fetchSub2ApiOverview(days),
+        fetchSub2ApiOverview(undefined, hours),
         fetchSub2ApiTimeseries(hours),
         fetchSub2ApiModels(days, 20),
         fetchSub2ApiRankings(rankingDimension, days),
@@ -73,8 +76,10 @@ export const useSub2ApiDashboardStore = create<Sub2ApiDashboardState>((set, get)
         fetchSub2ApiAccountQuotas(days),
         fetchSub2ApiHealth(168),
       ])
+      if (get()._refreshVersion !== version) return
       set({ accounts, overview, points, models, rankings, rankingTrend, events, quotaAccounts, serviceHealth, rankingDimension, loading: false })
     } catch (error) {
+      if (get()._refreshVersion !== version) return
       set({ error: error instanceof Error ? error.message : 'Unknown error', loading: false })
     }
   },

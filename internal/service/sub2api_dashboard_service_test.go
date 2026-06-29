@@ -168,15 +168,15 @@ func TestSub2APIDashboardOverviewSumsDailyRows(t *testing.T) {
 	}
 }
 
-func TestSub2APIDashboardOverviewDefaultsToSevenDays(t *testing.T) {
+func TestSub2APIDashboardOverviewDefaultsToOneDay(t *testing.T) {
 	reader := &fakeSub2APIReader{}
 
 	_, err := NewSub2APIDashboardService(reader).Overview(context.Background(), 0)
 	if err != nil {
 		t.Fatalf("Overview returned error: %v", err)
 	}
-	if reader.lastDailyDays != 7 {
-		t.Fatalf("expected daily overview days 7, got %d", reader.lastDailyDays)
+	if reader.lastDailyDays != 1 {
+		t.Fatalf("expected daily overview days 1, got %d", reader.lastDailyDays)
 	}
 }
 
@@ -202,8 +202,8 @@ func TestSub2APIDashboardModelsDefaultsToSevenDays(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Models returned error: %v", err)
 	}
-	if !reader.lastModelSince.Equal(fixedNow.AddDate(0, 0, -7)) {
-		t.Fatalf("expected model usage since %v, got %v", fixedNow.AddDate(0, 0, -7), reader.lastModelSince)
+	if !reader.lastModelSince.Equal(fixedNow.AddDate(0, 0, -1)) {
+		t.Fatalf("expected model usage since %v, got %v", fixedNow.AddDate(0, 0, -1), reader.lastModelSince)
 	}
 	if reader.lastModelLimit != 20 {
 		t.Fatalf("expected model usage limit 20, got %d", reader.lastModelLimit)
@@ -220,8 +220,8 @@ func TestSub2APIDashboardAccountQuotasDefaultsToSevenDays(t *testing.T) {
 	if err != nil {
 		t.Fatalf("AccountQuotas returned error: %v", err)
 	}
-	if !reader.lastAccountSince.Equal(fixedNow.AddDate(0, 0, -7)) {
-		t.Fatalf("expected account usage since %v, got %v", fixedNow.AddDate(0, 0, -7), reader.lastAccountSince)
+	if !reader.lastAccountSince.Equal(fixedNow.AddDate(0, 0, -1)) {
+		t.Fatalf("expected account usage since %v, got %v", fixedNow.AddDate(0, 0, -1), reader.lastAccountSince)
 	}
 }
 
@@ -247,8 +247,8 @@ func TestSub2APIDashboardRankingsNormalizesDefaults(t *testing.T) {
 	if reader.lastRankingDimension != "user" {
 		t.Fatalf("expected ranking dimension user, got %q", reader.lastRankingDimension)
 	}
-	if !reader.lastRankingSince.Equal(fixedNow.AddDate(0, 0, -7)) {
-		t.Fatalf("expected ranking since %v, got %v", fixedNow.AddDate(0, 0, -7), reader.lastRankingSince)
+	if !reader.lastRankingSince.Equal(fixedNow.AddDate(0, 0, -1)) {
+		t.Fatalf("expected ranking since %v, got %v", fixedNow.AddDate(0, 0, -1), reader.lastRankingSince)
 	}
 	if reader.lastRankingLimit != 20 {
 		t.Fatalf("expected ranking limit 20, got %d", reader.lastRankingLimit)

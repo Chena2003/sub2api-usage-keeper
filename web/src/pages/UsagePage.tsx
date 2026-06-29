@@ -473,6 +473,7 @@ export function UsagePage({ onAuthRequired }: { onAuthRequired?: () => void }) {
   const sub2apiServiceHealth = useSub2ApiDashboardStore((state) => state.serviceHealth);
   const rankingDimension = useSub2ApiDashboardStore((state) => state.rankingDimension);
   const sub2apiError = useSub2ApiDashboardStore((state) => state.error);
+  const sub2apiLoading = useSub2ApiDashboardStore((state) => state.loading);
   const refreshSub2APIRaw = useSub2ApiDashboardStore((state) => state.refresh);
   const loadRankings = useSub2ApiDashboardStore((state) => state.loadRankings);
   const refreshSub2API = useCallback(() => refreshSub2APIRaw({ hours: getSub2ApiDashboardHours(timeRange) }), [refreshSub2APIRaw, timeRange]);
@@ -777,7 +778,7 @@ export function UsagePage({ onAuthRequired }: { onAuthRequired?: () => void }) {
       return next;
     });
   }, [isOverviewTab, overviewModelNames]);
-  const overviewDisplayLoading = getOverviewDisplayLoading({ loading, hasUsage: Boolean(usage) });
+  const overviewDisplayLoading = getOverviewDisplayLoading({ loading, hasUsage: Boolean(usage) }) || sub2apiLoading;
 
   return (
     <div className={styles.pageShell}>
@@ -984,13 +985,13 @@ export function UsagePage({ onAuthRequired }: { onAuthRequired?: () => void }) {
                 onRetry={refreshSub2API}
               />
             )}
-            {activeTab === 'analysis' && <Sub2ApiAnalysisPanel models={sub2apiModels} points={sub2apiPoints} loading={loading} error={sub2apiError} onRetry={refreshSub2API} />}
-            {activeTab === 'events' && <RequestEventsPanel events={sub2apiEvents} loading={loading} error={sub2apiError} onRetry={refreshSub2API} />}
+            {activeTab === 'analysis' && <Sub2ApiAnalysisPanel models={sub2apiModels} points={sub2apiPoints} loading={sub2apiLoading} error={sub2apiError} onRetry={refreshSub2API} />}
+            {activeTab === 'events' && <RequestEventsPanel events={sub2apiEvents} loading={sub2apiLoading} error={sub2apiError} onRetry={refreshSub2API} />}
             {activeTab === 'ranking' && <>
-              <RankingTrendChart data={sub2apiRankingTrend} dimension={rankingDimension} loading={loading} />
-              <TokenRankingCard rankings={sub2apiRankings} dimension={rankingDimension} onDimensionChange={loadRankings} loading={loading} error={sub2apiError} onRetry={refreshSub2API} />
+              <RankingTrendChart data={sub2apiRankingTrend} dimension={rankingDimension} loading={sub2apiLoading} />
+              <TokenRankingCard rankings={sub2apiRankings} dimension={rankingDimension} onDimensionChange={loadRankings} loading={sub2apiLoading} error={sub2apiError} onRetry={refreshSub2API} />
             </>}
-            {activeTab === 'quotas' && <AccountQuotasCard accounts={sub2apiQuotaAccounts} loading={loading} error={sub2apiError} onRetry={refreshSub2API} />}
+            {activeTab === 'quotas' && <AccountQuotasCard accounts={sub2apiQuotaAccounts} loading={sub2apiLoading} error={sub2apiError} onRetry={refreshSub2API} />}
 
             {activeTab === 'settings' && (
               <div className={styles.settingsSections}>

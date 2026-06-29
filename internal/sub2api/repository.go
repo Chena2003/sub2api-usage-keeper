@@ -53,7 +53,7 @@ func (r *Repository) database() (*gorm.DB, error) {
 }
 
 func ClampDashboardDays(days int) int {
-	return clampPositive(days, 7, MaxDashboardDays)
+	return clampPositive(days, 1, MaxDashboardDays)
 }
 
 func ClampDashboardHours(hours int) int {
