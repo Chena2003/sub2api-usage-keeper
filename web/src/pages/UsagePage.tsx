@@ -100,7 +100,7 @@ const USAGE_TAB_LABEL_KEYS: Record<UsageTab, string> = {
 };
 const DEFAULT_USAGE_TAB: UsageTab = 'overview';
 const USAGE_TAB_STORAGE_KEY = 'cli-proxy-usage-tab-v1';
-const OVERVIEW_AUTO_REFRESH_INTERVAL_MS = 10_000;
+const OVERVIEW_AUTO_REFRESH_INTERVAL_MS = 30_000;
 
 export const shouldShowRangeControls = (tab: UsageTab) => tab !== 'settings';
 
@@ -475,8 +475,10 @@ export function UsagePage({ onAuthRequired }: { onAuthRequired?: () => void }) {
   const sub2apiError = useSub2ApiDashboardStore((state) => state.error);
   const sub2apiLoading = useSub2ApiDashboardStore((state) => state.loading);
   const refreshSub2APIRaw = useSub2ApiDashboardStore((state) => state.refresh);
+  const loadHealth = useSub2ApiDashboardStore((state) => state.loadHealth);
   const loadRankings = useSub2ApiDashboardStore((state) => state.loadRankings);
   const refreshSub2API = useCallback(() => refreshSub2APIRaw({ hours: getSub2ApiDashboardHours(timeRange) }), [refreshSub2APIRaw, timeRange]);
+  const refreshSub2APIBackground = useCallback(() => refreshSub2APIRaw({ hours: getSub2ApiDashboardHours(timeRange), background: true }), [refreshSub2APIRaw, timeRange]);
   const tabOptions = useMemo(() => getUsageTabOptions(t), [t]);
   const timeRangeOptions = useMemo(() => getTimeRangeOptions(t), [t]);
   const themeOptions = useMemo(
@@ -684,8 +686,8 @@ export function UsagePage({ onAuthRequired }: { onAuthRequired?: () => void }) {
   }, [activeTab, loadPricing, loadUsage, refreshSub2API]);
 
   const refreshAutoRefreshTab = useCallback(async () => {
-    await refreshAutoRefreshTabData({ activeTab, loadUsage, refreshSub2API });
-  }, [activeTab, loadUsage, refreshSub2API]);
+    await refreshAutoRefreshTabData({ activeTab, loadUsage, refreshSub2API: refreshSub2APIBackground });
+  }, [activeTab, loadUsage, refreshSub2APIBackground]);
 
   const autoRefreshEnabled = shouldAutoRefreshUsageTab({ activeTab });
 
@@ -755,6 +757,12 @@ export function UsagePage({ onAuthRequired }: { onAuthRequired?: () => void }) {
       void refreshSub2API();
     }
   }, [activeTab, refreshSub2API]);
+
+  useEffect(() => {
+    if (activeTab === 'overview') {
+      void loadHealth();
+    }
+  }, [activeTab, loadHealth]);
 
   const lastSyncAt = useMemo(() => {
     if (!status?.last_run_at) return null;

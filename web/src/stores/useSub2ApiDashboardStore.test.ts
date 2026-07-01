@@ -178,13 +178,13 @@ describe('useSub2ApiDashboardStore', () => {
     mockedFetchSub2ApiRankingTrend.mockResolvedValue({ points: [], granularity: 'day' })
     mockedFetchSub2ApiEvents.mockResolvedValue(eventsResponse)
     mockedFetchSub2ApiAccountQuotas.mockResolvedValue([quotaAccount])
-    mockedFetchSub2ApiHealth.mockResolvedValue(null)
 
     await useSub2ApiDashboardStore.getState().refresh()
 
     expect(mockedFetchSub2ApiRankings).toHaveBeenCalledWith('user', 1)
     expect(mockedFetchSub2ApiEvents).toHaveBeenCalledWith({ page: 1, limit: 100 })
     expect(mockedFetchSub2ApiAccountQuotas).toHaveBeenCalledWith(1)
+    expect(mockedFetchSub2ApiHealth).not.toHaveBeenCalled()
     expect(useSub2ApiDashboardStore.getState()).toMatchObject({
       accounts: [account],
       overview,
@@ -218,7 +218,6 @@ describe('useSub2ApiDashboardStore', () => {
     mockedFetchSub2ApiRankingTrend.mockResolvedValue({ points: [], granularity: 'day' })
     mockedFetchSub2ApiEvents.mockResolvedValue(eventsResponse)
     mockedFetchSub2ApiAccountQuotas.mockResolvedValue([quotaAccount])
-    mockedFetchSub2ApiHealth.mockResolvedValue(null)
     useSub2ApiDashboardStore.setState({ rankingDimension: 'api_key' })
 
     await useSub2ApiDashboardStore.getState().refresh()
@@ -244,5 +243,34 @@ describe('useSub2ApiDashboardStore', () => {
 
     expect(mockedFetchSub2ApiAccountQuotas).toHaveBeenCalledWith(14)
     expect(useSub2ApiDashboardStore.getState().quotaAccounts).toEqual([quotaAccount])
+  })
+
+  it('loadHealth fetches health data without affecting loading state', async () => {
+    const healthData = { total_success: 100, total_failure: 5, success_rate: 95.24, rows: 7, columns: 96, bucket_seconds: 900, window_start: '', window_end: '', block_details: [] }
+    mockedFetchSub2ApiHealth.mockResolvedValue(healthData as never)
+
+    await useSub2ApiDashboardStore.getState().loadHealth()
+
+    expect(mockedFetchSub2ApiHealth).toHaveBeenCalledWith(168)
+    expect(useSub2ApiDashboardStore.getState().serviceHealth).toEqual(healthData)
+    expect(useSub2ApiDashboardStore.getState().loading).toBe(false)
+  })
+
+  it('background refresh does not flip loading to true', async () => {
+    mockedFetchSub2ApiAccounts.mockResolvedValue([account])
+    mockedFetchSub2ApiOverview.mockResolvedValue(overview)
+    mockedFetchSub2ApiTimeseries.mockResolvedValue([point])
+    mockedFetchSub2ApiModels.mockResolvedValue([model])
+    mockedFetchSub2ApiRankings.mockResolvedValue([ranking])
+    mockedFetchSub2ApiRankingTrend.mockResolvedValue({ points: [], granularity: 'day' })
+    mockedFetchSub2ApiEvents.mockResolvedValue(eventsResponse)
+    mockedFetchSub2ApiAccountQuotas.mockResolvedValue([quotaAccount])
+
+    const refreshPromise = useSub2ApiDashboardStore.getState().refresh({ background: true })
+    expect(useSub2ApiDashboardStore.getState().loading).toBe(false)
+
+    await refreshPromise
+    expect(useSub2ApiDashboardStore.getState().loading).toBe(false)
+    expect(useSub2ApiDashboardStore.getState().overview).toEqual(overview)
   })
 })

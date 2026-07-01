@@ -33,16 +33,17 @@ const (
 )
 
 // BuildSub2APIServiceHealth creates a full grid (rows × columns) spanning the
-// requested time window. Data blocks are placed into the matching grid slot;
-// empty slots remain idle (Rate=-1). This ensures the frontend grid is always
-// fully occupied regardless of how sparse the actual data is.
+// requested time window. The window ends at the next local midnight (start of
+// tomorrow) so that "today + 6 prior days" are all complete calendar days.
+// Data blocks are placed into the matching grid slot; empty slots remain idle
+// (Rate=-1). This ensures the frontend grid is always fully occupied.
 func BuildSub2APIServiceHealth(blocks []sub2api.HealthBlockRow, hours int) Sub2APIServiceHealth {
 	bucketSpan := healthBucketSpan(hours)
 	columns := healthDefaultColumns
 	totalBlocks := healthRows * columns
 
-	now := time.Now().UTC()
-	windowEnd := now.Truncate(bucketSpan).Add(bucketSpan)
+	now := time.Now()
+	windowEnd := time.Date(now.Year(), now.Month(), now.Day()+1, 0, 0, 0, 0, time.Local)
 	windowStart := windowEnd.Add(-time.Duration(totalBlocks) * bucketSpan)
 
 	// Pre-allocate full grid with idle blocks.

@@ -162,6 +162,10 @@
     white-space: nowrap;
   }
 
+  th:not(:first-child) {
+    text-align: right;
+  }
+
   td {
     padding: 8px 12px;
     border-bottom: 1px solid var(--border);

@@ -61,8 +61,8 @@ export function ModelPricingReferenceCard() {
 
   return (
     <Panel
-      eyebrow="Settings"
-      title={t('usage_stats.model_pricing_title', 'Model Pricing Reference')}
+      eyebrow={t('usage_stats.model_pricing_eyebrow')}
+      title={t('usage_stats.model_pricing_title')}
       as="section"
       actions={
         <input
@@ -71,23 +71,23 @@ export function ModelPricingReferenceCard() {
           placeholder={t('common.search', 'Search…')}
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          aria-label="Filter models"
+          aria-label={t('common.search', 'Search…')}
         />
       }
     >
       <p className={styles.hint}>
-        {t('usage_stats.model_pricing_hint', 'Reference pricing per 1M tokens. Prices may vary — check provider docs for the latest rates.')}
+        {t('usage_stats.model_pricing_hint')}
       </p>
       <div className={styles.tableWrap}>
         <table className={styles.table}>
           <thead>
             <tr>
-              <th>Model</th>
-              <th>Display Name</th>
-              <th>Input</th>
-              <th>Output</th>
-              <th>Cache Hit</th>
-              <th>Cache Create</th>
+              <th>{t('usage_stats.model_pricing_col_model')}</th>
+              <th>{t('usage_stats.model_pricing_col_display_name')}</th>
+              <th>{t('usage_stats.model_pricing_col_input')}</th>
+              <th>{t('usage_stats.model_pricing_col_output')}</th>
+              <th>{t('usage_stats.model_pricing_col_cache_hit')}</th>
+              <th>{t('usage_stats.model_pricing_col_cache_create')}</th>
             </tr>
           </thead>
           <tbody>
@@ -103,7 +103,7 @@ export function ModelPricingReferenceCard() {
             ))}
             {filtered.length === 0 && (
               <tr>
-                <td colSpan={6} className={styles.empty}>No models match "{search}"</td>
+                <td colSpan={6} className={styles.empty}>{t('usage_stats.model_pricing_empty', { query: search })}</td>
               </tr>
             )}
           </tbody>
