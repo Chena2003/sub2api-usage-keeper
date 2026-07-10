@@ -328,7 +328,7 @@ func (r *Repository) GetRankings(ctx context.Context, dimension string, since ti
 	return rows, nil
 }
 
-func (r *Repository) GetEvents(ctx context.Context, page int, limit int) ([]UsageEventRow, int64, error) {
+func (r *Repository) GetEvents(ctx context.Context, since time.Time, page int, limit int) ([]UsageEventRow, int64, error) {
 	page = ClampDashboardPage(page)
 	limit = ClampDashboardLimit(limit, 100)
 
@@ -339,8 +339,8 @@ func (r *Repository) GetEvents(ctx context.Context, page int, limit int) ([]Usag
 
 	var total int64
 	if err := db.WithContext(ctx).Raw(`
-		SELECT (SELECT COUNT(*) FROM usage_logs) + (SELECT COUNT(*) FROM ops_error_logs)
-	`).Scan(&total).Error; err != nil {
+		SELECT (SELECT COUNT(*) FROM usage_logs WHERE created_at >= ?) + (SELECT COUNT(*) FROM ops_error_logs WHERE created_at >= ?)
+	`, since, since).Scan(&total).Error; err != nil {
 		return nil, 0, fmt.Errorf("get sub2api events: %w", err)
 	}
 
@@ -366,6 +366,7 @@ func (r *Repository) GetEvents(ctx context.Context, page int, limit int) ([]Usag
 			COALESCE(l.first_token_ms, 0) AS first_token_ms
 		FROM usage_logs l
 		LEFT JOIN users u ON l.user_id = u.id
+		WHERE l.created_at >= ?
 		UNION ALL
 		SELECT
 			e.id,
@@ -387,9 +388,10 @@ func (r *Repository) GetEvents(ctx context.Context, page int, limit int) ([]Usag
 			0 AS first_token_ms
 		FROM ops_error_logs e
 		LEFT JOIN users eu ON e.user_id = eu.id
+		WHERE e.created_at >= ?
 		ORDER BY created_at DESC
 		LIMIT ? OFFSET ?
-	`, limit, (page-1)*limit).Scan(&rows).Error
+		`, since, since, limit, (page-1)*limit).Scan(&rows).Error
 	if err != nil {
 		return nil, 0, fmt.Errorf("get sub2api events: %w", err)
 	}

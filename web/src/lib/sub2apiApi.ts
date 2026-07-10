@@ -77,11 +77,15 @@ export async function fetchSub2ApiAccountQuotas(hours = 168): Promise<Sub2ApiAcc
 export function fetchSub2ApiEvents({
   page = 1,
   limit = 100,
-}: { page?: number; limit?: number } = {}): Promise<Sub2ApiEventsResponse> {
+  hours,
+}: { page?: number; limit?: number; hours?: number } = {}): Promise<Sub2ApiEventsResponse> {
   const params = new URLSearchParams({
     page: String(page),
     limit: String(limit),
   })
+  if (hours !== undefined) {
+    params.set('hours', String(hours))
+  }
   return getJson<Sub2ApiEventsResponse>(`/events?${params.toString()}`)
 }
 

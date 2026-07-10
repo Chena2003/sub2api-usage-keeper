@@ -162,6 +162,9 @@ function resetStore() {
     loading: false,
     eventsLoading: false,
     error: null,
+    _refreshVersion: 0,
+    _healthVersion: 0,
+    _rankingVersion: 0,
   })
 }
 
@@ -184,7 +187,7 @@ describe('useSub2ApiDashboardStore', () => {
     await useSub2ApiDashboardStore.getState().refresh()
 
     expect(mockedFetchSub2ApiRankings).toHaveBeenCalledWith('user', 24)
-    expect(mockedFetchSub2ApiEvents).toHaveBeenCalledWith({ page: 1, limit: 100 })
+    expect(mockedFetchSub2ApiEvents).toHaveBeenCalledWith({ page: 1, limit: 100, hours: 24 })
     expect(mockedFetchSub2ApiAccountQuotas).toHaveBeenCalledWith(24)
     expect(mockedFetchSub2ApiHealth).not.toHaveBeenCalled()
     expect(useSub2ApiDashboardStore.getState()).toMatchObject({
@@ -234,7 +237,7 @@ describe('useSub2ApiDashboardStore', () => {
 
     await useSub2ApiDashboardStore.getState().loadEvents({ page: 2, limit: 50 })
 
-    expect(mockedFetchSub2ApiEvents).toHaveBeenCalledWith({ page: 2, limit: 50 })
+    expect(mockedFetchSub2ApiEvents).toHaveBeenCalledWith({ page: 2, limit: 50, hours: 168 })
     expect(useSub2ApiDashboardStore.getState().events).toEqual(eventsResponse)
   })
 

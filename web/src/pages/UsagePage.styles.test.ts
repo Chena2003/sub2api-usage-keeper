@@ -330,7 +330,7 @@ describe('UsagePage toolbar styles', () => {
   it('renders each Task 5 tab with the intended Sub2API panel and keeps health only in Overview', () => {
     const overviewPanelIndex = usagePageSource.indexOf('<Sub2ApiOverviewPanel')
     const analysisPanelIndex = usagePageSource.indexOf("{activeTab === 'analysis' && <Sub2ApiAnalysisPanel")
-    const eventsPanelIndex = usagePageSource.indexOf("{activeTab === 'events' && <RequestEventsPanel")
+    const eventsPanelIndex = usagePageSource.indexOf("{activeTab === 'events' &&")
     const rankingCardIndex = usagePageSource.indexOf("{activeTab === 'ranking' && <>")
     const quotasCardIndex = usagePageSource.indexOf("{activeTab === 'quotas' && <AccountQuotasCard")
     const settingsIndex = usagePageSource.indexOf("{activeTab === 'settings' && (")

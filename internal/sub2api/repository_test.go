@@ -220,7 +220,7 @@ func TestRepositoryRankingsAndEventsUseSub2APIUsageLogColumns(t *testing.T) {
 		t.Fatalf("GetRankings(account) = %+v, want account name 'test-account-3'", accountRankings)
 	}
 
-	events, total, err := repository.GetEvents(context.Background(), 1, 5)
+	events, total, err := repository.GetEvents(context.Background(), time.Now().Add(-24*time.Hour), 1, 5)
 	if err != nil {
 		t.Fatalf("GetEvents() error = %v", err)
 	}

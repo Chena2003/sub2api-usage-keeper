@@ -476,11 +476,15 @@ export function UsagePage({ onAuthRequired }: { onAuthRequired?: () => void }) {
   const sub2apiLoading = useSub2ApiDashboardStore((state) => state.loading);
   const sub2apiEventsLoading = useSub2ApiDashboardStore((state) => state.eventsLoading);
   const refreshSub2APIRaw = useSub2ApiDashboardStore((state) => state.refresh);
-  const loadHealth = useSub2ApiDashboardStore((state) => state.loadHealth);
-  const loadRankings = useSub2ApiDashboardStore((state) => state.loadRankings);
+ const loadHealth = useSub2ApiDashboardStore((state) => state.loadHealth);
+ const loadRankings = useSub2ApiDashboardStore((state) => state.loadRankings);
+  const loadEvents = useSub2ApiDashboardStore((state) => state.loadEvents);
   const refreshSub2API = useCallback(() => refreshSub2APIRaw({ hours: getSub2ApiDashboardHours(timeRange) }), [refreshSub2APIRaw, timeRange]);
-  const refreshSub2APIBackground = useCallback(() => refreshSub2APIRaw({ hours: getSub2ApiDashboardHours(timeRange), background: true }), [refreshSub2APIRaw, timeRange]);
-  const tabOptions = useMemo(() => getUsageTabOptions(t), [t]);
+ const refreshSub2APIBackground = useCallback(() => refreshSub2APIRaw({ hours: getSub2ApiDashboardHours(timeRange), background: true }), [refreshSub2APIRaw, timeRange]);
+  const handleEventsPageChange = useCallback((page: number) => {
+    void loadEvents({ page, limit: 100 });
+  }, [loadEvents]);
+ const tabOptions = useMemo(() => getUsageTabOptions(t), [t]);
   const timeRangeOptions = useMemo(() => getTimeRangeOptions(t), [t]);
   const themeOptions = useMemo(
     () =>
@@ -995,7 +999,9 @@ export function UsagePage({ onAuthRequired }: { onAuthRequired?: () => void }) {
               />
             )}
             {activeTab === 'analysis' && <Sub2ApiAnalysisPanel models={sub2apiModels} points={sub2apiPoints} loading={sub2apiLoading} error={sub2apiError} onRetry={refreshSub2API} />}
-            {activeTab === 'events' && <RequestEventsPanel events={sub2apiEvents} loading={sub2apiEventsLoading} error={sub2apiError} onRetry={refreshSub2API} />}
+            {activeTab === 'events' && (
+              <RequestEventsPanel events={sub2apiEvents} loading={sub2apiEventsLoading} error={sub2apiError} onRetry={refreshSub2API} onPageChange={handleEventsPageChange} />
+            )}
             {activeTab === 'ranking' && <>
               <RankingTrendChart data={sub2apiRankingTrend} dimension={rankingDimension} loading={sub2apiLoading} />
               <TokenRankingCard rankings={sub2apiRankings} dimension={rankingDimension} onDimensionChange={loadRankings} loading={sub2apiLoading} error={sub2apiError} onRetry={refreshSub2API} />

@@ -28,6 +28,7 @@ type fakeSub2APIReader struct {
 	lastRankingLimit     int
 	lastEventsPage       int
 	lastEventsLimit      int
+	lastEventsSince      time.Time
 	lastRankingTrendSince time.Time
 }
 
@@ -63,9 +64,10 @@ func (f *fakeSub2APIReader) GetRankings(_ context.Context, dimension string, sin
 	return f.rankings, nil
 }
 
-func (f *fakeSub2APIReader) GetEvents(_ context.Context, page int, limit int) ([]sub2api.UsageEventRow, int64, error) {
+func (f *fakeSub2APIReader) GetEvents(_ context.Context, since time.Time, page int, limit int) ([]sub2api.UsageEventRow, int64, error) {
 	f.lastEventsPage = page
 	f.lastEventsLimit = limit
+	f.lastEventsSince = since
 	return f.events, f.eventsTotal, nil
 }
 
@@ -273,7 +275,7 @@ func TestSub2APIDashboardEventsNormalizesDefaults(t *testing.T) {
 		eventsTotal: 5,
 	}
 
-	events, err := NewSub2APIDashboardService(reader).Events(context.Background(), 0, 0)
+	events, err := NewSub2APIDashboardService(reader).Events(context.Background(), time.Time{}, 0, 0)
 	if err != nil {
 		t.Fatalf("Events returned error: %v", err)
 	}
@@ -335,8 +337,11 @@ func TestSub2APIDashboardClampsMaximums(t *testing.T) {
 		t.Fatalf("expected ranking limit 100, got %d", reader.lastRankingLimit)
 	}
 
-	if _, err := service.Events(context.Background(), 9999, 9999); err != nil {
+	if _, err := service.Events(context.Background(), fixedNow.AddDate(0, 0, -9999), 9999, 9999); err != nil {
 		t.Fatalf("Events returned error: %v", err)
+	}
+	if !reader.lastEventsSince.Equal(fixedNow.AddDate(0, 0, -90)) {
+		t.Fatalf("expected events since %v, got %v", fixedNow.AddDate(0, 0, -90), reader.lastEventsSince)
 	}
 	if reader.lastEventsPage != 1000 {
 		t.Fatalf("expected events page 1000, got %d", reader.lastEventsPage)

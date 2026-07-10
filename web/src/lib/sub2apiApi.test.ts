@@ -68,9 +68,9 @@ describe('Sub2API data fetchers', () => {
     })
     vi.stubGlobal('fetch', fetchMock)
 
-    await expect(fetchSub2ApiEvents({ page: 2, limit: 50 })).resolves.toEqual(response)
+    await expect(fetchSub2ApiEvents({ page: 2, limit: 50, hours: 24 })).resolves.toEqual(response)
 
-    expect(fetchMock).toHaveBeenCalledWith('/api/v1/sub2api/events?page=2&limit=50', {
+    expect(fetchMock).toHaveBeenCalledWith('/api/v1/sub2api/events?page=2&limit=50&hours=24', {
       credentials: 'include',
     })
   })

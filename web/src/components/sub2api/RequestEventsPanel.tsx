@@ -9,6 +9,7 @@ type RequestEventsPanelProps = {
   loading?: boolean
   error?: string | null
   onRetry?: () => void
+  onPageChange?: (page: number) => void
 }
 
 const formatNumber = (value: number) => new Intl.NumberFormat().format(value)
@@ -33,8 +34,13 @@ function eventVariant(status: string): 'ok' | 'warn' | 'danger' {
   return 'warn'
 }
 
-export function RequestEventsPanel({ events, loading, error, onRetry }: RequestEventsPanelProps) {
+export function RequestEventsPanel({ events, loading, error, onRetry, onPageChange }: RequestEventsPanelProps) {
   const { t } = useTranslation()
+  const currentPage = events.page
+  const limit = events.limit
+  const totalPages = Math.max(1, Math.ceil(events.total / limit))
+  const hasNext = currentPage < totalPages
+  const hasPrev = currentPage > 1
 
   return (
     <Panel
@@ -82,11 +88,31 @@ export function RequestEventsPanel({ events, loading, error, onRetry }: RequestE
               ))}
             </tbody>
           </table>
-          {events.total > events.events.length && (
-            <div className={styles.pagination}>
-              <span className={styles.mono}>{events.events.length} / {formatNumber(events.total)}</span>
-            </div>
-          )}
+         {events.total > events.events.length && (
+           <div className={styles.pagination}>
+              <span className={styles.mono}>{currentPage} / {totalPages} ({formatNumber(events.total)})</span>
+              {onPageChange && (
+                <div className={styles.pageButtons}>
+                  <button
+                    type="button"
+                    className={styles.pageBtn}
+                    onClick={() => onPageChange(currentPage - 1)}
+                    disabled={!hasPrev || loading}
+                  >
+                    ‹
+                  </button>
+                  <button
+                    type="button"
+                    className={styles.pageBtn}
+                    onClick={() => onPageChange(currentPage + 1)}
+                    disabled={!hasNext || loading}
+                  >
+                    ›
+                  </button>
+                </div>
+              )}
+           </div>
+         )}
         </div>
       )}
     </Panel>

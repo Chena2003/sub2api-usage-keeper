@@ -20,7 +20,7 @@ type Sub2APIDashboardProvider interface {
 	OverviewByHours(context.Context, int) (quota.Sub2APIOverview, error)
 	Hourly(context.Context, int) ([]sub2api.UsageOverviewRow, error)
 	Models(context.Context, time.Time, int) ([]sub2api.ModelUsageRow, error)
-	Events(context.Context, int, int) (quota.Sub2APIEventsResponse, error)
+	Events(context.Context, time.Time, int, int) (quota.Sub2APIEventsResponse, error)
 	Rankings(context.Context, string, time.Time, int) ([]quota.Sub2APIRankingRow, error)
 	RankingTrend(context.Context, string, time.Time, int) ([]quota.Sub2APIRankingTrendPoint, string, error)
 	ServiceHealth(context.Context, int) (quota.Sub2APIServiceHealth, error)
@@ -115,7 +115,7 @@ func registerSub2APIDashboardRoutes(router gin.IRoutes, provider Sub2APIDashboar
 			return
 		}
 
-		events, err := provider.Events(c.Request.Context(), sub2APIPageQuery(c), sub2APILimitQuery(c, 100))
+		events, err := provider.Events(c.Request.Context(), sub2APISinceQuery(c), sub2APIPageQuery(c), sub2APILimitQuery(c, 100))
 		if err != nil {
 			writeInternalError(c, "list sub2api events failed", err)
 			return

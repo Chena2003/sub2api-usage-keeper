@@ -16,7 +16,7 @@ type Sub2APIReader interface {
 	GetDailyOverview(context.Context, int) ([]sub2api.UsageOverviewRow, error)
 	GetHourlyOverview(context.Context, int) ([]sub2api.UsageOverviewRow, error)
 	GetModelUsage(context.Context, time.Time, int) ([]sub2api.ModelUsageRow, error)
-	GetEvents(context.Context, int, int) ([]sub2api.UsageEventRow, int64, error)
+	GetEvents(context.Context, time.Time, int, int) ([]sub2api.UsageEventRow, int64, error)
 	GetRankings(context.Context, string, time.Time, int) ([]sub2api.RankingRow, error)
 	GetRankingTrend(context.Context, string, time.Time, string, int) ([]sub2api.RankingTrendRow, error)
 	GetHealthBlocks(context.Context, int) ([]sub2api.HealthBlockRow, error)
@@ -203,13 +203,13 @@ func (s *Sub2APIDashboardService) RankingTrend(ctx context.Context, dimension st
 	return quota.NormalizeSub2APIRankingTrend(dimension, rows), granularityLabel, nil
 }
 
-func (s *Sub2APIDashboardService) Events(ctx context.Context, page int, limit int) (quota.Sub2APIEventsResponse, error) {
+func (s *Sub2APIDashboardService) Events(ctx context.Context, since time.Time, page int, limit int) (quota.Sub2APIEventsResponse, error) {
 	if err := s.validate(); err != nil {
 		return quota.Sub2APIEventsResponse{}, err
 	}
 	page = normalizePage(page)
 	limit = normalizeLimit(limit, 100)
-	rows, total, err := s.reader.GetEvents(ctx, page, limit)
+	rows, total, err := s.reader.GetEvents(ctx, normalizeSince(s.currentTime(), since), page, limit)
 	if err != nil {
 		return quota.Sub2APIEventsResponse{}, err
 	}

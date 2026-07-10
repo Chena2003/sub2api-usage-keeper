@@ -25,6 +25,7 @@ type fakeSub2APIDashboardProvider struct {
 	rankingsLimit     int
 	eventsPage        int
 	eventsLimit       int
+	eventsSince       time.Time
 	accountQuotasSince time.Time
 }
 
@@ -92,9 +93,10 @@ func (f *fakeSub2APIDashboardProvider) Rankings(_ context.Context, dimension str
 	}, nil
 }
 
-func (f *fakeSub2APIDashboardProvider) Events(_ context.Context, page int, limit int) (quota.Sub2APIEventsResponse, error) {
+func (f *fakeSub2APIDashboardProvider) Events(_ context.Context, since time.Time, page int, limit int) (quota.Sub2APIEventsResponse, error) {
 	f.eventsPage = page
 	f.eventsLimit = limit
+	f.eventsSince = since
 	return quota.Sub2APIEventsResponse{
 		Events: []quota.Sub2APIEvent{
 			{
@@ -249,12 +251,18 @@ func TestSub2APIEventsRoutePassesPageAndLimit(t *testing.T) {
 	router := gin.New()
 	registerSub2APIDashboardRoutes(router.Group("/api/v1"), provider)
 
-	req := httptest.NewRequest(http.MethodGet, "/api/v1/sub2api/events?page=2&limit=50", nil)
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/sub2api/events?page=2&limit=50&hours=24", nil)
 	resp := httptest.NewRecorder()
 	router.ServeHTTP(resp, req)
 
 	if resp.Code != http.StatusOK {
 		t.Fatalf("expected status 200, got %d", resp.Code)
+	}
+	if provider.eventsSince.IsZero() {
+		t.Fatal("expected events since to be set, got zero")
+	}
+	if dur := time.Since(provider.eventsSince); dur < 23*time.Hour || dur > 25*time.Hour {
+		t.Fatalf("expected events since ~24h, got %v (dur %v)", provider.eventsSince, dur)
 	}
 	if provider.eventsPage != 2 {
 		t.Fatalf("expected page 2, got %d", provider.eventsPage)
