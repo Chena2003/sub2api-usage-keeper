@@ -1,7 +1,7 @@
 # Sub2API Usage Keeper
 
 [![Go](https://img.shields.io/badge/Go-1.22+-00ADD8?logo=go&logoColor=white)](https://go.dev)
-[![React](https://img.shields.io/badge/React-18+-61DAFB?logo=react&logoColor=black)](https://react.dev)
+[![React](https://img.shields.io/badge/React-19+-61DAFB?logo=react&logoColor=black)](https://react.dev)
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](./LICENSE)
 [![Docker](https://img.shields.io/badge/Docker-Ready-2496ED?logo=docker&logoColor=white)](./Dockerfile)
 
@@ -10,6 +10,8 @@ English | [中文](./README.md)
 Sub2API Usage Keeper is a standalone sidecar dashboard for [Sub2API](https://github.com/xLmile/sub2api) usage statistics, account status monitoring, and ranking analysis.
 
 This project is inspired by [CPA Usage Keeper](https://github.com/willxup/cpa-usage-keeper) and adapts its architecture and design patterns for the Sub2API data model and deployment scenarios.
+
+The server queries Sub2API PostgreSQL directly through a read-only connection. It does not consume a Redis usage queue or copy Sub2API request events into local SQLite. SQLite is limited to the application's remaining local data, cleanup, and backups.
 
 ## Preview
 
@@ -37,7 +39,7 @@ This project is inspired by [CPA Usage Keeper](https://github.com/willxup/cpa-us
 | Layer | Technology |
 |-------|-----------|
 | Backend | Go 1.22, Gin, GORM, SQLite |
-| Frontend | React 18, TypeScript, Vite, Chart.js, Zustand |
+| Frontend | React 19, TypeScript, Vite, Chart.js, Recharts, Zustand |
 | Data Source | Sub2API PostgreSQL (read-only connection) |
 | Deployment | Docker, Docker Compose |
 
@@ -70,23 +72,17 @@ docker run -d \
   sub2api-usage-keeper:latest
 ```
 
-> Bind to `127.0.0.1` and expose HTTPS through Caddy / Nginx / Cloudflare.
+> The current version has no built-in login protection. Bind it to `127.0.0.1` or a protected private network, and use upstream infrastructure such as Caddy, Nginx, or Cloudflare Access for HTTPS and access control.
 
 ## Configuration
 
 | Variable | Required | Default | Description |
 |----------|:--------:|---------|-------------|
 | `SUB2API_DATABASE_URL` | ✅ | — | Sub2API PostgreSQL connection string |
-| `AUTH_ENABLED` | | `false` | Enable login protection |
-| `LOGIN_PASSWORD` | When auth enabled | — | Dashboard login password |
-| `AUTH_SESSION_TTL` | | `168h` | Session lifetime |
 | `APP_PORT` | | `8080` | HTTP listen port |
 | `APP_BASE_PATH` | | `/` | Subpath prefix, e.g. `/usage` |
 | `TZ` | | `Asia/Shanghai` | Timezone |
 | `WORK_DIR` | | `./data` | Data directory (SQLite, logs, backups) |
-| `PUBLIC_MODE` | | `true` | Public dashboard mode |
-| `QUOTA_REFRESH_INTERVAL` | | `5m` | Quota/status refresh interval |
-| `REQUEST_TIMEOUT` | | `30s` | External request timeout |
 | `LOG_LEVEL` | | `info` | Log level |
 | `LOG_FILE_ENABLED` | | `true` | Write persistent log files |
 | `LOG_RETENTION_DAYS` | | `7` | Log retention days |
@@ -164,7 +160,8 @@ sub2api-usage-keeper/
 - User emails are automatically masked: local part > 5 chars retains first 3 and last 2; short local parts keep only the first character; domain remains visible
 - Non-email user identifiers are hash-masked
 - Use a read-only PostgreSQL user in production
-- Bind container ports to `127.0.0.1` and terminate HTTPS at the reverse proxy
+- There is no built-in login page or password session; do not expose the service directly to the public Internet
+- Bind container ports to `127.0.0.1`, terminate HTTPS at the reverse proxy, and enforce access control there
 
 ## Acknowledgments
 

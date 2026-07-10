@@ -1,7 +1,7 @@
 # Sub2API Usage Keeper
 
 [![Go](https://img.shields.io/badge/Go-1.22+-00ADD8?logo=go&logoColor=white)](https://go.dev)
-[![React](https://img.shields.io/badge/React-18+-61DAFB?logo=react&logoColor=black)](https://react.dev)
+[![React](https://img.shields.io/badge/React-19+-61DAFB?logo=react&logoColor=black)](https://react.dev)
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](./LICENSE)
 [![Docker](https://img.shields.io/badge/Docker-Ready-2496ED?logo=docker&logoColor=white)](./Dockerfile)
 
@@ -10,6 +10,8 @@
 Sub2API Usage Keeper 是一个独立的 sidecar 仪表盘服务，用于 [Sub2API](https://github.com/xLmile/sub2api) 的用量统计、账号状态监控和排行分析。
 
 本项目参考了 [CPA Usage Keeper](https://github.com/willxup/cpa-usage-keeper) 的架构设计和实现方式，针对 Sub2API 的数据模型和部署场景进行了适配开发。
+
+服务端通过只读连接直接查询 Sub2API PostgreSQL，不消费 Redis usage 队列，也不把 Sub2API 请求事件复制到本地 SQLite。SQLite 仅用于应用自身仍保留的本地数据、清理和备份。
 
 ## 预览
 
@@ -37,7 +39,7 @@ Sub2API Usage Keeper 是一个独立的 sidecar 仪表盘服务，用于 [Sub2AP
 | 层 | 技术 |
 |---|---|
 | 后端 | Go 1.22、Gin、GORM、SQLite |
-| 前端 | React 18、TypeScript、Vite、Chart.js、Zustand |
+| 前端 | React 19、TypeScript、Vite、Chart.js、Recharts、Zustand |
 | 数据源 | Sub2API PostgreSQL（只读连接） |
 | 部署 | Docker、Docker Compose |
 
@@ -70,23 +72,17 @@ docker run -d \
   sub2api-usage-keeper:latest
 ```
 
-> 建议绑定 `127.0.0.1`，通过 Caddy / Nginx / Cloudflare 反代暴露 HTTPS。
+> 当前版本不提供内置登录保护。必须绑定 `127.0.0.1` 或置于受保护的私有网络，并由 Caddy / Nginx / Cloudflare Access 等上游设施负责 HTTPS 和访问控制。
 
 ## 配置
 
 | 变量 | 必填 | 默认值 | 说明 |
 |------|:----:|--------|------|
 | `SUB2API_DATABASE_URL` | ✅ | — | Sub2API PostgreSQL 连接串 |
-| `AUTH_ENABLED` | | `false` | 启用登录保护 |
-| `LOGIN_PASSWORD` | 启用认证时 | — | 仪表盘登录密码 |
-| `AUTH_SESSION_TTL` | | `168h` | 会话有效期 |
 | `APP_PORT` | | `8080` | HTTP 监听端口 |
 | `APP_BASE_PATH` | | `/` | 子路径前缀，如 `/usage` |
 | `TZ` | | `Asia/Shanghai` | 时区 |
 | `WORK_DIR` | | `./data` | 数据目录（SQLite、日志、备份） |
-| `PUBLIC_MODE` | | `true` | 公开仪表盘模式 |
-| `QUOTA_REFRESH_INTERVAL` | | `5m` | 额度/状态刷新间隔 |
-| `REQUEST_TIMEOUT` | | `30s` | 外部请求超时 |
 | `LOG_LEVEL` | | `info` | 日志级别 |
 | `LOG_FILE_ENABLED` | | `true` | 写入持久化日志文件 |
 | `LOG_RETENTION_DAYS` | | `7` | 日志保留天数 |
@@ -164,7 +160,8 @@ sub2api-usage-keeper/
 - 用户邮箱自动脱敏：本地部分 > 5 字符保留首 3 尾 2；短本地部分仅保留首字符；域名可见
 - 非邮箱用户标识进行哈希脱敏
 - 生产环境建议使用只读 PostgreSQL 用户
-- 将容器端口绑定到 `127.0.0.1`，通过反向代理终止 HTTPS
+- 当前没有内置登录页面或密码 session；不要把服务直接暴露到公网
+- 将容器端口绑定到 `127.0.0.1`，通过反向代理终止 HTTPS 并实施访问控制
 
 ## 致谢
 
