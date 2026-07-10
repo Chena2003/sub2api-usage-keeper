@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
 
 	"sub2api-usage-keeper/internal/quota"
 	"sub2api-usage-keeper/internal/sub2api"
@@ -13,15 +14,15 @@ import (
 )
 
 type Sub2APIDashboardProvider interface {
-	Accounts(context.Context, int) ([]quota.Sub2APIAccountQuota, error)
-	AccountQuotas(context.Context, int) ([]quota.Sub2APIAccountQuota, error)
+	Accounts(context.Context, time.Time) ([]quota.Sub2APIAccountQuota, error)
+	AccountQuotas(context.Context, time.Time) ([]quota.Sub2APIAccountQuota, error)
 	Overview(context.Context, int) (quota.Sub2APIOverview, error)
 	OverviewByHours(context.Context, int) (quota.Sub2APIOverview, error)
 	Hourly(context.Context, int) ([]sub2api.UsageOverviewRow, error)
-	Models(context.Context, int, int) ([]sub2api.ModelUsageRow, error)
+	Models(context.Context, time.Time, int) ([]sub2api.ModelUsageRow, error)
 	Events(context.Context, int, int) (quota.Sub2APIEventsResponse, error)
-	Rankings(context.Context, string, int, int) ([]quota.Sub2APIRankingRow, error)
-	RankingTrend(context.Context, string, int, int) ([]quota.Sub2APIRankingTrendPoint, string, error)
+	Rankings(context.Context, string, time.Time, int) ([]quota.Sub2APIRankingRow, error)
+	RankingTrend(context.Context, string, time.Time, int) ([]quota.Sub2APIRankingTrendPoint, string, error)
 	ServiceHealth(context.Context, int) (quota.Sub2APIServiceHealth, error)
 }
 
@@ -32,7 +33,7 @@ func registerSub2APIDashboardRoutes(router gin.IRoutes, provider Sub2APIDashboar
 			return
 		}
 
-		accounts, err := provider.Accounts(c.Request.Context(), sub2APIDaysQuery(c))
+		accounts, err := provider.Accounts(c.Request.Context(), sub2APISinceQuery(c))
 		if err != nil {
 			writeInternalError(c, "list sub2api accounts failed", err)
 			return
@@ -47,7 +48,7 @@ func registerSub2APIDashboardRoutes(router gin.IRoutes, provider Sub2APIDashboar
 			return
 		}
 
-		accounts, err := provider.AccountQuotas(c.Request.Context(), sub2APIDaysQuery(c))
+		accounts, err := provider.AccountQuotas(c.Request.Context(), sub2APISinceQuery(c))
 		if err != nil {
 			writeInternalError(c, "list sub2api account quotas failed", err)
 			return
@@ -99,7 +100,7 @@ func registerSub2APIDashboardRoutes(router gin.IRoutes, provider Sub2APIDashboar
 			return
 		}
 
-		models, err := provider.Models(c.Request.Context(), sub2APIDaysQuery(c), sub2APILimitQuery(c, 20))
+		models, err := provider.Models(c.Request.Context(), sub2APISinceQuery(c), sub2APILimitQuery(c, 20))
 		if err != nil {
 			writeInternalError(c, "list sub2api models failed", err)
 			return
@@ -129,7 +130,7 @@ func registerSub2APIDashboardRoutes(router gin.IRoutes, provider Sub2APIDashboar
 			return
 		}
 
-		rankings, err := provider.Rankings(c.Request.Context(), normalizeRankingDimension(c.Query("dimension")), sub2APIDaysQuery(c), sub2APILimitQuery(c, 20))
+		rankings, err := provider.Rankings(c.Request.Context(), normalizeRankingDimension(c.Query("dimension")), sub2APISinceQuery(c), sub2APILimitQuery(c, 20))
 		if err != nil {
 			writeInternalError(c, "list sub2api rankings failed", err)
 			return
@@ -144,7 +145,7 @@ func registerSub2APIDashboardRoutes(router gin.IRoutes, provider Sub2APIDashboar
 			return
 		}
 
-		points, granularity, err := provider.RankingTrend(c.Request.Context(), normalizeRankingDimension(c.Query("dimension")), sub2APIDaysQuery(c), sub2APILimitQuery(c, 12))
+		points, granularity, err := provider.RankingTrend(c.Request.Context(), normalizeRankingDimension(c.Query("dimension")), sub2APISinceQuery(c), sub2APILimitQuery(c, 12))
 		if err != nil {
 			writeInternalError(c, "get sub2api ranking trend failed", err)
 			return
@@ -171,6 +172,21 @@ func registerSub2APIDashboardRoutes(router gin.IRoutes, provider Sub2APIDashboar
 
 func sub2APIDaysQuery(c *gin.Context) int {
 	return sub2api.ClampDashboardDays(sub2APIQueryInt(c, "days", 7))
+}
+
+// sub2APISinceQuery returns a since timestamp from the hours or days query parameter.
+// It accepts hours (sub-day precision) or days (backward compatible). When neither is
+// present it defaults to 7 days. The maximum lookback is 90 days.
+func sub2APISinceQuery(c *gin.Context) time.Time {
+	now := time.Now()
+	if hoursStr := c.Query("hours"); hoursStr != "" {
+		if hours, err := strconv.Atoi(hoursStr); err == nil && hours > 0 {
+			hours = sub2api.ClampDashboardHours(hours)
+			return now.Add(-time.Duration(hours) * time.Hour)
+		}
+	}
+	days := sub2api.ClampDashboardDays(sub2APIQueryInt(c, "days", 7))
+	return now.AddDate(0, 0, -days)
 }
 
 func sub2APIHoursQuery(c *gin.Context) int {

@@ -159,6 +159,7 @@ function resetStore() {
     serviceHealth: null,
     rankingDimension: 'user',
     loading: false,
+    eventsLoading: false,
     error: null,
   })
 }
@@ -181,9 +182,9 @@ describe('useSub2ApiDashboardStore', () => {
 
     await useSub2ApiDashboardStore.getState().refresh()
 
-    expect(mockedFetchSub2ApiRankings).toHaveBeenCalledWith('user', 1)
+    expect(mockedFetchSub2ApiRankings).toHaveBeenCalledWith('user', 24)
     expect(mockedFetchSub2ApiEvents).toHaveBeenCalledWith({ page: 1, limit: 100 })
-    expect(mockedFetchSub2ApiAccountQuotas).toHaveBeenCalledWith(1)
+    expect(mockedFetchSub2ApiAccountQuotas).toHaveBeenCalledWith(24)
     expect(mockedFetchSub2ApiHealth).not.toHaveBeenCalled()
     expect(useSub2ApiDashboardStore.getState()).toMatchObject({
       accounts: [account],
@@ -204,7 +205,7 @@ describe('useSub2ApiDashboardStore', () => {
 
     await useSub2ApiDashboardStore.getState().loadRankings('api_key')
 
-    expect(mockedFetchSub2ApiRankings).toHaveBeenCalledWith('api_key', 1)
+    expect(mockedFetchSub2ApiRankings).toHaveBeenCalledWith('api_key', 24)
     expect(useSub2ApiDashboardStore.getState().rankingDimension).toBe('api_key')
     expect(useSub2ApiDashboardStore.getState().rankings).toEqual([ranking])
   })
@@ -222,7 +223,7 @@ describe('useSub2ApiDashboardStore', () => {
 
     await useSub2ApiDashboardStore.getState().refresh()
 
-    expect(mockedFetchSub2ApiRankings).toHaveBeenCalledWith('api_key', 1)
+    expect(mockedFetchSub2ApiRankings).toHaveBeenCalledWith('api_key', 24)
     expect(mockedFetchSub2ApiRankings).not.toHaveBeenCalledWith('user')
     expect(useSub2ApiDashboardStore.getState().rankingDimension).toBe('api_key')
   })
@@ -241,7 +242,7 @@ describe('useSub2ApiDashboardStore', () => {
 
     await useSub2ApiDashboardStore.getState().loadAccountQuotas(14)
 
-    expect(mockedFetchSub2ApiAccountQuotas).toHaveBeenCalledWith(14)
+    expect(mockedFetchSub2ApiAccountQuotas).toHaveBeenCalledWith(336)
     expect(useSub2ApiDashboardStore.getState().quotaAccounts).toEqual([quotaAccount])
   })
 

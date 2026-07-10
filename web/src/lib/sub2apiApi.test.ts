@@ -39,7 +39,7 @@ describe('Sub2API data fetchers', () => {
 
     await expect(fetchSub2ApiRankings()).resolves.toEqual([])
 
-    expect(fetchMock).toHaveBeenCalledWith('/api/v1/sub2api/rankings?dimension=user&days=7&limit=20', {
+    expect(fetchMock).toHaveBeenCalledWith('/api/v1/sub2api/rankings?dimension=user&hours=168&limit=20', {
       credentials: 'include',
     })
   })
@@ -52,9 +52,9 @@ describe('Sub2API data fetchers', () => {
     })
     vi.stubGlobal('fetch', fetchMock)
 
-    await expect(fetchSub2ApiAccountQuotas(14)).resolves.toEqual([])
+    await expect(fetchSub2ApiAccountQuotas(14 * 24)).resolves.toEqual([])
 
-    expect(fetchMock).toHaveBeenCalledWith('/api/v1/sub2api/account-quotas?days=14', {
+    expect(fetchMock).toHaveBeenCalledWith('/api/v1/sub2api/account-quotas?hours=336', {
       credentials: 'include',
     })
   })

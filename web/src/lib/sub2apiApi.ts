@@ -29,8 +29,8 @@ async function getJson<T>(path: string): Promise<T> {
   return response.json() as Promise<T>
 }
 
-export async function fetchSub2ApiAccounts(days = 7): Promise<Sub2ApiAccount[]> {
-  const body = await getJson<AccountsResponse>(`/accounts?days=${days}`)
+export async function fetchSub2ApiAccounts(hours = 168): Promise<Sub2ApiAccount[]> {
+  const body = await getJson<AccountsResponse>(`/accounts?hours=${hours}`)
   return body.accounts
 }
 
@@ -49,27 +49,27 @@ export async function fetchSub2ApiTimeseries(hours = 24): Promise<Sub2ApiTimeser
   return body.points
 }
 
-export async function fetchSub2ApiModels(days = 7, limit = 20): Promise<Sub2ApiModelUsage[]> {
-  const body = await getJson<ModelsResponse>(`/models?days=${days}&limit=${limit}`)
+export async function fetchSub2ApiModels(hours = 168, limit = 20): Promise<Sub2ApiModelUsage[]> {
+  const body = await getJson<ModelsResponse>(`/models?hours=${hours}&limit=${limit}`)
   return body.models
 }
 
 export async function fetchSub2ApiRankings(
   dimension: Sub2ApiRankingDimension = 'user',
-  days = 7,
+  hours = 168,
   limit = 20,
 ): Promise<Sub2ApiRanking[]> {
   const params = new URLSearchParams({
     dimension,
-    days: String(days),
+    hours: String(hours),
     limit: String(limit),
   })
   const body = await getJson<RankingsResponse>(`/rankings?${params.toString()}`)
   return body.rankings
 }
 
-export async function fetchSub2ApiAccountQuotas(days = 7): Promise<Sub2ApiAccount[]> {
-  const params = new URLSearchParams({ days: String(days) })
+export async function fetchSub2ApiAccountQuotas(hours = 168): Promise<Sub2ApiAccount[]> {
+  const params = new URLSearchParams({ hours: String(hours) })
   const body = await getJson<AccountsResponse>(`/account-quotas?${params.toString()}`)
   return body.accounts
 }
@@ -91,8 +91,8 @@ export function fetchSub2ApiHealth(hours = 24): Promise<Sub2ApiServiceHealth> {
 
 export async function fetchSub2ApiRankingTrend(
   dimension: Sub2ApiRankingDimension = 'user',
-  days = 7,
+  hours = 168,
   limit = 12,
 ): Promise<Sub2ApiRankingTrendResponse> {
-  return getJson<Sub2ApiRankingTrendResponse>(`/rankings-trend?dimension=${dimension}&days=${days}&limit=${limit}`)
+  return getJson<Sub2ApiRankingTrendResponse>(`/rankings-trend?dimension=${dimension}&hours=${hours}&limit=${limit}`)
 }

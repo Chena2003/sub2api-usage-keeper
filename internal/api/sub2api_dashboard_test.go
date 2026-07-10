@@ -15,21 +15,21 @@ import (
 )
 
 type fakeSub2APIDashboardProvider struct {
-	accountsDays      int
+	accountsSince     time.Time
 	overviewDays      int
 	hourlyHours       int
-	modelsDays        int
+	modelsSince       time.Time
 	modelsLimit       int
 	rankingsDimension string
-	rankingsDays      int
+	rankingsSince     time.Time
 	rankingsLimit     int
 	eventsPage        int
 	eventsLimit       int
-	accountQuotasDays int
+	accountQuotasSince time.Time
 }
 
-func (f *fakeSub2APIDashboardProvider) Accounts(_ context.Context, days int) ([]quota.Sub2APIAccountQuota, error) {
-	f.accountsDays = days
+func (f *fakeSub2APIDashboardProvider) Accounts(_ context.Context, since time.Time) ([]quota.Sub2APIAccountQuota, error) {
+	f.accountsSince = since
 	return []quota.Sub2APIAccountQuota{
 		{
 			ID:          4,
@@ -68,8 +68,8 @@ func (f *fakeSub2APIDashboardProvider) Hourly(_ context.Context, hours int) ([]s
 	}, nil
 }
 
-func (f *fakeSub2APIDashboardProvider) Models(_ context.Context, days int, limit int) ([]sub2api.ModelUsageRow, error) {
-	f.modelsDays = days
+func (f *fakeSub2APIDashboardProvider) Models(_ context.Context, since time.Time, limit int) ([]sub2api.ModelUsageRow, error) {
+	f.modelsSince = since
 	f.modelsLimit = limit
 	return []sub2api.ModelUsageRow{
 		{
@@ -79,9 +79,9 @@ func (f *fakeSub2APIDashboardProvider) Models(_ context.Context, days int, limit
 	}, nil
 }
 
-func (f *fakeSub2APIDashboardProvider) Rankings(_ context.Context, dimension string, days int, limit int) ([]quota.Sub2APIRankingRow, error) {
+func (f *fakeSub2APIDashboardProvider) Rankings(_ context.Context, dimension string, since time.Time, limit int) ([]quota.Sub2APIRankingRow, error) {
 	f.rankingsDimension = dimension
-	f.rankingsDays = days
+	f.rankingsSince = since
 	f.rankingsLimit = limit
 	return []quota.Sub2APIRankingRow{
 		{
@@ -109,8 +109,8 @@ func (f *fakeSub2APIDashboardProvider) Events(_ context.Context, page int, limit
 	}, nil
 }
 
-func (f *fakeSub2APIDashboardProvider) AccountQuotas(_ context.Context, days int) ([]quota.Sub2APIAccountQuota, error) {
-	f.accountQuotasDays = days
+func (f *fakeSub2APIDashboardProvider) AccountQuotas(_ context.Context, since time.Time) ([]quota.Sub2APIAccountQuota, error) {
+	f.accountQuotasSince = since
 	return []quota.Sub2APIAccountQuota{
 		{
 			ID:          4,
@@ -129,7 +129,7 @@ func (f *fakeSub2APIDashboardProvider) ServiceHealth(_ context.Context, _ int) (
 	}, nil
 }
 
-func (f *fakeSub2APIDashboardProvider) RankingTrend(_ context.Context, dimension string, days int, limit int) ([]quota.Sub2APIRankingTrendPoint, string, error) {
+func (f *fakeSub2APIDashboardProvider) RankingTrend(_ context.Context, dimension string, since time.Time, limit int) ([]quota.Sub2APIRankingTrendPoint, string, error) {
 	return []quota.Sub2APIRankingTrendPoint{
 		{Bucket: "2026-06-28", Name: "user@example.com", Tokens: 1000},
 	}, "day", nil
@@ -147,8 +147,8 @@ func TestSub2APIAccountsRoute(t *testing.T) {
 	if resp.Code != http.StatusOK {
 		t.Fatalf("expected status 200, got %d", resp.Code)
 	}
-	if provider.accountsDays != 7 {
-		t.Fatalf("expected days 7, got %d", provider.accountsDays)
+	if dur := time.Since(provider.accountsSince); dur < 6*24*time.Hour-time.Minute || dur > 8*24*time.Hour+time.Minute {
+		t.Fatalf("expected accounts since ~7d, got %v (dur %v)", provider.accountsSince, dur)
 	}
 	if body := resp.Body.String(); !strings.Contains(body, `"accounts":[`) || !strings.Contains(body, `"displayName":"openai oauth #4"`) {
 		t.Fatalf("unexpected response body: %s", body)
@@ -207,8 +207,8 @@ func TestSub2APIModelsRoute(t *testing.T) {
 	if resp.Code != http.StatusOK {
 		t.Fatalf("expected status 200, got %d", resp.Code)
 	}
-	if provider.modelsDays != 7 {
-		t.Fatalf("expected days 7, got %d", provider.modelsDays)
+	if dur := time.Since(provider.modelsSince); dur < 6*24*time.Hour-time.Minute || dur > 8*24*time.Hour+time.Minute {
+		t.Fatalf("expected models since ~7d, got %v (dur %v)", provider.modelsSince, dur)
 	}
 	if provider.modelsLimit != 20 {
 		t.Fatalf("expected limit 20, got %d", provider.modelsLimit)
@@ -233,8 +233,8 @@ func TestSub2APIRankingsRouteDefaultsDimensionUser(t *testing.T) {
 	if provider.rankingsDimension != "user" {
 		t.Fatalf("expected dimension user, got %q", provider.rankingsDimension)
 	}
-	if provider.rankingsDays != 7 {
-		t.Fatalf("expected days 7, got %d", provider.rankingsDays)
+	if dur := time.Since(provider.rankingsSince); dur < 6*24*time.Hour-time.Minute || dur > 8*24*time.Hour+time.Minute {
+		t.Fatalf("expected rankings since ~7d, got %v (dur %v)", provider.rankingsSince, dur)
 	}
 	if provider.rankingsLimit != 20 {
 		t.Fatalf("expected limit 20, got %d", provider.rankingsLimit)
@@ -279,8 +279,8 @@ func TestSub2APIAccountQuotasRoute(t *testing.T) {
 	if resp.Code != http.StatusOK {
 		t.Fatalf("expected status 200, got %d", resp.Code)
 	}
-	if provider.accountQuotasDays != 7 {
-		t.Fatalf("expected days 7, got %d", provider.accountQuotasDays)
+	if dur := time.Since(provider.accountQuotasSince); dur < 6*24*time.Hour-time.Minute || dur > 8*24*time.Hour+time.Minute {
+		t.Fatalf("expected account quotas since ~7d, got %v (dur %v)", provider.accountQuotasSince, dur)
 	}
 	if body := resp.Body.String(); !strings.Contains(body, `"accounts":[`) || !strings.Contains(body, `"displayName":"openai oauth #4"`) {
 		t.Fatalf("unexpected response body: %s", body)
@@ -298,9 +298,9 @@ func TestSub2APIQueryClampsMaximums(t *testing.T) {
 			path: "/api/v1/sub2api/accounts?days=9999",
 			assertions: func(t *testing.T, provider *fakeSub2APIDashboardProvider) {
 				t.Helper()
-				if provider.accountsDays != 90 {
-					t.Fatalf("expected days 90, got %d", provider.accountsDays)
-				}
+			if dur := time.Since(provider.accountsSince); dur < 89*24*time.Hour-time.Minute || dur > 91*24*time.Hour+time.Minute {
+				t.Fatalf("expected accounts since ~90d, got %v (dur %v)", provider.accountsSince, dur)
+			}
 			},
 		},
 		{
@@ -318,8 +318,8 @@ func TestSub2APIQueryClampsMaximums(t *testing.T) {
 			path: "/api/v1/sub2api/models?days=9999&limit=9999",
 			assertions: func(t *testing.T, provider *fakeSub2APIDashboardProvider) {
 				t.Helper()
-				if provider.modelsDays != 90 {
-					t.Fatalf("expected days 90, got %d", provider.modelsDays)
+				if dur := time.Since(provider.modelsSince); dur < 89*24*time.Hour-time.Minute || dur > 91*24*time.Hour+time.Minute {
+					t.Fatalf("expected models since ~90d, got %v (dur %v)", provider.modelsSince, dur)
 				}
 				if provider.modelsLimit != 100 {
 					t.Fatalf("expected limit 100, got %d", provider.modelsLimit)
@@ -370,9 +370,9 @@ func TestSub2APIQueryDefaults(t *testing.T) {
 			path: "/api/v1/sub2api/accounts?days=0",
 			assertions: func(t *testing.T, provider *fakeSub2APIDashboardProvider) {
 				t.Helper()
-				if provider.accountsDays != 7 {
-					t.Fatalf("expected days 7, got %d", provider.accountsDays)
-				}
+			if dur := time.Since(provider.accountsSince); dur < 6*24*time.Hour-time.Minute || dur > 8*24*time.Hour+time.Minute {
+				t.Fatalf("expected accounts since ~7d, got %v (dur %v)", provider.accountsSince, dur)
+			}
 			},
 		},
 		{
@@ -390,8 +390,8 @@ func TestSub2APIQueryDefaults(t *testing.T) {
 			path: "/api/v1/sub2api/models?days=x&limit=0",
 			assertions: func(t *testing.T, provider *fakeSub2APIDashboardProvider) {
 				t.Helper()
-				if provider.modelsDays != 7 {
-					t.Fatalf("expected days 7, got %d", provider.modelsDays)
+				if dur := time.Since(provider.modelsSince); dur < 6*24*time.Hour-time.Minute || dur > 8*24*time.Hour+time.Minute {
+					t.Fatalf("expected models since ~7d, got %v (dur %v)", provider.modelsSince, dur)
 				}
 				if provider.modelsLimit != 20 {
 					t.Fatalf("expected limit 20, got %d", provider.modelsLimit)

@@ -474,6 +474,7 @@ export function UsagePage({ onAuthRequired }: { onAuthRequired?: () => void }) {
   const rankingDimension = useSub2ApiDashboardStore((state) => state.rankingDimension);
   const sub2apiError = useSub2ApiDashboardStore((state) => state.error);
   const sub2apiLoading = useSub2ApiDashboardStore((state) => state.loading);
+  const sub2apiEventsLoading = useSub2ApiDashboardStore((state) => state.eventsLoading);
   const refreshSub2APIRaw = useSub2ApiDashboardStore((state) => state.refresh);
   const loadHealth = useSub2ApiDashboardStore((state) => state.loadHealth);
   const loadRankings = useSub2ApiDashboardStore((state) => state.loadRankings);
@@ -994,7 +995,7 @@ export function UsagePage({ onAuthRequired }: { onAuthRequired?: () => void }) {
               />
             )}
             {activeTab === 'analysis' && <Sub2ApiAnalysisPanel models={sub2apiModels} points={sub2apiPoints} loading={sub2apiLoading} error={sub2apiError} onRetry={refreshSub2API} />}
-            {activeTab === 'events' && <RequestEventsPanel events={sub2apiEvents} loading={sub2apiLoading} error={sub2apiError} onRetry={refreshSub2API} />}
+            {activeTab === 'events' && <RequestEventsPanel events={sub2apiEvents} loading={sub2apiEventsLoading} error={sub2apiError} onRetry={refreshSub2API} />}
             {activeTab === 'ranking' && <>
               <RankingTrendChart data={sub2apiRankingTrend} dimension={rankingDimension} loading={sub2apiLoading} />
               <TokenRankingCard rankings={sub2apiRankings} dimension={rankingDimension} onDimensionChange={loadRankings} loading={sub2apiLoading} error={sub2apiError} onRetry={refreshSub2API} />
