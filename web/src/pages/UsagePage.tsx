@@ -32,6 +32,7 @@ import {
 } from '@/components/usage';
 import { AccountQuotasCard, RequestEventsPanel, Sub2ApiOverviewPanel, TokenRankingCard, RankingTrendChart, ModelPricingReferenceCard } from '@/components/sub2api';
 import { useSub2ApiDashboardStore } from '@/stores/useSub2ApiDashboardStore';
+import type { TimeRangeParams } from '@/lib/sub2apiApi';
 import { buildUsageRangeQuery } from '@/utils/usage/rangeQuery';
 import {
   getModelNamesFromUsage,
@@ -394,6 +395,36 @@ export const getSub2ApiDashboardHours = (timeRange: UsageTimeRange): number => {
   return 24;
 };
 
+/** Build a TimeRangeParams object for the sub2api dashboard store, with midnight-aligned
+ *  since/until for 'today', 'yesterday', and 'custom' ranges. */
+export const getSub2ApiDashboardRange = (
+  timeRange: UsageTimeRange,
+  customTimeRange: { start: string; end: string },
+): TimeRangeParams => {
+  if (isTodayTimeRange(timeRange)) {
+    const since = new Date();
+    since.setHours(0, 0, 0, 0);
+    return { since: since.toISOString() };
+  }
+  if (isYesterdayTimeRange(timeRange)) {
+    const since = new Date();
+    since.setDate(since.getDate() - 1);
+    since.setHours(0, 0, 0, 0);
+    const until = new Date();
+    until.setHours(0, 0, 0, 0);
+    return { since: since.toISOString(), until: until.toISOString() };
+  }
+  if (timeRange === 'custom') {
+    const startMs = parseCustomDateStart(customTimeRange.start);
+    const endMs = parseCustomDateEnd(customTimeRange.end);
+    if (startMs !== undefined && endMs !== undefined) {
+      return { since: new Date(startMs).toISOString(), until: new Date(endMs).toISOString() };
+    }
+    return { hours: 24 };
+  }
+  return { hours: HOUR_WINDOW_BY_TIME_RANGE[timeRange] ?? 24 };
+};
+
 export const getPreferredOverviewChartPeriod = ({ windowMinutes }: { windowMinutes?: number }): 'hour' | 'day' => (
   windowMinutes !== undefined && windowMinutes > 24 * 60 ? 'day' : 'hour'
 );
@@ -476,15 +507,15 @@ export function UsagePage({ onAuthRequired }: { onAuthRequired?: () => void }) {
   const sub2apiLoading = useSub2ApiDashboardStore((state) => state.loading);
   const sub2apiEventsLoading = useSub2ApiDashboardStore((state) => state.eventsLoading);
   const refreshSub2APIRaw = useSub2ApiDashboardStore((state) => state.refresh);
- const loadHealth = useSub2ApiDashboardStore((state) => state.loadHealth);
- const loadRankings = useSub2ApiDashboardStore((state) => state.loadRankings);
+  const loadHealth = useSub2ApiDashboardStore((state) => state.loadHealth);
+  const loadRankings = useSub2ApiDashboardStore((state) => state.loadRankings);
   const loadEvents = useSub2ApiDashboardStore((state) => state.loadEvents);
-  const refreshSub2API = useCallback(() => refreshSub2APIRaw({ hours: getSub2ApiDashboardHours(timeRange) }), [refreshSub2APIRaw, timeRange]);
- const refreshSub2APIBackground = useCallback(() => refreshSub2APIRaw({ hours: getSub2ApiDashboardHours(timeRange), background: true }), [refreshSub2APIRaw, timeRange]);
+  const refreshSub2API = useCallback(() => refreshSub2APIRaw(getSub2ApiDashboardRange(timeRange, customTimeRange)), [refreshSub2APIRaw, timeRange, customTimeRange]);
+  const refreshSub2APIBackground = useCallback(() => refreshSub2APIRaw({ ...getSub2ApiDashboardRange(timeRange, customTimeRange), background: true }), [refreshSub2APIRaw, timeRange, customTimeRange]);
   const handleEventsPageChange = useCallback((page: number) => {
     void loadEvents({ page, limit: 100 });
   }, [loadEvents]);
- const tabOptions = useMemo(() => getUsageTabOptions(t), [t]);
+  const tabOptions = useMemo(() => getUsageTabOptions(t), [t]);
   const timeRangeOptions = useMemo(() => getTimeRangeOptions(t), [t]);
   const themeOptions = useMemo(
     () =>
@@ -753,9 +784,9 @@ export function UsagePage({ onAuthRequired }: { onAuthRequired?: () => void }) {
 
   useEffect(() => {
     if (activeTab === 'overview') {
-      void loadHealth(getSub2ApiDashboardHours(timeRange));
+      void loadHealth(getSub2ApiDashboardRange(timeRange, customTimeRange));
     }
-  }, [activeTab, loadHealth, timeRange]);
+  }, [activeTab, loadHealth, timeRange, customTimeRange]);
 
   const lastSyncAt = useMemo(() => {
     if (!status?.last_run_at) return null;

@@ -33,7 +33,7 @@ func registerSub2APIDashboardRoutes(router gin.IRoutes, provider Sub2APIDashboar
 			return
 		}
 
-		accounts, err := provider.Accounts(c.Request.Context(), sub2APISinceQuery(c))
+		accounts, err := provider.Accounts(c.Request.Context(), sub2APISinceTimeQuery(c))
 		if err != nil {
 			writeInternalError(c, "list sub2api accounts failed", err)
 			return
@@ -48,7 +48,7 @@ func registerSub2APIDashboardRoutes(router gin.IRoutes, provider Sub2APIDashboar
 			return
 		}
 
-		accounts, err := provider.AccountQuotas(c.Request.Context(), sub2APISinceQuery(c))
+		accounts, err := provider.AccountQuotas(c.Request.Context(), sub2APISinceTimeQuery(c))
 		if err != nil {
 			writeInternalError(c, "list sub2api account quotas failed", err)
 			return
@@ -100,7 +100,7 @@ func registerSub2APIDashboardRoutes(router gin.IRoutes, provider Sub2APIDashboar
 			return
 		}
 
-		models, err := provider.Models(c.Request.Context(), sub2APISinceQuery(c), sub2APILimitQuery(c, 20))
+		models, err := provider.Models(c.Request.Context(), sub2APISinceTimeQuery(c), sub2APILimitQuery(c, 20))
 		if err != nil {
 			writeInternalError(c, "list sub2api models failed", err)
 			return
@@ -115,7 +115,7 @@ func registerSub2APIDashboardRoutes(router gin.IRoutes, provider Sub2APIDashboar
 			return
 		}
 
-		events, err := provider.Events(c.Request.Context(), sub2APISinceQuery(c), sub2APIPageQuery(c), sub2APILimitQuery(c, 100))
+		events, err := provider.Events(c.Request.Context(), sub2APISinceTimeQuery(c), sub2APIPageQuery(c), sub2APILimitQuery(c, 100))
 		if err != nil {
 			writeInternalError(c, "list sub2api events failed", err)
 			return
@@ -130,7 +130,7 @@ func registerSub2APIDashboardRoutes(router gin.IRoutes, provider Sub2APIDashboar
 			return
 		}
 
-		rankings, err := provider.Rankings(c.Request.Context(), normalizeRankingDimension(c.Query("dimension")), sub2APISinceQuery(c), sub2APILimitQuery(c, 20))
+		rankings, err := provider.Rankings(c.Request.Context(), normalizeRankingDimension(c.Query("dimension")), sub2APISinceTimeQuery(c), sub2APILimitQuery(c, 20))
 		if err != nil {
 			writeInternalError(c, "list sub2api rankings failed", err)
 			return
@@ -145,7 +145,7 @@ func registerSub2APIDashboardRoutes(router gin.IRoutes, provider Sub2APIDashboar
 			return
 		}
 
-		points, granularity, err := provider.RankingTrend(c.Request.Context(), normalizeRankingDimension(c.Query("dimension")), sub2APISinceQuery(c), sub2APILimitQuery(c, 12))
+		points, granularity, err := provider.RankingTrend(c.Request.Context(), normalizeRankingDimension(c.Query("dimension")), sub2APISinceTimeQuery(c), sub2APILimitQuery(c, 12))
 		if err != nil {
 			writeInternalError(c, "get sub2api ranking trend failed", err)
 			return
@@ -187,6 +187,30 @@ func sub2APISinceQuery(c *gin.Context) time.Time {
 	}
 	days := sub2api.ClampDashboardDays(sub2APIQueryInt(c, "days", 7))
 	return now.AddDate(0, 0, -days)
+}
+
+// sub2APIUntilQuery returns an until timestamp from the until query parameter.
+// It accepts an RFC3339 timestamp. When not present or invalid it returns time.Time{}
+// (zero), which downstream code interprets as "now".
+func sub2APIUntilQuery(c *gin.Context) time.Time {
+	if untilStr := c.Query("until"); untilStr != "" {
+		if parsed, err := time.Parse(time.RFC3339, untilStr); err == nil {
+			return parsed
+		}
+	}
+	return time.Time{}
+}
+
+// sub2APISinceTimeQuery returns a since timestamp from the since query parameter.
+// It accepts an RFC3339 timestamp. When not present or invalid it falls back to
+// sub2APISinceQuery (hours/days).
+func sub2APISinceTimeQuery(c *gin.Context) time.Time {
+	if sinceStr := c.Query("since"); sinceStr != "" {
+		if parsed, err := time.Parse(time.RFC3339, sinceStr); err == nil {
+			return parsed
+		}
+	}
+	return sub2APISinceQuery(c)
 }
 
 func sub2APIHoursQuery(c *gin.Context) int {

@@ -29,7 +29,7 @@ describe('Sub2API data fetchers', () => {
     vi.restoreAllMocks()
   })
 
-  it('fetches rankings from the default rankings URL with credentials', async () => {
+  it('fetches rankings with TimeRangeParams and credentials', async () => {
     vi.stubGlobal('window', { __APP_BASE_PATH__: undefined })
     const fetchMock = vi.fn().mockResolvedValue({
       ok: true,
@@ -39,12 +39,27 @@ describe('Sub2API data fetchers', () => {
 
     await expect(fetchSub2ApiRankings()).resolves.toEqual([])
 
-    expect(fetchMock).toHaveBeenCalledWith('/api/v1/sub2api/rankings?dimension=user&hours=168&limit=20', {
+    expect(fetchMock).toHaveBeenCalledWith('/api/v1/sub2api/rankings?dimension=user&limit=20', {
       credentials: 'include',
     })
   })
 
-  it('fetches account quotas for the requested day window', async () => {
+  it('fetches rankings with since/until params', async () => {
+    vi.stubGlobal('window', { __APP_BASE_PATH__: undefined })
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve({ rankings: [] }),
+    })
+    vi.stubGlobal('fetch', fetchMock)
+
+    await expect(fetchSub2ApiRankings('user', { since: '2026-07-10T00:00:00.000Z', until: '2026-07-11T00:00:00.000Z' })).resolves.toEqual([])
+
+    expect(fetchMock).toHaveBeenCalledWith('/api/v1/sub2api/rankings?dimension=user&limit=20&since=2026-07-10T00%3A00%3A00.000Z&until=2026-07-11T00%3A00%3A00.000Z', {
+      credentials: 'include',
+    })
+  })
+
+  it('fetches account quotas with TimeRangeParams', async () => {
     vi.stubGlobal('window', { __APP_BASE_PATH__: undefined })
     const fetchMock = vi.fn().mockResolvedValue({
       ok: true,
@@ -52,14 +67,14 @@ describe('Sub2API data fetchers', () => {
     })
     vi.stubGlobal('fetch', fetchMock)
 
-    await expect(fetchSub2ApiAccountQuotas(14 * 24)).resolves.toEqual([])
+    await expect(fetchSub2ApiAccountQuotas({ hours: 336 })).resolves.toEqual([])
 
     expect(fetchMock).toHaveBeenCalledWith('/api/v1/sub2api/account-quotas?hours=336', {
       credentials: 'include',
     })
   })
 
-  it('fetches events with the requested pagination', async () => {
+  it('fetches events with pagination and time range', async () => {
     vi.stubGlobal('window', { __APP_BASE_PATH__: undefined })
     const response = { events: [], total: 0, page: 2, limit: 50 }
     const fetchMock = vi.fn().mockResolvedValue({

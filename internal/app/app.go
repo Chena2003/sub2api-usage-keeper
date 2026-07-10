@@ -178,6 +178,9 @@ func (a *App) Run() error {
 	server := &http.Server{
 		Addr:    ":" + a.Config.AppPort,
 		Handler: a.Router,
+		ReadTimeout:  30 * time.Second,
+		WriteTimeout: 60 * time.Second,
+		IdleTimeout:  120 * time.Second,
 	}
 	if a.Config.TLSEnabled {
 		return server.ListenAndServeTLS(a.Config.TLSCertFile, a.Config.TLSKeyFile)

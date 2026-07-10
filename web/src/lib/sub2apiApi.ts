@@ -16,6 +16,14 @@ type TimeseriesResponse = { points: Sub2ApiTimeseriesPoint[] }
 type ModelsResponse = { models: Sub2ApiModelUsage[] }
 type RankingsResponse = { rankings: Sub2ApiRanking[] }
 
+export type TimeRangeParams = { hours?: number; since?: string; until?: string }
+
+function appendTimeRangeParams(params: URLSearchParams, tr: TimeRangeParams): void {
+  if (tr.since) params.set('since', tr.since)
+  if (tr.until) params.set('until', tr.until)
+  if (tr.hours !== undefined) params.set('hours', String(tr.hours))
+}
+
 export function sub2apiEndpoint(path: string): string {
   const normalized = path.startsWith('/') ? path : `/${path}`
   return apiPath(`/sub2api${normalized}`)
@@ -29,47 +37,51 @@ async function getJson<T>(path: string): Promise<T> {
   return response.json() as Promise<T>
 }
 
-export async function fetchSub2ApiAccounts(hours = 168): Promise<Sub2ApiAccount[]> {
-  const body = await getJson<AccountsResponse>(`/accounts?hours=${hours}`)
+export async function fetchSub2ApiAccounts(tr: TimeRangeParams = {}): Promise<Sub2ApiAccount[]> {
+  const params = new URLSearchParams()
+  appendTimeRangeParams(params, tr)
+  const body = await getJson<AccountsResponse>(`/accounts?${params.toString()}`)
   return body.accounts
 }
 
-export function fetchSub2ApiOverview(days?: number, hours?: number): Promise<Sub2ApiOverview> {
+export function fetchSub2ApiOverview(tr: TimeRangeParams = {}): Promise<Sub2ApiOverview> {
   const params = new URLSearchParams()
-  if (hours !== undefined) {
-    params.set('hours', String(hours))
-  } else {
-    params.set('days', String(days ?? 7))
-  }
+  appendTimeRangeParams(params, tr)
   return getJson<Sub2ApiOverview>(`/overview?${params.toString()}`)
 }
 
-export async function fetchSub2ApiTimeseries(hours = 24): Promise<Sub2ApiTimeseriesPoint[]> {
-  const body = await getJson<TimeseriesResponse>(`/timeseries?hours=${hours}`)
+export async function fetchSub2ApiTimeseries(tr: TimeRangeParams = {}): Promise<Sub2ApiTimeseriesPoint[]> {
+  const params = new URLSearchParams()
+  appendTimeRangeParams(params, tr)
+  const body = await getJson<TimeseriesResponse>(`/timeseries?${params.toString()}`)
   return body.points
 }
 
-export async function fetchSub2ApiModels(hours = 168, limit = 20): Promise<Sub2ApiModelUsage[]> {
-  const body = await getJson<ModelsResponse>(`/models?hours=${hours}&limit=${limit}`)
+export async function fetchSub2ApiModels(tr: TimeRangeParams = {}, limit = 20): Promise<Sub2ApiModelUsage[]> {
+  const params = new URLSearchParams()
+  appendTimeRangeParams(params, tr)
+  params.set('limit', String(limit))
+  const body = await getJson<ModelsResponse>(`/models?${params.toString()}`)
   return body.models
 }
 
 export async function fetchSub2ApiRankings(
   dimension: Sub2ApiRankingDimension = 'user',
-  hours = 168,
+  tr: TimeRangeParams = {},
   limit = 20,
 ): Promise<Sub2ApiRanking[]> {
   const params = new URLSearchParams({
     dimension,
-    hours: String(hours),
     limit: String(limit),
   })
+  appendTimeRangeParams(params, tr)
   const body = await getJson<RankingsResponse>(`/rankings?${params.toString()}`)
   return body.rankings
 }
 
-export async function fetchSub2ApiAccountQuotas(hours = 168): Promise<Sub2ApiAccount[]> {
-  const params = new URLSearchParams({ hours: String(hours) })
+export async function fetchSub2ApiAccountQuotas(tr: TimeRangeParams = {}): Promise<Sub2ApiAccount[]> {
+  const params = new URLSearchParams()
+  appendTimeRangeParams(params, tr)
   const body = await getJson<AccountsResponse>(`/account-quotas?${params.toString()}`)
   return body.accounts
 }
@@ -78,7 +90,9 @@ export function fetchSub2ApiEvents({
   page = 1,
   limit = 100,
   hours,
-}: { page?: number; limit?: number; hours?: number } = {}): Promise<Sub2ApiEventsResponse> {
+  since,
+  until,
+}: { page?: number; limit?: number; hours?: number; since?: string; until?: string } = {}): Promise<Sub2ApiEventsResponse> {
   const params = new URLSearchParams({
     page: String(page),
     limit: String(limit),
@@ -86,17 +100,26 @@ export function fetchSub2ApiEvents({
   if (hours !== undefined) {
     params.set('hours', String(hours))
   }
+  if (since) params.set('since', since)
+  if (until) params.set('until', until)
   return getJson<Sub2ApiEventsResponse>(`/events?${params.toString()}`)
 }
 
-export function fetchSub2ApiHealth(hours = 24): Promise<Sub2ApiServiceHealth> {
-  return getJson<Sub2ApiServiceHealth>(`/health?hours=${hours}`)
+export function fetchSub2ApiHealth(tr: TimeRangeParams = {}): Promise<Sub2ApiServiceHealth> {
+  const params = new URLSearchParams()
+  appendTimeRangeParams(params, tr)
+  return getJson<Sub2ApiServiceHealth>(`/health?${params.toString()}`)
 }
 
 export async function fetchSub2ApiRankingTrend(
   dimension: Sub2ApiRankingDimension = 'user',
-  hours = 168,
+  tr: TimeRangeParams = {},
   limit = 12,
 ): Promise<Sub2ApiRankingTrendResponse> {
-  return getJson<Sub2ApiRankingTrendResponse>(`/rankings-trend?dimension=${dimension}&hours=${hours}&limit=${limit}`)
+  const params = new URLSearchParams({
+    dimension,
+    limit: String(limit),
+  })
+  appendTimeRangeParams(params, tr)
+  return getJson<Sub2ApiRankingTrendResponse>(`/rankings-trend?${params.toString()}`)
 }
