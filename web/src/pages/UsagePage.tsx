@@ -761,9 +761,9 @@ export function UsagePage({ onAuthRequired }: { onAuthRequired?: () => void }) {
 
   useEffect(() => {
     if (activeTab === 'overview') {
-      void loadHealth();
+      void loadHealth(getSub2ApiDashboardHours(timeRange));
     }
-  }, [activeTab, loadHealth]);
+  }, [activeTab, loadHealth, timeRange]);
 
   const lastSyncAt = useMemo(() => {
     if (!status?.last_run_at) return null;

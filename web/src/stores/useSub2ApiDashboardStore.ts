@@ -39,7 +39,7 @@ type Sub2ApiDashboardState = {
   error: string | null
   _refreshVersion: number
   refresh: (opts?: { hours?: number; background?: boolean }) => Promise<void>
-  loadHealth: () => Promise<void>
+  loadHealth: (hours?: number) => Promise<void>
   loadRankings: (dimension?: Sub2ApiRankingDimension) => Promise<void>
   loadEvents: (params?: { page?: number; limit?: number }) => Promise<void>
   loadAccountQuotas: (days?: number) => Promise<void>
@@ -86,17 +86,26 @@ export const useSub2ApiDashboardStore = create<Sub2ApiDashboardState>((set, get)
       set({ error: error instanceof Error ? error.message : 'Unknown error', loading: false })
     }
   },
-  loadHealth: async () => {
-    const serviceHealth = await fetchSub2ApiHealth(168)
-    set({ serviceHealth })
+  loadHealth: async (hours?: number) => {
+    const h = hours ?? get().currentHours
+    try {
+      const serviceHealth = await fetchSub2ApiHealth(h)
+      set({ serviceHealth })
+    } catch (error) {
+      console.error('loadHealth failed:', error)
+    }
   },
   loadRankings: async (dimension = 'user') => {
     const { currentHours } = get()
-    const [rankings, rankingTrend] = await Promise.all([
-      fetchSub2ApiRankings(dimension, currentHours),
-      fetchSub2ApiRankingTrend(dimension, currentHours, 12),
-    ])
-    set({ rankings, rankingTrend, rankingDimension: dimension })
+    try {
+      const [rankings, rankingTrend] = await Promise.all([
+        fetchSub2ApiRankings(dimension, currentHours),
+        fetchSub2ApiRankingTrend(dimension, currentHours, 12),
+      ])
+      set({ rankings, rankingTrend, rankingDimension: dimension })
+    } catch (error) {
+      console.error('loadRankings failed:', error)
+    }
   },
   loadEvents: async (params = {}) => {
     set({ eventsLoading: true })

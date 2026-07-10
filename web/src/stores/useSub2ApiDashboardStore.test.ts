@@ -158,6 +158,7 @@ function resetStore() {
     quotaAccounts: [],
     serviceHealth: null,
     rankingDimension: 'user',
+    currentHours: 168,
     loading: false,
     eventsLoading: false,
     error: null,
@@ -205,7 +206,7 @@ describe('useSub2ApiDashboardStore', () => {
 
     await useSub2ApiDashboardStore.getState().loadRankings('api_key')
 
-    expect(mockedFetchSub2ApiRankings).toHaveBeenCalledWith('api_key', 24)
+    expect(mockedFetchSub2ApiRankings).toHaveBeenCalledWith('api_key', 168)
     expect(useSub2ApiDashboardStore.getState().rankingDimension).toBe('api_key')
     expect(useSub2ApiDashboardStore.getState().rankings).toEqual([ranking])
   })
@@ -255,6 +256,16 @@ describe('useSub2ApiDashboardStore', () => {
     expect(mockedFetchSub2ApiHealth).toHaveBeenCalledWith(168)
     expect(useSub2ApiDashboardStore.getState().serviceHealth).toEqual(healthData)
     expect(useSub2ApiDashboardStore.getState().loading).toBe(false)
+  })
+
+  it('loadHealth uses provided hours instead of currentHours', async () => {
+    const healthData = { total_success: 50, total_failure: 2, success_rate: 96.15, rows: 3, columns: 48, bucket_seconds: 900, window_start: '', window_end: '', block_details: [] }
+    mockedFetchSub2ApiHealth.mockResolvedValue(healthData as never)
+
+    await useSub2ApiDashboardStore.getState().loadHealth(8)
+
+    expect(mockedFetchSub2ApiHealth).toHaveBeenCalledWith(8)
+    expect(useSub2ApiDashboardStore.getState().serviceHealth).toEqual(healthData)
   })
 
   it('background refresh does not flip loading to true', async () => {

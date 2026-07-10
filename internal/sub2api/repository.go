@@ -11,7 +11,7 @@ import (
 
 const (
 	MaxDashboardDays  = 90
-	MaxDashboardHours = 168
+	MaxDashboardHours = 90 * 24 // 2160 — must match MaxDashboardDays so sub-day ranges work up to 90 days
 	MaxDashboardLimit = 100
 	MaxDashboardPage  = 1000
 )
@@ -444,12 +444,6 @@ func rankingColumn(dimension string) string {
 	}
 }
 
-func rankingTrendGranularity(days int) string {
-	if days <= 2 {
-		return "YYYY-MM-DD HH24:00"
-	}
-	return "YYYY-MM-DD"
-}
 
 func (r *Repository) GetRankingTrend(ctx context.Context, dimension string, since time.Time, granularity string, limit int) ([]RankingTrendRow, error) {
 	limit = ClampDashboardLimit(limit, 12)

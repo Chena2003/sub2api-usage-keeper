@@ -85,8 +85,8 @@ func TestClampDashboardDays(t *testing.T) {
 }
 
 func TestClampDashboardHours(t *testing.T) {
-	if got := ClampDashboardHours(9999); got != 168 {
-		t.Fatalf("ClampDashboardHours() = %d, want 168", got)
+	if got := ClampDashboardHours(9999); got != 2160 {
+		t.Fatalf("ClampDashboardHours() = %d, want 2160", got)
 	}
 	if got := ClampDashboardHours(0); got != 24 {
 		t.Fatalf("ClampDashboardHours() = %d, want 24", got)

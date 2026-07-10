@@ -304,12 +304,12 @@ func TestSub2APIQueryClampsMaximums(t *testing.T) {
 			},
 		},
 		{
-			name: "timeseries hours clamps to one week",
+			name: "timeseries hours clamps to ninety days",
 			path: "/api/v1/sub2api/timeseries?hours=9999",
 			assertions: func(t *testing.T, provider *fakeSub2APIDashboardProvider) {
 				t.Helper()
-				if provider.hourlyHours != 168 {
-					t.Fatalf("expected hours 168, got %d", provider.hourlyHours)
+				if provider.hourlyHours != 2160 {
+					t.Fatalf("expected hours 2160, got %d", provider.hourlyHours)
 				}
 			},
 		},

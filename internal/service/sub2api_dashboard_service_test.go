@@ -311,8 +311,8 @@ func TestSub2APIDashboardClampsMaximums(t *testing.T) {
 	if _, err := service.Hourly(context.Background(), 9999); err != nil {
 		t.Fatalf("Hourly returned error: %v", err)
 	}
-	if reader.lastHourlyHours != 168 {
-		t.Fatalf("expected hourly overview hours 168, got %d", reader.lastHourlyHours)
+	if reader.lastHourlyHours != 2160 {
+		t.Fatalf("expected hourly overview hours 2160, got %d", reader.lastHourlyHours)
 	}
 
 	if _, err := service.Models(context.Background(), fixedNow.AddDate(0, 0, -9999), 9999); err != nil {
