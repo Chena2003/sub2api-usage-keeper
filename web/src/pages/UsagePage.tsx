@@ -666,20 +666,8 @@ export function UsagePage({ onAuthRequired }: { onAuthRequired?: () => void }) {
     }
   }, []);
 
-  const refreshActiveTab = useCallback(async () => {
-    if (activeTab === 'overview') {
-      await refreshSub2API();
-      return;
-    }
-    if (activeTab === 'events') {
-      await refreshSub2API();
-      return;
-    }
-    if (activeTab === 'ranking' || activeTab === 'quotas') {
-      await refreshSub2API();
-      return;
-    }
-    if (activeTab === 'analysis') {
+ const refreshActiveTab = useCallback(async () => {
+    if (activeTab === 'overview' || activeTab === 'events' || activeTab === 'ranking' || activeTab === 'quotas' || activeTab === 'analysis') {
       await refreshSub2API();
       return;
     }
