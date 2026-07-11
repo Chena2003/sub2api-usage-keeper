@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { fetchSub2ApiAccountQuotas, fetchSub2ApiEvents, fetchSub2ApiRankings, sub2apiEndpoint } from './sub2apiApi'
+import { fetchSub2ApiEvents, fetchSub2ApiRankings, sub2apiEndpoint } from './sub2apiApi'
 
 describe('sub2apiEndpoint', () => {
   afterEach(() => {
@@ -55,21 +55,6 @@ describe('Sub2API data fetchers', () => {
     await expect(fetchSub2ApiRankings('user', { since: '2026-07-10T00:00:00.000Z', until: '2026-07-11T00:00:00.000Z' })).resolves.toEqual([])
 
     expect(fetchMock).toHaveBeenCalledWith('/api/v1/sub2api/rankings?dimension=user&limit=20&since=2026-07-10T00%3A00%3A00.000Z&until=2026-07-11T00%3A00%3A00.000Z', {
-      credentials: 'include',
-    })
-  })
-
-  it('fetches account quotas with TimeRangeParams', async () => {
-    vi.stubGlobal('window', { __APP_BASE_PATH__: undefined })
-    const fetchMock = vi.fn().mockResolvedValue({
-      ok: true,
-      json: () => Promise.resolve({ accounts: [] }),
-    })
-    vi.stubGlobal('fetch', fetchMock)
-
-    await expect(fetchSub2ApiAccountQuotas({ hours: 336 })).resolves.toEqual([])
-
-    expect(fetchMock).toHaveBeenCalledWith('/api/v1/sub2api/account-quotas?hours=336', {
       credentials: 'include',
     })
   })

@@ -38,10 +38,6 @@ type Config struct {
 	TLSKeyFile string
 	// Sub2APIDatabaseURL 是 Sub2API PostgreSQL 数据库连接地址。
 	Sub2APIDatabaseURL string
-	// QuotaRefreshInterval 是刷新 Sub2API quota 数据的间隔。
-	QuotaRefreshInterval time.Duration
-	// PublicMode 控制是否启用公开访问模式。
-	PublicMode bool
 	// WorkDir 是应用工作目录，数据库、日志和备份默认从这里派生。
 	WorkDir string
 	// SQLitePath 是 SQLite 数据库文件路径。
@@ -54,8 +50,6 @@ type Config struct {
 	BackupInterval time.Duration
 	// BackupRetentionDays 是备份文件保留天数。
 	BackupRetentionDays int
-	// RequestTimeout 是访问外部服务的超时时间。
-	RequestTimeout time.Duration
 	// LogLevel 是应用日志级别。
 	LogLevel string
 	// LogFileEnabled 控制是否写入持久化日志文件。
@@ -88,24 +82,6 @@ func Load(options LoadOptions) (*Config, error) {
 		return nil, err
 	}
 	if err := applyProjectTimeZone(); err != nil {
-		return nil, err
-	}
-
-	quotaRefreshInterval, err := getDuration("QUOTA_REFRESH_INTERVAL", 5*time.Minute)
-	if err != nil {
-		return nil, err
-	}
-	if quotaRefreshInterval <= 0 {
-		return nil, fmt.Errorf("QUOTA_REFRESH_INTERVAL must be positive")
-	}
-
-	publicMode, err := getBool("PUBLIC_MODE", true)
-	if err != nil {
-		return nil, err
-	}
-
-	requestTimeout, err := getDuration("REQUEST_TIMEOUT", 30*time.Second)
-	if err != nil {
 		return nil, err
 	}
 
@@ -161,15 +137,12 @@ func Load(options LoadOptions) (*Config, error) {
 		TLSCertFile:          strings.TrimSpace(os.Getenv("TLS_CERT_FILE")),
 		TLSKeyFile:           strings.TrimSpace(os.Getenv("TLS_KEY_FILE")),
 		Sub2APIDatabaseURL:   strings.TrimSpace(os.Getenv("SUB2API_DATABASE_URL")),
-		QuotaRefreshInterval: quotaRefreshInterval,
-		PublicMode:           publicMode,
 		WorkDir:              workDir,
 		SQLitePath:           filepath.Join(workDir, workDirDatabaseName),
 		BackupEnabled:        backupEnabled,
 		BackupDir:            filepath.Join(workDir, workDirBackupsName),
 		BackupInterval:       backupInterval,
 		BackupRetentionDays:  backupRetentionDays,
-		RequestTimeout:       requestTimeout,
 		LogLevel:             getString("LOG_LEVEL", "info"),
 		LogFileEnabled:       logFileEnabled,
 		LogDir:               filepath.Join(workDir, workDirLogsName),

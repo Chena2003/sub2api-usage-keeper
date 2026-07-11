@@ -16,21 +16,25 @@ import (
 
 type fakeSub2APIDashboardProvider struct {
 	accountsSince     time.Time
+	accountsUntil     time.Time
 	overviewDays      int
 	hourlyHours       int
 	modelsSince       time.Time
+	modelsUntil       time.Time
 	modelsLimit       int
 	rankingsDimension string
 	rankingsSince     time.Time
+	rankingsUntil     time.Time
 	rankingsLimit     int
 	eventsPage        int
 	eventsLimit       int
 	eventsSince       time.Time
-	accountQuotasSince time.Time
+	eventsUntil       time.Time
 }
 
-func (f *fakeSub2APIDashboardProvider) Accounts(_ context.Context, since time.Time) ([]quota.Sub2APIAccountQuota, error) {
+func (f *fakeSub2APIDashboardProvider) Accounts(_ context.Context, since time.Time, until time.Time) ([]quota.Sub2APIAccountQuota, error) {
 	f.accountsSince = since
+	f.accountsUntil = until
 	return []quota.Sub2APIAccountQuota{
 		{
 			ID:          4,
@@ -69,8 +73,9 @@ func (f *fakeSub2APIDashboardProvider) Hourly(_ context.Context, hours int) ([]s
 	}, nil
 }
 
-func (f *fakeSub2APIDashboardProvider) Models(_ context.Context, since time.Time, limit int) ([]sub2api.ModelUsageRow, error) {
+func (f *fakeSub2APIDashboardProvider) Models(_ context.Context, since time.Time, until time.Time, limit int) ([]sub2api.ModelUsageRow, error) {
 	f.modelsSince = since
+	f.modelsUntil = until
 	f.modelsLimit = limit
 	return []sub2api.ModelUsageRow{
 		{
@@ -80,9 +85,10 @@ func (f *fakeSub2APIDashboardProvider) Models(_ context.Context, since time.Time
 	}, nil
 }
 
-func (f *fakeSub2APIDashboardProvider) Rankings(_ context.Context, dimension string, since time.Time, limit int) ([]quota.Sub2APIRankingRow, error) {
+func (f *fakeSub2APIDashboardProvider) Rankings(_ context.Context, dimension string, since time.Time, until time.Time, limit int) ([]quota.Sub2APIRankingRow, error) {
 	f.rankingsDimension = dimension
 	f.rankingsSince = since
+	f.rankingsUntil = until
 	f.rankingsLimit = limit
 	return []quota.Sub2APIRankingRow{
 		{
@@ -93,10 +99,11 @@ func (f *fakeSub2APIDashboardProvider) Rankings(_ context.Context, dimension str
 	}, nil
 }
 
-func (f *fakeSub2APIDashboardProvider) Events(_ context.Context, since time.Time, page int, limit int) (quota.Sub2APIEventsResponse, error) {
+func (f *fakeSub2APIDashboardProvider) Events(_ context.Context, since time.Time, until time.Time, page int, limit int) (quota.Sub2APIEventsResponse, error) {
 	f.eventsPage = page
 	f.eventsLimit = limit
 	f.eventsSince = since
+	f.eventsUntil = until
 	return quota.Sub2APIEventsResponse{
 		Events: []quota.Sub2APIEvent{
 			{
@@ -111,19 +118,6 @@ func (f *fakeSub2APIDashboardProvider) Events(_ context.Context, since time.Time
 	}, nil
 }
 
-func (f *fakeSub2APIDashboardProvider) AccountQuotas(_ context.Context, since time.Time) ([]quota.Sub2APIAccountQuota, error) {
-	f.accountQuotasSince = since
-	return []quota.Sub2APIAccountQuota{
-		{
-			ID:          4,
-			Provider:    "openai",
-			AccountType: "oauth",
-			DisplayName: "openai oauth #4",
-			Status:      "active",
-		},
-	}, nil
-}
-
 func (f *fakeSub2APIDashboardProvider) ServiceHealth(_ context.Context, _ int) (quota.Sub2APIServiceHealth, error) {
 	return quota.Sub2APIServiceHealth{
 		Rows:         7,
@@ -131,7 +125,7 @@ func (f *fakeSub2APIDashboardProvider) ServiceHealth(_ context.Context, _ int) (
 	}, nil
 }
 
-func (f *fakeSub2APIDashboardProvider) RankingTrend(_ context.Context, dimension string, since time.Time, limit int) ([]quota.Sub2APIRankingTrendPoint, string, error) {
+func (f *fakeSub2APIDashboardProvider) RankingTrend(_ context.Context, dimension string, since time.Time, until time.Time, limit int) ([]quota.Sub2APIRankingTrendPoint, string, error) {
 	return []quota.Sub2APIRankingTrendPoint{
 		{Bucket: "2026-06-28", Name: "user@example.com", Tokens: 1000},
 	}, "day", nil
@@ -271,26 +265,6 @@ func TestSub2APIEventsRoutePassesPageAndLimit(t *testing.T) {
 		t.Fatalf("expected limit 50, got %d", provider.eventsLimit)
 	}
 	if body := resp.Body.String(); !strings.Contains(body, `"events":[`) || !strings.Contains(body, `"page":2`) || !strings.Contains(body, `"limit":50`) {
-		t.Fatalf("unexpected response body: %s", body)
-	}
-}
-
-func TestSub2APIAccountQuotasRoute(t *testing.T) {
-	provider := &fakeSub2APIDashboardProvider{}
-	router := gin.New()
-	registerSub2APIDashboardRoutes(router.Group("/api/v1"), provider)
-
-	req := httptest.NewRequest(http.MethodGet, "/api/v1/sub2api/account-quotas?days=7", nil)
-	resp := httptest.NewRecorder()
-	router.ServeHTTP(resp, req)
-
-	if resp.Code != http.StatusOK {
-		t.Fatalf("expected status 200, got %d", resp.Code)
-	}
-	if dur := time.Since(provider.accountQuotasSince); dur < 6*24*time.Hour-time.Minute || dur > 8*24*time.Hour+time.Minute {
-		t.Fatalf("expected account quotas since ~7d, got %v (dur %v)", provider.accountQuotasSince, dur)
-	}
-	if body := resp.Body.String(); !strings.Contains(body, `"accounts":[`) || !strings.Contains(body, `"displayName":"openai oauth #4"`) {
 		t.Fatalf("unexpected response body: %s", body)
 	}
 }

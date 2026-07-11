@@ -21,23 +21,29 @@ type fakeSub2APIReader struct {
 	lastDailyDays        int
 	lastHourlyHours      int
 	lastAccountSince     time.Time
+	lastAccountUntil     time.Time
 	lastModelSince       time.Time
+	lastModelUntil       time.Time
 	lastModelLimit       int
 	lastRankingDimension string
 	lastRankingSince     time.Time
+	lastRankingUntil     time.Time
 	lastRankingLimit     int
 	lastEventsPage       int
 	lastEventsLimit      int
 	lastEventsSince      time.Time
+	lastEventsUntil      time.Time
 	lastRankingTrendSince time.Time
+	lastRankingTrendUntil time.Time
 }
 
 func (f *fakeSub2APIReader) ListAccounts(context.Context) ([]sub2api.AccountRow, error) {
 	return f.accounts, nil
 }
 
-func (f *fakeSub2APIReader) GetAccountUsage(_ context.Context, since time.Time) ([]sub2api.AccountUsageRow, error) {
+func (f *fakeSub2APIReader) GetAccountUsage(_ context.Context, since time.Time, until time.Time) ([]sub2api.AccountUsageRow, error) {
 	f.lastAccountSince = since
+	f.lastAccountUntil = until
 	return f.accountUsage, nil
 }
 
@@ -51,23 +57,26 @@ func (f *fakeSub2APIReader) GetHourlyOverview(_ context.Context, hours int) ([]s
 	return f.hourlyOverview, nil
 }
 
-func (f *fakeSub2APIReader) GetModelUsage(_ context.Context, since time.Time, limit int) ([]sub2api.ModelUsageRow, error) {
+func (f *fakeSub2APIReader) GetModelUsage(_ context.Context, since time.Time, until time.Time, limit int) ([]sub2api.ModelUsageRow, error) {
 	f.lastModelSince = since
+	f.lastModelUntil = until
 	f.lastModelLimit = limit
 	return f.modelUsage, nil
 }
 
-func (f *fakeSub2APIReader) GetRankings(_ context.Context, dimension string, since time.Time, limit int) ([]sub2api.RankingRow, error) {
+func (f *fakeSub2APIReader) GetRankings(_ context.Context, dimension string, since time.Time, until time.Time, limit int) ([]sub2api.RankingRow, error) {
 	f.lastRankingDimension = dimension
 	f.lastRankingSince = since
+	f.lastRankingUntil = until
 	f.lastRankingLimit = limit
 	return f.rankings, nil
 }
 
-func (f *fakeSub2APIReader) GetEvents(_ context.Context, since time.Time, page int, limit int) ([]sub2api.UsageEventRow, int64, error) {
+func (f *fakeSub2APIReader) GetEvents(_ context.Context, since time.Time, until time.Time, page int, limit int) ([]sub2api.UsageEventRow, int64, error) {
 	f.lastEventsPage = page
 	f.lastEventsLimit = limit
 	f.lastEventsSince = since
+	f.lastEventsUntil = until
 	return f.events, f.eventsTotal, nil
 }
 
@@ -79,8 +88,9 @@ func (f *fakeSub2APIReader) GetHealthBlocks(_ context.Context, _ int) ([]sub2api
 	return nil, nil
 }
 
-func (f *fakeSub2APIReader) GetRankingTrend(_ context.Context, _ string, since time.Time, _ string, _ int) ([]sub2api.RankingTrendRow, error) {
+func (f *fakeSub2APIReader) GetRankingTrend(_ context.Context, _ string, since time.Time, until time.Time, _ string, _ int) ([]sub2api.RankingTrendRow, error) {
 	f.lastRankingTrendSince = since
+	f.lastRankingTrendUntil = until
 	return nil, nil
 }
 
@@ -101,7 +111,7 @@ func TestSub2APIDashboardAccountsMergeUsage(t *testing.T) {
 		}},
 	}
 
-	accounts, err := NewSub2APIDashboardService(reader).Accounts(context.Background(), time.Time{})
+	accounts, err := NewSub2APIDashboardService(reader).Accounts(context.Background(), time.Time{}, time.Time{})
 	if err != nil {
 		t.Fatalf("Accounts returned error: %v", err)
 	}
@@ -202,7 +212,7 @@ func TestSub2APIDashboardModelsDefaultsToSevenDays(t *testing.T) {
 	service := NewSub2APIDashboardService(reader)
 	service.now = func() time.Time { return fixedNow }
 
-	_, err := service.Models(context.Background(), time.Time{}, 20)
+	_, err := service.Models(context.Background(), time.Time{}, time.Time{}, 20)
 	if err != nil {
 		t.Fatalf("Models returned error: %v", err)
 	}
@@ -220,7 +230,7 @@ func TestSub2APIDashboardAccountQuotasDefaultsToSevenDays(t *testing.T) {
 	service := NewSub2APIDashboardService(reader)
 	service.now = func() time.Time { return fixedNow }
 
-	_, err := service.AccountQuotas(context.Background(), time.Time{})
+	_, err := service.Accounts(context.Background(), time.Time{}, time.Time{})
 	if err != nil {
 		t.Fatalf("AccountQuotas returned error: %v", err)
 	}
@@ -244,7 +254,7 @@ func TestSub2APIDashboardRankingsNormalizesDefaults(t *testing.T) {
 	service := NewSub2APIDashboardService(reader)
 	service.now = func() time.Time { return fixedNow }
 
-	rankings, err := service.Rankings(context.Background(), "", time.Time{}, 0)
+	rankings, err := service.Rankings(context.Background(), "", time.Time{}, time.Time{}, 0)
 	if err != nil {
 		t.Fatalf("Rankings returned error: %v", err)
 	}
@@ -275,7 +285,7 @@ func TestSub2APIDashboardEventsNormalizesDefaults(t *testing.T) {
 		eventsTotal: 5,
 	}
 
-	events, err := NewSub2APIDashboardService(reader).Events(context.Background(), time.Time{}, 0, 0)
+	events, err := NewSub2APIDashboardService(reader).Events(context.Background(), time.Time{}, time.Time{}, 0, 0)
 	if err != nil {
 		t.Fatalf("Events returned error: %v", err)
 	}
@@ -296,7 +306,7 @@ func TestSub2APIDashboardClampsMaximums(t *testing.T) {
 	service := NewSub2APIDashboardService(reader)
 	service.now = func() time.Time { return fixedNow }
 
-	if _, err := service.AccountQuotas(context.Background(), fixedNow.AddDate(0, 0, -9999)); err != nil {
+	if _, err := service.Accounts(context.Background(), fixedNow.AddDate(0, 0, -9999), time.Time{}); err != nil {
 		t.Fatalf("AccountQuotas returned error: %v", err)
 	}
 	if !reader.lastAccountSince.Equal(fixedNow.AddDate(0, 0, -90)) {
@@ -317,7 +327,7 @@ func TestSub2APIDashboardClampsMaximums(t *testing.T) {
 		t.Fatalf("expected hourly overview hours 2160, got %d", reader.lastHourlyHours)
 	}
 
-	if _, err := service.Models(context.Background(), fixedNow.AddDate(0, 0, -9999), 9999); err != nil {
+	if _, err := service.Models(context.Background(), fixedNow.AddDate(0, 0, -9999), time.Time{}, 9999); err != nil {
 		t.Fatalf("Models returned error: %v", err)
 	}
 	if !reader.lastModelSince.Equal(fixedNow.AddDate(0, 0, -90)) {
@@ -327,7 +337,7 @@ func TestSub2APIDashboardClampsMaximums(t *testing.T) {
 		t.Fatalf("expected model limit 100, got %d", reader.lastModelLimit)
 	}
 
-	if _, err := service.Rankings(context.Background(), "user", fixedNow.AddDate(0, 0, -9999), 9999); err != nil {
+	if _, err := service.Rankings(context.Background(), "user", fixedNow.AddDate(0, 0, -9999), time.Time{}, 9999); err != nil {
 		t.Fatalf("Rankings returned error: %v", err)
 	}
 	if !reader.lastRankingSince.Equal(fixedNow.AddDate(0, 0, -90)) {
@@ -337,7 +347,7 @@ func TestSub2APIDashboardClampsMaximums(t *testing.T) {
 		t.Fatalf("expected ranking limit 100, got %d", reader.lastRankingLimit)
 	}
 
-	if _, err := service.Events(context.Background(), fixedNow.AddDate(0, 0, -9999), 9999, 9999); err != nil {
+	if _, err := service.Events(context.Background(), fixedNow.AddDate(0, 0, -9999), time.Time{}, 9999, 9999); err != nil {
 		t.Fatalf("Events returned error: %v", err)
 	}
 	if !reader.lastEventsSince.Equal(fixedNow.AddDate(0, 0, -90)) {

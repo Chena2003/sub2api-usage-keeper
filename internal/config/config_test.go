@@ -105,12 +105,6 @@ func TestLoadFromEnvAppliesDefaults(t *testing.T) {
 	if cfg.Sub2APIDatabaseURL != testSub2APIDatabaseURL {
 		t.Fatalf("expected sub2api database URL %q, got %q", testSub2APIDatabaseURL, cfg.Sub2APIDatabaseURL)
 	}
-	if cfg.QuotaRefreshInterval != 5*time.Minute {
-		t.Fatalf("expected default quota refresh interval 5m, got %s", cfg.QuotaRefreshInterval)
-	}
-	if !cfg.PublicMode {
-		t.Fatal("expected public mode to be enabled by default")
-	}
 	if !cfg.BackupEnabled {
 		t.Fatal("expected backup to be enabled by default")
 	}
@@ -125,9 +119,6 @@ func TestLoadFromEnvAppliesDefaults(t *testing.T) {
 	}
 	if cfg.BackupRetentionDays != 7 {
 		t.Fatalf("expected default backup retention 7 days, got %d", cfg.BackupRetentionDays)
-	}
-	if cfg.RequestTimeout != 30*time.Second {
-		t.Fatalf("expected default request timeout 30s, got %s", cfg.RequestTimeout)
 	}
 	if cfg.SQLitePath != filepath.Join("data", "app.db") {
 		t.Fatalf("expected default sqlite path data/app.db, got %s", cfg.SQLitePath)
@@ -343,12 +334,6 @@ func TestLoadSub2APISettings(t *testing.T) {
 	if cfg.Sub2APIDatabaseURL != testSub2APIDatabaseURL {
 		t.Fatalf("expected Sub2APIDatabaseURL %q, got %q", testSub2APIDatabaseURL, cfg.Sub2APIDatabaseURL)
 	}
-	if cfg.QuotaRefreshInterval != 10*time.Minute {
-		t.Fatalf("expected quota refresh interval 10m, got %s", cfg.QuotaRefreshInterval)
-	}
-	if !cfg.PublicMode {
-		t.Fatal("expected public mode to be true")
-	}
 }
 
 func TestLoadFromEnvIgnoresRemovedLegacySyncEnvVars(t *testing.T) {
@@ -382,24 +367,11 @@ func TestLoadFromEnvParsesOverrides(t *testing.T) {
 		t.Fatalf("LoadFromEnv returned error: %v", err)
 	}
 
-	if cfg.AppPort != "9090" || cfg.AppBasePath != "/sub2api" || cfg.WorkDir != "/tmp/work" || cfg.SQLitePath != filepath.Join("/tmp/work", "app.db") || cfg.BackupEnabled || cfg.BackupDir != filepath.Join("/tmp/work", "backups") || cfg.BackupInterval != 2*time.Hour || cfg.BackupRetentionDays != 7 || cfg.RequestTimeout != 15*time.Second || cfg.LogLevel != "debug" || cfg.LogFileEnabled || cfg.LogDir != filepath.Join("/tmp/work", "logs") || cfg.LogRetentionDays != 14 || cfg.QuotaRefreshInterval != 30*time.Minute || cfg.PublicMode {
+	if cfg.AppPort != "9090" || cfg.AppBasePath != "/sub2api" || cfg.WorkDir != "/tmp/work" || cfg.SQLitePath != filepath.Join("/tmp/work", "app.db") || cfg.BackupEnabled || cfg.BackupDir != filepath.Join("/tmp/work", "backups") || cfg.BackupInterval != 2*time.Hour || cfg.BackupRetentionDays != 7 || cfg.LogLevel != "debug" || cfg.LogFileEnabled || cfg.LogDir != filepath.Join("/tmp/work", "logs") || cfg.LogRetentionDays != 14 {
 		t.Fatalf("unexpected config override result: %+v", cfg)
 	}
 }
 
-func TestLoadFromEnvRejectsNonPositiveQuotaRefreshInterval(t *testing.T) {
-	for _, value := range []string{"0s", "-1m"} {
-		t.Run(value, func(t *testing.T) {
-			setRequiredSub2APIEnv(t)
-			t.Setenv("QUOTA_REFRESH_INTERVAL", value)
-
-			_, err := LoadFromEnv()
-			if err == nil || err.Error() != "QUOTA_REFRESH_INTERVAL must be positive" {
-				t.Fatalf("expected QUOTA_REFRESH_INTERVAL validation error, got %v", err)
-			}
-		})
-	}
-}
 
 func TestLoadFromEnvRejectsNonPositiveBackupInterval(t *testing.T) {
 	for _, value := range []string{"0s", "-1h"} {

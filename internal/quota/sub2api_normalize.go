@@ -98,7 +98,7 @@ func sub2APIPlanType(credentials json.RawMessage) string {
 func publicCredentialKeys(credentials json.RawMessage) []string {
 	fields := credentialFields(credentials)
 	if len(fields) == 0 {
-		return nil
+		return []string{}
 	}
 
 	keys := make([]string, 0, len(fields))

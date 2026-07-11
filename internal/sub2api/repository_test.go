@@ -31,14 +31,14 @@ func TestAccountCredentialKeysNilCases(t *testing.T) {
 		credentials json.RawMessage
 	}{
 		{
-			name: "empty credentials returns nil",
+			name: "empty credentials returns empty slice",
 		},
 		{
-			name:        "invalid JSON returns nil",
+			name:        "invalid JSON returns empty slice",
 			credentials: json.RawMessage(`{invalid-json`),
 		},
 		{
-			name:        "empty JSON object returns nil",
+			name:        "empty JSON object returns empty slice",
 			credentials: json.RawMessage(`{}`),
 		},
 	}
@@ -47,8 +47,8 @@ func TestAccountCredentialKeysNilCases(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			row := AccountRow{Credentials: tt.credentials}
 
-			if got := row.CredentialKeys(); got != nil {
-				t.Fatalf("CredentialKeys() = %v, want nil", got)
+			if got := row.CredentialKeys(); len(got) != 0 {
+				t.Fatalf("CredentialKeys() = %v, want empty slice", got)
 			}
 		})
 	}
@@ -204,7 +204,7 @@ func TestRepositoryRankingsAndEventsUseSub2APIUsageLogColumns(t *testing.T) {
 
 	repository := NewRepository(db)
 
-	rankings, err := repository.GetRankings(context.Background(), "user", time.Now().Add(-24*time.Hour), 5)
+	rankings, err := repository.GetRankings(context.Background(), "user", time.Now().Add(-24*time.Hour), time.Time{}, 5)
 	if err != nil {
 		t.Fatalf("GetRankings() error = %v", err)
 	}
@@ -212,7 +212,7 @@ func TestRepositoryRankingsAndEventsUseSub2APIUsageLogColumns(t *testing.T) {
 		t.Fatalf("GetRankings() = %+v, want one user_id ranking", rankings)
 	}
 
-	accountRankings, err := repository.GetRankings(context.Background(), "account", time.Now().Add(-24*time.Hour), 5)
+	accountRankings, err := repository.GetRankings(context.Background(), "account", time.Now().Add(-24*time.Hour), time.Time{}, 5)
 	if err != nil {
 		t.Fatalf("GetRankings(account) error = %v", err)
 	}
@@ -220,7 +220,7 @@ func TestRepositoryRankingsAndEventsUseSub2APIUsageLogColumns(t *testing.T) {
 		t.Fatalf("GetRankings(account) = %+v, want account name 'test-account-3'", accountRankings)
 	}
 
-	events, total, err := repository.GetEvents(context.Background(), time.Now().Add(-24*time.Hour), 1, 5)
+	events, total, err := repository.GetEvents(context.Background(), time.Now().Add(-24*time.Hour), time.Time{}, 1, 5)
 	if err != nil {
 		t.Fatalf("GetEvents() error = %v", err)
 	}

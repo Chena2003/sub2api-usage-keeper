@@ -25,8 +25,6 @@ import { IconRefreshCw } from '@/components/ui/icons';
 import { useHeaderRefresh } from '@/hooks/useHeaderRefresh';
 import { useThemeStore } from '@/stores';
 import {
-  ApiKeySettingsCard,
-  PriceSettingsCard,
   useUsageData,
   usePricingData
 } from '@/components/usage';
@@ -386,13 +384,6 @@ export const getOverviewHourWindowHours = ({ timeRange, filterWindow }: { timeRa
   if (timeRange !== 'custom') return Math.min(HOUR_WINDOW_BY_TIME_RANGE[timeRange], 24);
   if (filterWindow.windowMinutes === undefined) return 24;
   return Math.min(Math.max(Math.ceil(filterWindow.windowMinutes / 60), 1), 24);
-};
-
-/** Hours for the sub2api dashboard store (timeseries + health), not capped at 24. */
-export const getSub2ApiDashboardHours = (timeRange: UsageTimeRange): number => {
-  if (isTodayTimeRange(timeRange) || isYesterdayTimeRange(timeRange)) return 24;
-  if (timeRange !== 'custom') return HOUR_WINDOW_BY_TIME_RANGE[timeRange] ?? 24;
-  return 24;
 };
 
 /** Build a TimeRangeParams object for the sub2api dashboard store, with midnight-aligned
@@ -1022,7 +1013,7 @@ export function UsagePage({ onAuthRequired }: { onAuthRequired?: () => void }) {
               <RequestEventsPanel events={sub2apiEvents} loading={sub2apiEventsLoading} error={sub2apiError} onRetry={refreshSub2API} onPageChange={handleEventsPageChange} />
             )}
             {activeTab === 'ranking' && <>
-              <RankingTrendChart data={sub2apiRankingTrend} dimension={rankingDimension} loading={sub2apiLoading} />
+              <RankingTrendChart data={sub2apiRankingTrend} loading={sub2apiLoading} />
               <TokenRankingCard rankings={sub2apiRankings} dimension={rankingDimension} onDimensionChange={loadRankings} loading={sub2apiLoading} error={sub2apiError} onRetry={refreshSub2API} />
             </>}
             {activeTab === 'quotas' && <AccountQuotasCard accounts={sub2apiQuotaAccounts} loading={sub2apiLoading} error={sub2apiError} onRetry={refreshSub2API} />}

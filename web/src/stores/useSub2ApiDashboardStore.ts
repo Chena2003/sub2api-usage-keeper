@@ -44,6 +44,7 @@ type Sub2ApiDashboardState = {
   _refreshVersion: number
   _healthVersion: number
   _rankingVersion: number
+  _eventsVersion: number
   refresh: (opts?: RefreshOpts) => Promise<void>
   loadHealth: (tr?: TimeRangeParams) => Promise<void>
   loadRankings: (dimension?: Sub2ApiRankingDimension) => Promise<void>
@@ -77,6 +78,7 @@ export const useSub2ApiDashboardStore = create<Sub2ApiDashboardState>((set, get)
   _refreshVersion: 0,
   _healthVersion: 0,
   _rankingVersion: 0,
+  _eventsVersion: 0,
   refresh: async (opts) => {
     const { rankingDimension, _refreshVersion } = get()
     const version = _refreshVersion + 1
@@ -94,7 +96,7 @@ export const useSub2ApiDashboardStore = create<Sub2ApiDashboardState>((set, get)
       currentUntil: opts?.until,
     })
     try {
-      const [accounts, overview, points, models, rankings, rankingTrend] = await Promise.all([
+      const [accountsR, overviewR, pointsR, modelsR, rankingsR, rankingTrendR] = await Promise.allSettled([
         fetchSub2ApiAccounts(tr),
         fetchSub2ApiOverview(tr),
         fetchSub2ApiTimeseries(tr),
@@ -103,6 +105,18 @@ export const useSub2ApiDashboardStore = create<Sub2ApiDashboardState>((set, get)
         fetchSub2ApiRankingTrend(rankingDimension, tr, 12),
       ])
       if (get()._refreshVersion !== version) return
+
+      const accounts = accountsR.status === 'fulfilled' ? accountsR.value : []
+      const overview = overviewR.status === 'fulfilled' ? overviewR.value : null
+      const points = pointsR.status === 'fulfilled' ? pointsR.value : []
+      const models = modelsR.status === 'fulfilled' ? modelsR.value : []
+      const rankings = rankingsR.status === 'fulfilled' ? rankingsR.value : []
+      const rankingTrend = rankingTrendR.status === 'fulfilled' ? rankingTrendR.value : null
+
+      const firstError = [accountsR, overviewR, pointsR, modelsR, rankingsR, rankingTrendR].find(
+        (r) => r.status === 'rejected',
+      ) as PromiseRejectedResult | undefined
+
       set({
         accounts,
         quotaAccounts: accounts,
@@ -113,11 +127,18 @@ export const useSub2ApiDashboardStore = create<Sub2ApiDashboardState>((set, get)
         rankingTrend,
         rankingDimension,
         loading: false,
+        error: firstError
+          ? firstError.reason instanceof Error
+            ? firstError.reason.message
+            : 'Unknown error'
+          : null,
       })
-      void get().loadEvents({ page: 1, limit: 100, ...tr })
-    } catch (error) {
+      if (!firstError) {
+        void get().loadEvents({ page: 1, limit: 100, ...tr })
+      }
+    } catch {
       if (get()._refreshVersion !== version) return
-      set({ error: error instanceof Error ? error.message : 'Unknown error', loading: false })
+      set({ loading: false })
     }
   },
   loadHealth: async (tr?: TimeRangeParams) => {
@@ -150,7 +171,8 @@ export const useSub2ApiDashboardStore = create<Sub2ApiDashboardState>((set, get)
     }
   },
   loadEvents: async (params = {}) => {
-    set({ eventsLoading: true })
+    const version = get()._eventsVersion + 1
+    set({ eventsLoading: true, _eventsVersion: version })
     try {
       const { page, limit, ...tr } = params
       const timeRange: TimeRangeParams = {}
@@ -167,12 +189,16 @@ export const useSub2ApiDashboardStore = create<Sub2ApiDashboardState>((set, get)
         }
       }
       const events = await fetchSub2ApiEvents({ page, limit, ...timeRange })
+      if (get()._eventsVersion !== version) return
       set({ events })
     } catch (error) {
+      if (get()._eventsVersion !== version) return
       console.error('loadEvents failed:', error)
       set({ events: { events: [], total: 0, page: 1, limit: 100 } })
     } finally {
-      set({ eventsLoading: false })
+      if (get()._eventsVersion === version) {
+        set({ eventsLoading: false })
+      }
     }
   },
 }))

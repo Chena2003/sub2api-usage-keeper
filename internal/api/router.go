@@ -42,6 +42,10 @@ func NewRouter(
 	_ = router.SetTrustedProxies(nil)
 	router.Use(gin.Recovery())
 
+	// No CORS middleware: this service is designed for same-origin deployment
+	// (static frontend served from the same Gin router). If cross-origin access
+	// is needed, add a CORS middleware here and restrict allowed origins.
+
 	appGroup := router.Group(basePath)
 	registerHealthRoutes(appGroup)
 

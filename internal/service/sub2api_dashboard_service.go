@@ -11,14 +11,14 @@ import (
 
 type Sub2APIReader interface {
 	ListAccounts(context.Context) ([]sub2api.AccountRow, error)
-	GetAccountUsage(context.Context, time.Time) ([]sub2api.AccountUsageRow, error)
+	GetAccountUsage(context.Context, time.Time, time.Time) ([]sub2api.AccountUsageRow, error)
 	GetFiveHourAccountUsage(context.Context) ([]sub2api.AccountUsageRow, error)
 	GetDailyOverview(context.Context, int) ([]sub2api.UsageOverviewRow, error)
 	GetHourlyOverview(context.Context, int) ([]sub2api.UsageOverviewRow, error)
-	GetModelUsage(context.Context, time.Time, int) ([]sub2api.ModelUsageRow, error)
-	GetEvents(context.Context, time.Time, int, int) ([]sub2api.UsageEventRow, int64, error)
-	GetRankings(context.Context, string, time.Time, int) ([]sub2api.RankingRow, error)
-	GetRankingTrend(context.Context, string, time.Time, string, int) ([]sub2api.RankingTrendRow, error)
+	GetModelUsage(context.Context, time.Time, time.Time, int) ([]sub2api.ModelUsageRow, error)
+	GetEvents(context.Context, time.Time, time.Time, int, int) ([]sub2api.UsageEventRow, int64, error)
+	GetRankings(context.Context, string, time.Time, time.Time, int) ([]sub2api.RankingRow, error)
+	GetRankingTrend(context.Context, string, time.Time, time.Time, string, int) ([]sub2api.RankingTrendRow, error)
 	GetHealthBlocks(context.Context, int) ([]sub2api.HealthBlockRow, error)
 }
 
@@ -34,7 +34,7 @@ func NewSub2APIDashboardService(reader Sub2APIReader) *Sub2APIDashboardService {
 	}
 }
 
-func (s *Sub2APIDashboardService) Accounts(ctx context.Context, since time.Time) ([]quota.Sub2APIAccountQuota, error) {
+func (s *Sub2APIDashboardService) Accounts(ctx context.Context, since time.Time, until time.Time) ([]quota.Sub2APIAccountQuota, error) {
 	if err := s.validate(); err != nil {
 		return nil, err
 	}
@@ -43,7 +43,8 @@ func (s *Sub2APIDashboardService) Accounts(ctx context.Context, since time.Time)
 	if err != nil {
 		return nil, err
 	}
-	usageRows, err := s.reader.GetAccountUsage(ctx, normalizeSince(s.currentTime(), since))
+	normalizedSince, normalizedUntil := normalizeTimeRange(s.currentTime(), since, until)
+	usageRows, err := s.reader.GetAccountUsage(ctx, normalizedSince, normalizedUntil)
 	if err != nil {
 		return nil, err
 	}
@@ -74,10 +75,6 @@ func (s *Sub2APIDashboardService) Accounts(ctx context.Context, since time.Time)
 		result = append(result, quota.NormalizeSub2APIAccount(account, usage, fiveHourUsage))
 	}
 	return result, nil
-}
-
-func (s *Sub2APIDashboardService) AccountQuotas(ctx context.Context, since time.Time) ([]quota.Sub2APIAccountQuota, error) {
-	return s.Accounts(ctx, since)
 }
 
 func (s *Sub2APIDashboardService) Overview(ctx context.Context, days int) (quota.Sub2APIOverview, error) {
@@ -159,34 +156,36 @@ func (s *Sub2APIDashboardService) Hourly(ctx context.Context, hours int) ([]sub2
 	return s.reader.GetHourlyOverview(ctx, normalizeHours(hours))
 }
 
-func (s *Sub2APIDashboardService) Models(ctx context.Context, since time.Time, limit int) ([]sub2api.ModelUsageRow, error) {
+func (s *Sub2APIDashboardService) Models(ctx context.Context, since time.Time, until time.Time, limit int) ([]sub2api.ModelUsageRow, error) {
 	if err := s.validate(); err != nil {
 		return nil, err
 	}
-	return s.reader.GetModelUsage(ctx, normalizeSince(s.currentTime(), since), normalizeLimit(limit, 20))
+	normalizedSince, normalizedUntil := normalizeTimeRange(s.currentTime(), since, until)
+	return s.reader.GetModelUsage(ctx, normalizedSince, normalizedUntil, normalizeLimit(limit, 20))
 }
 
-func (s *Sub2APIDashboardService) Rankings(ctx context.Context, dimension string, since time.Time, limit int) ([]quota.Sub2APIRankingRow, error) {
+func (s *Sub2APIDashboardService) Rankings(ctx context.Context, dimension string, since time.Time, until time.Time, limit int) ([]quota.Sub2APIRankingRow, error) {
 	if err := s.validate(); err != nil {
 		return nil, err
 	}
 	dimension = normalizeSub2APIRankingDimension(dimension)
 	limit = normalizeLimit(limit, 20)
-	rows, err := s.reader.GetRankings(ctx, dimension, normalizeSince(s.currentTime(), since), limit)
+	normalizedSince, normalizedUntil := normalizeTimeRange(s.currentTime(), since, until)
+	rows, err := s.reader.GetRankings(ctx, dimension, normalizedSince, normalizedUntil, limit)
 	if err != nil {
 		return nil, err
 	}
 	return quota.NormalizeSub2APIRankings(dimension, rows), nil
 }
 
-func (s *Sub2APIDashboardService) RankingTrend(ctx context.Context, dimension string, since time.Time, limit int) ([]quota.Sub2APIRankingTrendPoint, string, error) {
+func (s *Sub2APIDashboardService) RankingTrend(ctx context.Context, dimension string, since time.Time, until time.Time, limit int) ([]quota.Sub2APIRankingTrendPoint, string, error) {
 	if err := s.validate(); err != nil {
 		return nil, "", err
 	}
 	dimension = normalizeSub2APIRankingDimension(dimension)
 	limit = normalizeLimit(limit, 12)
 
-	normalizedSince := normalizeSince(s.currentTime(), since)
+	normalizedSince, normalizedUntil := normalizeTimeRange(s.currentTime(), since, until)
 	hours := int(s.currentTime().Sub(normalizedSince).Hours())
 
 	granularity := "YYYY-MM-DD"
@@ -196,20 +195,21 @@ func (s *Sub2APIDashboardService) RankingTrend(ctx context.Context, dimension st
 		granularityLabel = "hour"
 	}
 
-	rows, err := s.reader.GetRankingTrend(ctx, dimension, normalizedSince, granularity, limit)
+	rows, err := s.reader.GetRankingTrend(ctx, dimension, normalizedSince, normalizedUntil, granularity, limit)
 	if err != nil {
 		return nil, "", err
 	}
 	return quota.NormalizeSub2APIRankingTrend(dimension, rows), granularityLabel, nil
 }
 
-func (s *Sub2APIDashboardService) Events(ctx context.Context, since time.Time, page int, limit int) (quota.Sub2APIEventsResponse, error) {
+func (s *Sub2APIDashboardService) Events(ctx context.Context, since time.Time, until time.Time, page int, limit int) (quota.Sub2APIEventsResponse, error) {
 	if err := s.validate(); err != nil {
 		return quota.Sub2APIEventsResponse{}, err
 	}
 	page = normalizePage(page)
 	limit = normalizeLimit(limit, 100)
-	rows, total, err := s.reader.GetEvents(ctx, normalizeSince(s.currentTime(), since), page, limit)
+	normalizedSince, normalizedUntil := normalizeTimeRange(s.currentTime(), since, until)
+	rows, total, err := s.reader.GetEvents(ctx, normalizedSince, normalizedUntil, page, limit)
 	if err != nil {
 		return quota.Sub2APIEventsResponse{}, err
 	}
@@ -268,6 +268,10 @@ func normalizeLimit(limit int, defaultValue int) int {
 
 // normalizeSince clamps a since timestamp to the allowed dashboard range.
 // A zero since defaults to 7 days ago; the maximum lookback is 90 days.
+// A since slightly in the future (within 1 hour) is tolerated to account for
+// timezone differences between client and server (e.g. "today" at local midnight
+// may be slightly ahead of server now). Anything further in the future falls
+// back to the 7-day default.
 func normalizeSince(now time.Time, since time.Time) time.Time {
 	if since.IsZero() || since.After(now) {
 		return now.AddDate(0, 0, -7)
@@ -277,6 +281,24 @@ func normalizeSince(now time.Time, since time.Time) time.Time {
 		return maxSince
 	}
 	return since
+}
+
+// normalizeTimeRange clamps both since and until timestamps. until is returned
+// as-is when non-zero and valid; a zero until means "no upper bound".
+func normalizeTimeRange(now time.Time, since time.Time, until time.Time) (time.Time, time.Time) {
+	// Allow up to 1 hour of timezone skew before falling back to default.
+	if since.IsZero() || since.After(now.Add(time.Hour)) {
+		since = now.AddDate(0, 0, -7)
+	}
+	maxSince := now.AddDate(0, 0, -sub2api.MaxDashboardDays)
+	if since.Before(maxSince) {
+		since = maxSince
+	}
+	// Clamp until to not be before since; leave zero as "no upper bound".
+	if !until.IsZero() && until.Before(since) {
+		until = time.Time{}
+	}
+	return since, until
 }
 
 func normalizeSub2APIRankingDimension(dimension string) string {

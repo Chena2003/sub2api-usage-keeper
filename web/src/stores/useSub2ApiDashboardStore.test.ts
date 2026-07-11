@@ -158,6 +158,7 @@ function resetStore() {
     _refreshVersion: 0,
     _healthVersion: 0,
     _rankingVersion: 0,
+    _eventsVersion: 0,
   })
 }
 

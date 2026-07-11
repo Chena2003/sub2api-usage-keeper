@@ -79,13 +79,6 @@ export async function fetchSub2ApiRankings(
   return body.rankings ?? []
 }
 
-export async function fetchSub2ApiAccountQuotas(tr: TimeRangeParams = {}): Promise<Sub2ApiAccount[]> {
-  const params = new URLSearchParams()
-  appendTimeRangeParams(params, tr)
-  const body = await getJson<AccountsResponse>(`/account-quotas?${params.toString()}`)
-  return body.accounts ?? []
-}
-
 export function fetchSub2ApiEvents({
   page = 1,
   limit = 100,

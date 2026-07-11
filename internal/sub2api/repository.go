@@ -131,6 +131,9 @@ func (r *Repository) ListAccounts(ctx context.Context) ([]AccountRow, error) {
 	if err != nil {
 		return nil, fmt.Errorf("list sub2api accounts: %w", err)
 	}
+	if rows == nil {
+		rows = []AccountRow{}
+	}
 	return rows, nil
 }
 
@@ -162,6 +165,9 @@ func (r *Repository) GetDailyOverview(ctx context.Context, days int) ([]UsageOve
 	`, days).Scan(&rows).Error
 	if err != nil {
 		return nil, fmt.Errorf("get sub2api daily overview: %w", err)
+	}
+	if rows == nil {
+		rows = []UsageOverviewRow{}
 	}
 	return rows, nil
 }
@@ -195,10 +201,13 @@ func (r *Repository) GetHourlyOverview(ctx context.Context, hours int) ([]UsageO
 	if err != nil {
 		return nil, fmt.Errorf("get sub2api hourly overview: %w", err)
 	}
+	if rows == nil {
+		rows = []UsageOverviewRow{}
+	}
 	return rows, nil
 }
 
-func (r *Repository) GetModelUsage(ctx context.Context, since time.Time, limit int) ([]ModelUsageRow, error) {
+func (r *Repository) GetModelUsage(ctx context.Context, since time.Time, until time.Time, limit int) ([]ModelUsageRow, error) {
 	limit = ClampDashboardLimit(limit, 20)
 
 	db, err := r.database()
@@ -207,7 +216,8 @@ func (r *Repository) GetModelUsage(ctx context.Context, since time.Time, limit i
 	}
 
 	var rows []ModelUsageRow
-	err = db.WithContext(ctx).Raw(`
+	untilClause, untilArg := untilClauseAndArg(until)
+	query := fmt.Sprintf(`
 		SELECT
 			model,
 			requested_model,
@@ -222,24 +232,35 @@ func (r *Repository) GetModelUsage(ctx context.Context, since time.Time, limit i
 			COALESCE(AVG(duration_ms), 0) AS average_duration_ms
 		FROM usage_logs
 		WHERE created_at >= ?
+		%s
 		GROUP BY model, requested_model, upstream_model
 		ORDER BY total_requests DESC
 		LIMIT ?
-	`, since, limit).Scan(&rows).Error
+	`, untilClause)
+	args := []any{since}
+	if untilArg != nil {
+		args = append(args, untilArg)
+	}
+	args = append(args, limit)
+	err = db.WithContext(ctx).Raw(query, args...).Scan(&rows).Error
 	if err != nil {
 		return nil, fmt.Errorf("get sub2api model usage: %w", err)
+	}
+	if rows == nil {
+		rows = []ModelUsageRow{}
 	}
 	return rows, nil
 }
 
-func (r *Repository) GetAccountUsage(ctx context.Context, since time.Time) ([]AccountUsageRow, error) {
+func (r *Repository) GetAccountUsage(ctx context.Context, since time.Time, until time.Time) ([]AccountUsageRow, error) {
 	db, err := r.database()
 	if err != nil {
 		return nil, fmt.Errorf("get sub2api account usage: %w", err)
 	}
 
 	var rows []AccountUsageRow
-	err = db.WithContext(ctx).Raw(`
+	untilClause, untilArg := untilClauseAndArg(until)
+	query := fmt.Sprintf(`
 		SELECT
 			account_id,
 			COUNT(*) AS total_requests,
@@ -253,12 +274,21 @@ func (r *Repository) GetAccountUsage(ctx context.Context, since time.Time) ([]Ac
 			MAX(created_at) AS last_request_at
 		FROM usage_logs
 		WHERE created_at >= ?
+			%s
 			AND account_id IS NOT NULL
 		GROUP BY account_id
 		ORDER BY total_requests DESC
-	`, since).Scan(&rows).Error
+	`, untilClause)
+	args := []any{since}
+	if untilArg != nil {
+		args = append(args, untilArg)
+	}
+	err = db.WithContext(ctx).Raw(query, args...).Scan(&rows).Error
 	if err != nil {
 		return nil, fmt.Errorf("get sub2api account usage: %w", err)
+	}
+	if rows == nil {
+		rows = []AccountUsageRow{}
 	}
 	return rows, nil
 }
@@ -291,10 +321,13 @@ func (r *Repository) GetFiveHourAccountUsage(ctx context.Context) ([]AccountUsag
 	if err != nil {
 		return nil, fmt.Errorf("get sub2api five hour account usage: %w", err)
 	}
+	if rows == nil {
+		rows = []AccountUsageRow{}
+	}
 	return rows, nil
 }
 
-func (r *Repository) GetRankings(ctx context.Context, dimension string, since time.Time, limit int) ([]RankingRow, error) {
+func (r *Repository) GetRankings(ctx context.Context, dimension string, since time.Time, until time.Time, limit int) ([]RankingRow, error) {
 	limit = ClampDashboardLimit(limit, 20)
 
 	column := rankingColumn(dimension)
@@ -304,6 +337,7 @@ func (r *Repository) GetRankings(ctx context.Context, dimension string, since ti
 	}
 
 	var rows []RankingRow
+	untilClause, untilArg := untilClauseAndArg(until)
 	query := fmt.Sprintf(`
 		SELECT
 			COALESCE(NULLIF(%s, ''), 'unknown') AS name,
@@ -317,18 +351,27 @@ func (r *Repository) GetRankings(ctx context.Context, dimension string, since ti
 		LEFT JOIN users u ON l.user_id = u.id
 		LEFT JOIN accounts a ON l.account_id = a.id
 		WHERE l.created_at >= ?
+		%s
 		GROUP BY 1
 		ORDER BY total_requests DESC
 		LIMIT ?
-	`, column)
-	err = db.WithContext(ctx).Raw(query, since, limit).Scan(&rows).Error
+	`, column, untilClause)
+	args := []any{since}
+	if untilArg != nil {
+		args = append(args, untilArg)
+	}
+	args = append(args, limit)
+	err = db.WithContext(ctx).Raw(query, args...).Scan(&rows).Error
 	if err != nil {
 		return nil, fmt.Errorf("get sub2api rankings: %w", err)
+	}
+	if rows == nil {
+		rows = []RankingRow{}
 	}
 	return rows, nil
 }
 
-func (r *Repository) GetEvents(ctx context.Context, since time.Time, page int, limit int) ([]UsageEventRow, int64, error) {
+func (r *Repository) GetEvents(ctx context.Context, since time.Time, until time.Time, page int, limit int) ([]UsageEventRow, int64, error) {
 	page = ClampDashboardPage(page)
 	limit = ClampDashboardLimit(limit, 100)
 
@@ -338,14 +381,24 @@ func (r *Repository) GetEvents(ctx context.Context, since time.Time, page int, l
 	}
 
 	var total int64
-	if err := db.WithContext(ctx).Raw(`
-		SELECT (SELECT COUNT(*) FROM usage_logs WHERE created_at >= ?) + (SELECT COUNT(*) FROM ops_error_logs WHERE created_at >= ?)
-	`, since, since).Scan(&total).Error; err != nil {
+	untilClause, untilArg := untilClauseAndArg(until)
+	countQuery := fmt.Sprintf(`
+		SELECT (SELECT COUNT(*) FROM usage_logs WHERE created_at >= ?%s) + (SELECT COUNT(*) FROM ops_error_logs WHERE created_at >= ?%s)
+	`, untilClause, untilClause)
+	countArgs := []any{since}
+	if untilArg != nil {
+		countArgs = append(countArgs, untilArg)
+	}
+	countArgs = append(countArgs, since)
+	if untilArg != nil {
+		countArgs = append(countArgs, untilArg)
+	}
+	if err := db.WithContext(ctx).Raw(countQuery, countArgs...).Scan(&total).Error; err != nil {
 		return nil, 0, fmt.Errorf("get sub2api events: %w", err)
 	}
 
 	var rows []UsageEventRow
-	err = db.WithContext(ctx).Raw(`
+	eventsQuery := fmt.Sprintf(`
 		SELECT
 			l.id,
 			l.created_at,
@@ -367,6 +420,7 @@ func (r *Repository) GetEvents(ctx context.Context, since time.Time, page int, l
 		FROM usage_logs l
 		LEFT JOIN users u ON l.user_id = u.id
 		WHERE l.created_at >= ?
+		%s
 		UNION ALL
 		SELECT
 			e.id,
@@ -389,11 +443,25 @@ func (r *Repository) GetEvents(ctx context.Context, since time.Time, page int, l
 		FROM ops_error_logs e
 		LEFT JOIN users eu ON e.user_id = eu.id
 		WHERE e.created_at >= ?
+		%s
 		ORDER BY created_at DESC
 		LIMIT ? OFFSET ?
-		`, since, since, limit, (page-1)*limit).Scan(&rows).Error
+	`, untilClause, untilClause)
+	eventsArgs := []any{since}
+	if untilArg != nil {
+		eventsArgs = append(eventsArgs, untilArg)
+	}
+	eventsArgs = append(eventsArgs, since)
+	if untilArg != nil {
+		eventsArgs = append(eventsArgs, untilArg)
+	}
+	eventsArgs = append(eventsArgs, limit, (page-1)*limit)
+	err = db.WithContext(ctx).Raw(eventsQuery, eventsArgs...).Scan(&rows).Error
 	if err != nil {
 		return nil, 0, fmt.Errorf("get sub2api events: %w", err)
+	}
+	if rows == nil {
+		rows = []UsageEventRow{}
 	}
 	return rows, total, nil
 }
@@ -430,6 +498,9 @@ func (r *Repository) GetHealthBlocks(ctx context.Context, hours int) ([]HealthBl
 	if err != nil {
 		return nil, fmt.Errorf("get sub2api health blocks: %w", err)
 	}
+	if rows == nil {
+		rows = []HealthBlockRow{}
+	}
 	return rows, nil
 }
 
@@ -447,7 +518,7 @@ func rankingColumn(dimension string) string {
 }
 
 
-func (r *Repository) GetRankingTrend(ctx context.Context, dimension string, since time.Time, granularity string, limit int) ([]RankingTrendRow, error) {
+func (r *Repository) GetRankingTrend(ctx context.Context, dimension string, since time.Time, until time.Time, granularity string, limit int) ([]RankingTrendRow, error) {
 	limit = ClampDashboardLimit(limit, 12)
 
 	db, err := r.database()
@@ -458,6 +529,7 @@ func (r *Repository) GetRankingTrend(ctx context.Context, dimension string, sinc
 	column := rankingColumn(dimension)
 
 	var rows []RankingTrendRow
+	untilClause, untilArg := untilClauseAndArg(until)
 	query := fmt.Sprintf(`
 		WITH top_entities AS (
 			SELECT %s AS entity_name
@@ -465,6 +537,7 @@ func (r *Repository) GetRankingTrend(ctx context.Context, dimension string, sinc
 			LEFT JOIN users u ON l.user_id = u.id
 			LEFT JOIN accounts a ON l.account_id = a.id
 			WHERE l.created_at >= ?
+			%s
 			GROUP BY 1
 			ORDER BY SUM(COALESCE(l.input_tokens, 0) + COALESCE(l.output_tokens, 0) + COALESCE(l.cache_creation_tokens, 0) + COALESCE(l.cache_read_tokens, 0)) DESC
 			LIMIT ?
@@ -477,14 +550,37 @@ func (r *Repository) GetRankingTrend(ctx context.Context, dimension string, sinc
 		LEFT JOIN users u ON l.user_id = u.id
 		LEFT JOIN accounts a ON l.account_id = a.id
 		WHERE l.created_at >= ?
+			%s
 			AND %s IN (SELECT entity_name FROM top_entities)
 		GROUP BY 1, 2
 		ORDER BY bucket ASC, tokens DESC
-	`, column, granularity, column, column)
+	`, column, untilClause, granularity, column, untilClause, column)
 
-	err = db.WithContext(ctx).Raw(query, since, limit, since).Scan(&rows).Error
+	args := []any{since}
+	if untilArg != nil {
+		args = append(args, untilArg)
+	}
+	args = append(args, limit)
+	args = append(args, since)
+	if untilArg != nil {
+		args = append(args, untilArg)
+	}
+	err = db.WithContext(ctx).Raw(query, args...).Scan(&rows).Error
 	if err != nil {
 		return nil, fmt.Errorf("get sub2api ranking trend: %w", err)
 	}
+	if rows == nil {
+		rows = []RankingTrendRow{}
+	}
 	return rows, nil
+}
+
+// untilClauseAndArg returns a SQL fragment and bind argument for an upper-bound
+// time filter. When until is the zero value, both return empty/nil so no upper
+// bound is applied (backward compatible with hours-based ranges).
+func untilClauseAndArg(until time.Time) (string, any) {
+	if until.IsZero() {
+		return "", nil
+	}
+	return "AND created_at <= ?", until
 }

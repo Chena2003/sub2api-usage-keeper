@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next'
 import type { ChartData, ChartOptions } from 'chart.js'
 import { Line } from 'react-chartjs-2'
 import { useThemeStore } from '@/stores'
-import type { Sub2ApiRankingDimension, Sub2ApiRankingTrendResponse } from '@/lib/sub2apiTypes'
+import type { Sub2ApiRankingTrendResponse } from '@/lib/sub2apiTypes'
 import { Panel } from '@/components/ui/Panel'
 import styles from './RankingTrendChart.module.scss'
 
@@ -15,7 +15,6 @@ const TREND_COLORS = [
 
 type Props = {
   data: Sub2ApiRankingTrendResponse | null
-  dimension: Sub2ApiRankingDimension
   loading?: boolean
 }
 
@@ -26,7 +25,7 @@ const formatTokensCompact = (n: number): string => {
   return String(n)
 }
 
-export function RankingTrendChart({ data, dimension: _dimension, loading }: Props) {
+export function RankingTrendChart({ data, loading }: Props) {
   const { t } = useTranslation()
   const theme = useThemeStore((s) => s.theme)
   const isDark = theme === 'dark'

@@ -14,15 +14,14 @@ import (
 )
 
 type Sub2APIDashboardProvider interface {
-	Accounts(context.Context, time.Time) ([]quota.Sub2APIAccountQuota, error)
-	AccountQuotas(context.Context, time.Time) ([]quota.Sub2APIAccountQuota, error)
+	Accounts(context.Context, time.Time, time.Time) ([]quota.Sub2APIAccountQuota, error)
 	Overview(context.Context, int) (quota.Sub2APIOverview, error)
 	OverviewByHours(context.Context, int) (quota.Sub2APIOverview, error)
 	Hourly(context.Context, int) ([]sub2api.UsageOverviewRow, error)
-	Models(context.Context, time.Time, int) ([]sub2api.ModelUsageRow, error)
-	Events(context.Context, time.Time, int, int) (quota.Sub2APIEventsResponse, error)
-	Rankings(context.Context, string, time.Time, int) ([]quota.Sub2APIRankingRow, error)
-	RankingTrend(context.Context, string, time.Time, int) ([]quota.Sub2APIRankingTrendPoint, string, error)
+	Models(context.Context, time.Time, time.Time, int) ([]sub2api.ModelUsageRow, error)
+	Events(context.Context, time.Time, time.Time, int, int) (quota.Sub2APIEventsResponse, error)
+	Rankings(context.Context, string, time.Time, time.Time, int) ([]quota.Sub2APIRankingRow, error)
+	RankingTrend(context.Context, string, time.Time, time.Time, int) ([]quota.Sub2APIRankingTrendPoint, string, error)
 	ServiceHealth(context.Context, int) (quota.Sub2APIServiceHealth, error)
 }
 
@@ -33,24 +32,9 @@ func registerSub2APIDashboardRoutes(router gin.IRoutes, provider Sub2APIDashboar
 			return
 		}
 
-		accounts, err := provider.Accounts(c.Request.Context(), sub2APISinceTimeQuery(c))
+		accounts, err := provider.Accounts(c.Request.Context(), sub2APISinceTimeQuery(c), sub2APIUntilQuery(c))
 		if err != nil {
 			writeInternalError(c, "list sub2api accounts failed", err)
-			return
-		}
-
-		c.JSON(http.StatusOK, gin.H{"accounts": accounts})
-	})
-
-	router.GET("/sub2api/account-quotas", func(c *gin.Context) {
-		if provider == nil {
-			writeInternalError(c, "sub2api dashboard provider is not configured", nil)
-			return
-		}
-
-		accounts, err := provider.AccountQuotas(c.Request.Context(), sub2APISinceTimeQuery(c))
-		if err != nil {
-			writeInternalError(c, "list sub2api account quotas failed", err)
 			return
 		}
 
@@ -100,7 +84,7 @@ func registerSub2APIDashboardRoutes(router gin.IRoutes, provider Sub2APIDashboar
 			return
 		}
 
-		models, err := provider.Models(c.Request.Context(), sub2APISinceTimeQuery(c), sub2APILimitQuery(c, 20))
+		models, err := provider.Models(c.Request.Context(), sub2APISinceTimeQuery(c), sub2APIUntilQuery(c), sub2APILimitQuery(c, 20))
 		if err != nil {
 			writeInternalError(c, "list sub2api models failed", err)
 			return
@@ -115,7 +99,7 @@ func registerSub2APIDashboardRoutes(router gin.IRoutes, provider Sub2APIDashboar
 			return
 		}
 
-		events, err := provider.Events(c.Request.Context(), sub2APISinceTimeQuery(c), sub2APIPageQuery(c), sub2APILimitQuery(c, 100))
+		events, err := provider.Events(c.Request.Context(), sub2APISinceTimeQuery(c), sub2APIUntilQuery(c), sub2APIPageQuery(c), sub2APILimitQuery(c, 100))
 		if err != nil {
 			writeInternalError(c, "list sub2api events failed", err)
 			return
@@ -130,7 +114,7 @@ func registerSub2APIDashboardRoutes(router gin.IRoutes, provider Sub2APIDashboar
 			return
 		}
 
-		rankings, err := provider.Rankings(c.Request.Context(), normalizeRankingDimension(c.Query("dimension")), sub2APISinceTimeQuery(c), sub2APILimitQuery(c, 20))
+		rankings, err := provider.Rankings(c.Request.Context(), normalizeRankingDimension(c.Query("dimension")), sub2APISinceTimeQuery(c), sub2APIUntilQuery(c), sub2APILimitQuery(c, 20))
 		if err != nil {
 			writeInternalError(c, "list sub2api rankings failed", err)
 			return
@@ -145,7 +129,7 @@ func registerSub2APIDashboardRoutes(router gin.IRoutes, provider Sub2APIDashboar
 			return
 		}
 
-		points, granularity, err := provider.RankingTrend(c.Request.Context(), normalizeRankingDimension(c.Query("dimension")), sub2APISinceTimeQuery(c), sub2APILimitQuery(c, 12))
+		points, granularity, err := provider.RankingTrend(c.Request.Context(), normalizeRankingDimension(c.Query("dimension")), sub2APISinceTimeQuery(c), sub2APIUntilQuery(c), sub2APILimitQuery(c, 12))
 		if err != nil {
 			writeInternalError(c, "get sub2api ranking trend failed", err)
 			return
