@@ -41,7 +41,7 @@ export async function fetchSub2ApiAccounts(tr: TimeRangeParams = {}): Promise<Su
   const params = new URLSearchParams()
   appendTimeRangeParams(params, tr)
   const body = await getJson<AccountsResponse>(`/accounts?${params.toString()}`)
-  return body.accounts
+  return body.accounts ?? []
 }
 
 export function fetchSub2ApiOverview(tr: TimeRangeParams = {}): Promise<Sub2ApiOverview> {
@@ -54,7 +54,7 @@ export async function fetchSub2ApiTimeseries(tr: TimeRangeParams = {}): Promise<
   const params = new URLSearchParams()
   appendTimeRangeParams(params, tr)
   const body = await getJson<TimeseriesResponse>(`/timeseries?${params.toString()}`)
-  return body.points
+  return body.points ?? []
 }
 
 export async function fetchSub2ApiModels(tr: TimeRangeParams = {}, limit = 20): Promise<Sub2ApiModelUsage[]> {
@@ -62,7 +62,7 @@ export async function fetchSub2ApiModels(tr: TimeRangeParams = {}, limit = 20): 
   appendTimeRangeParams(params, tr)
   params.set('limit', String(limit))
   const body = await getJson<ModelsResponse>(`/models?${params.toString()}`)
-  return body.models
+  return body.models ?? []
 }
 
 export async function fetchSub2ApiRankings(
@@ -76,14 +76,14 @@ export async function fetchSub2ApiRankings(
   })
   appendTimeRangeParams(params, tr)
   const body = await getJson<RankingsResponse>(`/rankings?${params.toString()}`)
-  return body.rankings
+  return body.rankings ?? []
 }
 
 export async function fetchSub2ApiAccountQuotas(tr: TimeRangeParams = {}): Promise<Sub2ApiAccount[]> {
   const params = new URLSearchParams()
   appendTimeRangeParams(params, tr)
   const body = await getJson<AccountsResponse>(`/account-quotas?${params.toString()}`)
-  return body.accounts
+  return body.accounts ?? []
 }
 
 export function fetchSub2ApiEvents({
