@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { fetchAnalysis, fetchCpaApiKeyOptions, fetchCpaApiKeys, fetchUsageOverview, fetchUsageQuotaCache, fetchUpdateCheck, fetchUsageEventModelFilterOptions, fetchUsageEventSourceFilterOptions, fetchUsageEvents, fetchUsageIdentities, fetchUsageIdentitiesPage, fetchUsageQuotaRefreshTask, refreshUsageQuotas, updateCpaApiKeyAlias } from './api';
+import { fetchAnalysis, fetchUsageOverview, fetchUsageQuotaCache, fetchUpdateCheck, fetchUsageEventModelFilterOptions, fetchUsageEventSourceFilterOptions, fetchUsageEvents, fetchUsageIdentities, fetchUsageIdentitiesPage, fetchUsageQuotaRefreshTask, refreshUsageQuotas } from './api';
 
 describe('fetchUsageEvents', () => {
   afterEach(() => {
@@ -183,53 +183,6 @@ describe('fetchUsageEvents', () => {
     expect(parsed.pathname).toBe('/api/v1/usage/identities');
     expect(parsed.search).toBe('');
     expect(init).toMatchObject({ credentials: 'include', signal });
-  });
-
-  it('loads CPA API key settings without exposing numeric ids', async () => {
-    vi.stubGlobal('window', { __APP_BASE_PATH__: undefined });
-    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue({
-      ok: true,
-      json: async () => ({ items: [{ id: '9007199254740993', keyAlias: '', displayKey: 'sk-*********123456', label: 'sk-*********123456', lastSyncedAt: null }] }),
-    } as Response);
-    const signal = new AbortController().signal;
-
-    const response = await fetchCpaApiKeys(signal);
-
-    const [url, init] = fetchMock.mock.calls[0];
-    const parsed = new URL(String(url), 'http://localhost');
-
-    expect(response.items[0].id).toBe('9007199254740993');
-    expect(typeof response.items[0].id).toBe('string');
-    expect(parsed.pathname).toBe('/api/v1/usage/api-keys');
-    expect(init).toMatchObject({ credentials: 'include', signal, cache: 'no-store' });
-  });
-
-  it('loads CPA API key options and updates aliases', async () => {
-    vi.stubGlobal('window', { __APP_BASE_PATH__: undefined });
-    const fetchMock = vi.spyOn(globalThis, 'fetch')
-      .mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({ options: [{ id: '123', keyAlias: 'Main', displayKey: 'sk-*********123456', label: 'Main', lastSyncedAt: '2026-05-13T00:00:00Z' }] }),
-      } as Response)
-      .mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({ id: '123', keyAlias: '', displayKey: 'sk-*********123456', label: 'sk-*********123456', lastSyncedAt: '2026-05-13T00:00:00Z' }),
-      } as Response);
-    const signal = new AbortController().signal;
-
-    const options = await fetchCpaApiKeyOptions(signal);
-    const updated = await updateCpaApiKeyAlias('123', '');
-
-    const [optionsUrl, optionsInit] = fetchMock.mock.calls[0];
-    const [updateUrl, updateInit] = fetchMock.mock.calls[1];
-
-    expect(options.options[0].id).toBe('123');
-    expect(new URL(String(optionsUrl), 'http://localhost').pathname).toBe('/api/v1/usage/api-keys/options');
-    expect(optionsInit).toMatchObject({ credentials: 'include', signal, cache: 'no-store' });
-    expect(updated.label).toBe('sk-*********123456');
-    expect(new URL(String(updateUrl), 'http://localhost').pathname).toBe('/api/v1/usage/api-keys/123');
-    expect(updateInit).toMatchObject({ credentials: 'include', method: 'PATCH' });
-    expect(updateInit?.body).toBe(JSON.stringify({ keyAlias: '' }));
   });
 
   it('loads paged usage identities for one credential auth type', async () => {

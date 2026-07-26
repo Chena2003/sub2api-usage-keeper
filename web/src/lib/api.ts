@@ -1,4 +1,4 @@
-import { type AnalysisResponse, type CpaApiKeyOptionsResponse, type CpaApiKeySettingsItem, type CpaApiKeysResponse, type PricingEntry, type PricingResponse, type StatusResponse, type UpdateCheckResponse, type UsageEventModelFilterOptionsResponse, type UsageEventSourceFilterOptionsResponse, type UsedModelsResponse, type UsageIdentitiesPageResponse, type UsageIdentitiesResponse, type UsageEventsResponse, type UsageIdentityAuthType, type UsageOverviewResponse, type UsageQuotaCacheResponse, type UsageQuotaRefreshResponse, type UsageQuotaRefreshTaskResponse } from './types'
+import { type AnalysisResponse, type PricingEntry, type PricingResponse, type StatusResponse, type UpdateCheckResponse, type UsageEventModelFilterOptionsResponse, type UsageEventSourceFilterOptionsResponse, type UsedModelsResponse, type UsageIdentitiesPageResponse, type UsageIdentitiesResponse, type UsageEventsResponse, type UsageIdentityAuthType, type UsageOverviewResponse, type UsageQuotaCacheResponse, type UsageQuotaRefreshResponse, type UsageQuotaRefreshTaskResponse } from './types'
 
 export class ApiError extends Error {
   status: number
@@ -230,36 +230,6 @@ export async function fetchAnalysis(range: string, start?: string, end?: string,
   return response.json()
 }
 
-
-export async function fetchCpaApiKeyOptions(signal?: AbortSignal): Promise<CpaApiKeyOptionsResponse> {
-  const response = await apiFetch(apiPath('/usage/api-keys/options'), { signal, cache: 'no-store' })
-  if (!response.ok) {
-    await parseApiError(response, `Failed to load CPA API key options: ${response.status}`)
-  }
-  return response.json()
-}
-
-export async function fetchCpaApiKeys(signal?: AbortSignal): Promise<CpaApiKeysResponse> {
-  const response = await apiFetch(apiPath('/usage/api-keys'), { signal, cache: 'no-store' })
-  if (!response.ok) {
-    await parseApiError(response, `Failed to load CPA API keys: ${response.status}`)
-  }
-  return response.json()
-}
-
-export async function updateCpaApiKeyAlias(id: string, keyAlias: string): Promise<CpaApiKeySettingsItem> {
-  const response = await apiFetch(apiPath(`/usage/api-keys/${encodeURIComponent(id)}`), {
-    method: 'PATCH',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({ keyAlias }),
-  })
-  if (!response.ok) {
-    await parseApiError(response, `Failed to update CPA API key alias: ${response.status}`)
-  }
-  return response.json()
-}
 
 export async function fetchUsedModels(signal?: AbortSignal): Promise<UsedModelsResponse> {
   const response = await apiFetch(apiPath('/models/used'), { signal })

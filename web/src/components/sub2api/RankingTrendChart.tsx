@@ -13,6 +13,40 @@ const TREND_COLORS = [
   '#14b8a6', '#84cc16',
 ]
 
+// FNV-1a hash, deterministic across renders regardless of insertion order.
+function hashStringToIndex(value: string, modulo: number): number {
+  let hash = 0x811c9dc5
+  for (let i = 0; i < value.length; i++) {
+    hash ^= value.charCodeAt(i)
+    hash = Math.imul(hash, 0x01000193)
+  }
+  return Math.abs(hash) % modulo
+}
+
+// Assigns each name a color derived from a hash of the name itself (not its
+// position), so a series keeps its color across refreshes even if the
+// backend ranking order changes. Names are processed in a fixed (sorted)
+// order so the outcome doesn't depend on the order `names` is passed in.
+// On a hash collision, the next free color in `colors` is used instead, so
+// colors stay distinct within a single render.
+export function assignSeriesColors(names: string[], colors: string[] = TREND_COLORS): Map<string, string> {
+  const used = new Set<number>()
+  const assignments = new Map<string, string>()
+  for (const name of [...names].sort()) {
+    let index = hashStringToIndex(name, colors.length)
+    if (used.has(index)) {
+      let candidate = (index + 1) % colors.length
+      while (used.has(candidate) && candidate !== index) {
+        candidate = (candidate + 1) % colors.length
+      }
+      index = candidate
+    }
+    used.add(index)
+    assignments.set(name, colors[index])
+  }
+  return assignments
+}
+
 type Props = {
   data: Sub2ApiRankingTrendResponse | null
   loading?: boolean
@@ -49,11 +83,12 @@ export function RankingTrendChart({ data, loading }: Props) {
     }
 
     const labels = [...allBuckets].sort()
-    const datasets = [...byName.entries()].map(([name, values], i) => ({
+    const colorByName = assignSeriesColors([...byName.keys()])
+    const datasets = [...byName.entries()].map(([name, values]) => ({
       label: name,
       data: labels.map((b) => values.get(b) ?? 0),
-      borderColor: TREND_COLORS[i % TREND_COLORS.length],
-      backgroundColor: `${TREND_COLORS[i % TREND_COLORS.length]}18`,
+      borderColor: colorByName.get(name)!,
+      backgroundColor: `${colorByName.get(name)}18`,
       fill: false,
       tension: 0.3,
       pointRadius: labels.length > 30 ? 0 : 3,

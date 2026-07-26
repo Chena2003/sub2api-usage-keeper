@@ -14,8 +14,8 @@ import {
   Legend,
   Filler
 } from 'chart.js';
-import { ApiError, fetchCpaApiKeyOptions, fetchStatus, fetchUpdateCheck } from '@/lib/api';
-import type { CpaApiKeyOption, StatusResponse } from '@/lib/types';
+import { ApiError, fetchStatus, fetchUpdateCheck } from '@/lib/api';
+import type { StatusResponse } from '@/lib/types';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 
 import { Sub2ApiAnalysisPanel } from '@/components/sub2api/Sub2ApiAnalysisPanel';
@@ -102,8 +102,6 @@ const USAGE_TAB_STORAGE_KEY = 'cli-proxy-usage-tab-v1';
 const OVERVIEW_AUTO_REFRESH_INTERVAL_MS = 30_000;
 
 export const shouldShowRangeControls = (tab: UsageTab) => tab !== 'settings';
-
-export const shouldShowApiKeyFilter = (tab: UsageTab) => shouldShowRangeControls(tab);
 
 export const shouldShowUpdateCheckButton = (status: Pick<StatusResponse, 'updateCheckEnabled'> | null) => status?.updateCheckEnabled === true;
 
@@ -451,9 +449,6 @@ export function UsagePage({ onAuthRequired }: { onAuthRequired?: () => void }) {
   const [chartLines, setChartLines] = useState<string[]>(loadChartLines);
   const [timeRange, setTimeRange] = useState<UsageTimeRange>(loadTimeRange);
   const [customTimeRange, setCustomTimeRange] = useState<{ start: string; end: string }>(loadCustomTimeRange);
-  const [selectedApiKeyId, setSelectedApiKeyId] = useState('');
-  const [apiKeyOptions, setApiKeyOptions] = useState<CpaApiKeyOption[]>([]);
-  const apiKeyOptionsRequestControllerRef = useRef<AbortController | null>(null);
   const isOverviewTab = activeTab === 'overview';
 
   const {
@@ -468,7 +463,6 @@ export function UsagePage({ onAuthRequired }: { onAuthRequired?: () => void }) {
     customStart: customTimeRange.start,
     customEnd: customTimeRange.end,
     enabled: activeTab === 'overview',
-    apiKeyId: selectedApiKeyId,
   });
   const {
     loadPricing,
@@ -543,33 +537,6 @@ export function UsagePage({ onAuthRequired }: { onAuthRequired?: () => void }) {
     setCustomRangeError('');
     setCustomRangeHint('');
   }, [customTimeRange.end, customTimeRange.start, t, timeRange]);
-
-  const loadApiKeyOptions = useCallback(async () => {
-    apiKeyOptionsRequestControllerRef.current?.abort();
-    const controller = new AbortController();
-    apiKeyOptionsRequestControllerRef.current = controller;
-    try {
-      const response = await fetchCpaApiKeyOptions(controller.signal);
-      if (apiKeyOptionsRequestControllerRef.current !== controller) {
-        return;
-      }
-      setApiKeyOptions(response.options ?? []);
-    } catch (error) {
-      if (controller.signal.aborted) {
-        return;
-      }
-      if (apiKeyOptionsRequestControllerRef.current === controller) {
-        setApiKeyOptions([]);
-      }
-      if (error instanceof ApiError && error.status === 401) {
-        onAuthRequired?.();
-      }
-    } finally {
-      if (apiKeyOptionsRequestControllerRef.current === controller) {
-        apiKeyOptionsRequestControllerRef.current = null;
-      }
-    }
-  }, [onAuthRequired]);
 
   const isCustomRange = timeRange === 'custom';
   const customDateRangeBounds = useMemo(() => getCustomDateRangeBounds(Date.now(), status?.timezone), [status?.timezone]);
@@ -660,20 +627,6 @@ export function UsagePage({ onAuthRequired }: { onAuthRequired?: () => void }) {
       window.clearInterval(timer);
     };
   }, [onAuthRequired]);
-
-  useEffect(() => {
-    void loadApiKeyOptions();
-    return () => {
-      apiKeyOptionsRequestControllerRef.current?.abort();
-      apiKeyOptionsRequestControllerRef.current = null;
-    };
-  }, [loadApiKeyOptions]);
-
-  useEffect(() => {
-    if (selectedApiKeyId && !apiKeyOptions.some((option) => option.id === selectedApiKeyId)) {
-      setSelectedApiKeyId('');
-    }
-  }, [apiKeyOptions, selectedApiKeyId]);
 
   useEffect(() => {
     if (!shouldShowUpdateCheckButton(status)) {

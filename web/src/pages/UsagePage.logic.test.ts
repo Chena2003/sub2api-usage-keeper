@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { buildCustomDateRangeQuery, getCustomDateRangeBounds, getOverviewChartEndMs, getOverviewDisplayLoading, getOverviewHourWindowHours, getPreferredOverviewChartPeriod, getTimeRangeOptions, getUsageTabOptions, isCustomDateWithinBounds, openDateInputPicker, refreshAutoRefreshTabData, refreshPageData, scheduleOverviewAutoRefresh, shouldAutoRefreshUsageTab, shouldShowApiKeyFilter, shouldShowRangeControls, shouldShowUpdateCheckButton, getUpdateCheckToastDuration } from './UsagePage';
+import { buildCustomDateRangeQuery, getCustomDateRangeBounds, getOverviewChartEndMs, getOverviewDisplayLoading, getOverviewHourWindowHours, getPreferredOverviewChartPeriod, getTimeRangeOptions, getUsageTabOptions, isCustomDateWithinBounds, openDateInputPicker, refreshAutoRefreshTabData, refreshPageData, scheduleOverviewAutoRefresh, shouldAutoRefreshUsageTab, shouldShowRangeControls, shouldShowUpdateCheckButton, getUpdateCheckToastDuration } from './UsagePage';
 import { filterUsageByWindow, type UsageFilterWindow } from '@/utils/usage';
 import type { UsageSnapshot } from '@/lib/types';
 
@@ -277,19 +277,6 @@ for (const [tab, expected] of [
 ] as const) {
   it(`returns ${expected} for ${tab} range controls visibility`, () => {
     expect(shouldShowRangeControls(tab)).toBe(expected);
-  });
-}
-
-for (const [tab, expected] of [
-  ['overview', true],
-  ['analysis', true],
-  ['events', true],
-  ['ranking', true],
-  ['quotas', true],
-  ['settings', false],
-] as const) {
-  it(`returns ${expected} for ${tab} API Key filter visibility`, () => {
-    expect(shouldShowApiKeyFilter(tab)).toBe(expected);
   });
 }
 
