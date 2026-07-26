@@ -54,11 +54,12 @@ func (r *StorageCleanupRunner) Run(ctx context.Context) error {
 	}
 }
 
-// nextDailyCleanupAt 用 time.Local 计算下一次 03:00，因此 TZ 同时控制业务日期边界和清理触发时间。
+// nextDailyCleanupAt 用 now 所在时区计算下一次 03:00，因此 TZ 同时控制业务日期边界和清理触发时间。
+// 生产环境下 now 来自 time.Now()，其 Location 就是 time.Local，行为与此前一致。
 func nextDailyCleanupAt(now time.Time) time.Time {
-	localNow := now.In(time.Local)
-	cleanupAt := time.Date(localNow.Year(), localNow.Month(), localNow.Day(), 3, 0, 0, 0, time.Local)
-	if !localNow.Before(cleanupAt) {
+	loc := now.Location()
+	cleanupAt := time.Date(now.Year(), now.Month(), now.Day(), 3, 0, 0, 0, loc)
+	if !now.Before(cleanupAt) {
 		cleanupAt = cleanupAt.AddDate(0, 0, 1)
 	}
 	return cleanupAt

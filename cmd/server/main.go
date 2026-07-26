@@ -6,11 +6,15 @@ import (
 	"os"
 
 	"sub2api-usage-keeper/internal/app"
+
+	"github.com/gin-gonic/gin"
 )
 
 func main() {
 	envFile := flag.String("env", "", "path to env file")
 	flag.Parse()
+
+	gin.SetMode(gin.ReleaseMode)
 
 	application, err := app.NewWithOptions(app.Options{EnvFile: *envFile})
 	if err != nil {

@@ -423,6 +423,17 @@ func TestNormalizeSub2APIUserEmailMasksLocalPartAsFirstThreeAndLastTwo(t *testin
 	}
 }
 
+func TestNormalizeSub2APIUserEmailMasksNonASCIILocalPartByRune(t *testing.T) {
+	events := NormalizeSub2APIEvents([]sub2api.UsageEventRow{{User: "张三李四王五赵六@example.com"}})
+
+	if len(events) != 1 || events[0].User != "张三李***赵六@example.com" {
+		t.Fatalf("event user = %#v, want 张三李***赵六@example.com", events)
+	}
+	if strings.ContainsRune(events[0].User, '�') {
+		t.Fatalf("masked non-ASCII email contains replacement chars: %#v", events)
+	}
+}
+
 func TestNormalizeSub2APIEventsMasksAPIKeyIdentifiers(t *testing.T) {
 	events := NormalizeSub2APIEvents([]sub2api.UsageEventRow{{APIKey: "sk-live-secret"}})
 

@@ -8,6 +8,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"sub2api-usage-keeper/internal/sub2api"
 )
@@ -401,13 +402,15 @@ func maskedSub2APIUser(value string) string {
 }
 
 func maskEmailLocal(local string) string {
-	if len(local) <= 1 {
+	runeCount := utf8.RuneCountInString(local)
+	if runeCount <= 1 {
 		return "*"
 	}
-	if len(local) <= 5 {
-		return local[:1] + strings.Repeat("*", len(local)-1)
+	runes := []rune(local)
+	if runeCount <= 5 {
+		return string(runes[:1]) + strings.Repeat("*", runeCount-1)
 	}
-	return local[:3] + strings.Repeat("*", len(local)-5) + local[len(local)-2:]
+	return string(runes[:3]) + strings.Repeat("*", runeCount-5) + string(runes[runeCount-2:])
 }
 
 func NormalizeSub2APIRankings(dimension string, rows []sub2api.RankingRow) []Sub2APIRankingRow {

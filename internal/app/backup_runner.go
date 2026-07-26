@@ -181,9 +181,9 @@ func (r *DatabaseBackupRunner) lastBackupAtFromHistory() (time.Time, bool) {
 }
 
 func nextDailyBackupAt(now time.Time) time.Time {
-	localNow := now.In(time.Local)
-	backupAt := time.Date(localNow.Year(), localNow.Month(), localNow.Day(), 4, 0, 0, 0, time.Local)
-	if !localNow.Before(backupAt) {
+	loc := now.Location()
+	backupAt := time.Date(now.Year(), now.Month(), now.Day(), 4, 0, 0, 0, loc)
+	if !now.Before(backupAt) {
 		backupAt = backupAt.AddDate(0, 0, 1)
 	}
 	return backupAt

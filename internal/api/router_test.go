@@ -214,6 +214,35 @@ func TestStaticAssetResponsesUseLongCache(t *testing.T) {
 	}
 }
 
+func TestSecurityHeadersAppliedToAPIAndStaticResponses(t *testing.T) {
+	staticFS := testStaticFS(t, map[string]string{
+		"index.html":    `<html><head><script>window.__APP_BASE_PATH__ = "__APP_BASE_PATH__";</script></head><body>app</body></html>`,
+		"assets/app.js": "console.log('ok')",
+	})
+	router := NewRouter(staticFS, nil, "")
+
+	assertSecurityHeaders := func(t *testing.T, resp *httptest.ResponseRecorder) {
+		t.Helper()
+		if got := resp.Header().Get("X-Content-Type-Options"); got != "nosniff" {
+			t.Fatalf("expected X-Content-Type-Options nosniff, got %q", got)
+		}
+		if got := resp.Header().Get("X-Frame-Options"); got != "DENY" {
+			t.Fatalf("expected X-Frame-Options DENY, got %q", got)
+		}
+		if got := resp.Header().Get("Referrer-Policy"); got != "no-referrer" {
+			t.Fatalf("expected Referrer-Policy no-referrer, got %q", got)
+		}
+	}
+
+	apiResp := httptest.NewRecorder()
+	router.ServeHTTP(apiResp, httptest.NewRequest(http.MethodGet, "/api/v1/ping", nil))
+	assertSecurityHeaders(t, apiResp)
+
+	assetResp := httptest.NewRecorder()
+	router.ServeHTTP(assetResp, httptest.NewRequest(http.MethodGet, "/assets/app.js", nil))
+	assertSecurityHeaders(t, assetResp)
+}
+
 func contains(s, sub string) bool {
 	return len(sub) == 0 || (len(s) >= len(sub) && (func() bool { return stringContains(s, sub) })())
 }

@@ -41,6 +41,7 @@ func NewRouter(
 	router := gin.New()
 	_ = router.SetTrustedProxies(nil)
 	router.Use(gin.Recovery())
+	router.Use(securityHeadersMiddleware())
 
 	// No CORS middleware: this service is designed for same-origin deployment
 	// (static frontend served from the same Gin router). If cross-origin access
@@ -128,6 +129,18 @@ func NewRouter(
 	}
 
 	return router
+}
+
+// securityHeadersMiddleware sets a minimal set of security response headers.
+// A Content-Security-Policy is intentionally omitted: the SPA relies on inline
+// styles and canvas-rendered charts, and a restrictive CSP would break it.
+func securityHeadersMiddleware() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		c.Header("X-Content-Type-Options", "nosniff")
+		c.Header("X-Frame-Options", "DENY")
+		c.Header("Referrer-Policy", "no-referrer")
+		c.Next()
+	}
 }
 
 func setHTMLCacheHeaders(c *gin.Context) {
