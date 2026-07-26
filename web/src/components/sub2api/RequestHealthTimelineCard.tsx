@@ -81,21 +81,21 @@ export function RequestHealthTimelineCard({ usage, serviceHealth, loading }: Req
   const { t } = useTranslation()
   const [activeTooltip, setActiveTooltip] = useState<ActiveTooltipState | null>(null)
   const gridRef = useRef<HTMLDivElement>(null)
-  // mountTime captured via useState initial value — avoids Date.* in render/useMemo paths
-  const [mountTime] = useState(() => parseTime(new Date().toISOString()))
 
   const healthData: ServiceHealthData = useMemo(() => {
     // Prefer dedicated serviceHealth prop; fall back to usage?.service_health
     const sh = serviceHealth ?? usage?.service_health
-    const blockDetails = (sh?.block_details ?? [])
-      .map((block) => ({
-        startTime: parseTime(block.start_time),
-        endTime: parseTime(block.end_time),
-        success: Number(block.success ?? 0),
-        failure: Number(block.failure ?? 0),
-        rate: Number(block.rate ?? -1),
-      }))
-      .filter((block) => block.startTime <= mountTime)
+    // Render ALL returned blocks. The backend builds a fixed 168h grid ending at
+    // the next local midnight and marks empty slots idle (rate=-1); do not filter
+    // by a frozen client timestamp or the newest blocks stop updating on the
+    // always-mounted auto-refresh tab.
+    const blockDetails = (sh?.block_details ?? []).map((block) => ({
+      startTime: parseTime(block.start_time),
+      endTime: parseTime(block.end_time),
+      success: Number(block.success ?? 0),
+      failure: Number(block.failure ?? 0),
+      rate: Number(block.rate ?? -1),
+    }))
     const rows = Number(sh?.rows ?? 7) || 7
     return {
       totalSuccess: Number(sh?.total_success ?? 0),
@@ -108,7 +108,7 @@ export function RequestHealthTimelineCard({ usage, serviceHealth, loading }: Req
       windowEnd: parseTime(sh?.window_end),
       blockDetails,
     }
-  }, [usage, serviceHealth, mountTime])
+  }, [usage, serviceHealth])
 
   const hasData = healthData.totalSuccess + healthData.totalFailure > 0
 

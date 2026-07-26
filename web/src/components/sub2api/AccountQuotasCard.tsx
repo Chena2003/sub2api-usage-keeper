@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import type { Sub2ApiAccount, Sub2ApiQuotaWindow } from '@/lib/sub2apiTypes'
 import { Panel } from '@/components/ui/Panel'
@@ -41,13 +41,18 @@ const STATUS_VARIANT: Record<string, PillVariant> = {
 }
 
 function useResetCountdown() {
-  // mount-time captured via lazy initializer to stay out of the render path
-  const [mountTime] = useState(() => Date.now())
+  // Tick "now" every 60s (minute display granularity) so the countdown text keeps
+  // decreasing on this always-mounted auto-refresh tab.
+  const [now, setNow] = useState(() => Date.now())
+  useEffect(() => {
+    const id = setInterval(() => setNow(Date.now()), 60000)
+    return () => clearInterval(id)
+  }, [])
   return (resetAt?: string): string => {
     if (!resetAt) return ''
     const target = Date.parse(resetAt)
     if (Number.isNaN(target)) return ''
-    const diffMs = target - mountTime
+    const diffMs = target - now
     if (diffMs <= 0) return ''
     const totalMinutes = Math.floor(diffMs / 60000)
     const days = Math.floor(totalMinutes / (24 * 60))

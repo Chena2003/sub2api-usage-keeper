@@ -106,12 +106,16 @@ export const useSub2ApiDashboardStore = create<Sub2ApiDashboardState>((set, get)
       ])
       if (get()._refreshVersion !== version) return
 
-      const accounts = accountsR.status === 'fulfilled' ? accountsR.value : []
-      const overview = overviewR.status === 'fulfilled' ? overviewR.value : null
-      const points = pointsR.status === 'fulfilled' ? pointsR.value : []
-      const models = modelsR.status === 'fulfilled' ? modelsR.value : []
-      const rankings = rankingsR.status === 'fulfilled' ? rankingsR.value : []
-      const rankingTrend = rankingTrendR.status === 'fulfilled' ? rankingTrendR.value : null
+      const prev = get()
+      // On rejection, preserve the last good value instead of wiping to empty.
+      // A single transient failure during the silent 30s poll must not blank real
+      // data; the error field below still surfaces the failure to the UI.
+      const accounts = accountsR.status === 'fulfilled' ? accountsR.value : prev.accounts
+      const overview = overviewR.status === 'fulfilled' ? overviewR.value : prev.overview
+      const points = pointsR.status === 'fulfilled' ? pointsR.value : prev.points
+      const models = modelsR.status === 'fulfilled' ? modelsR.value : prev.models
+      const rankings = rankingsR.status === 'fulfilled' ? rankingsR.value : prev.rankings
+      const rankingTrend = rankingTrendR.status === 'fulfilled' ? rankingTrendR.value : prev.rankingTrend
 
       const firstError = [accountsR, overviewR, pointsR, modelsR, rankingsR, rankingTrendR].find(
         (r) => r.status === 'rejected',
@@ -134,16 +138,23 @@ export const useSub2ApiDashboardStore = create<Sub2ApiDashboardState>((set, get)
           : null,
       })
       if (!firstError) {
-        void get().loadEvents({ page: 1, limit: 100, ...tr })
+        // On background (30s) polls preserve the page the user is browsing; on a
+        // foreground refresh (range change / manual) reset to page 1 since the old
+        // page may not exist in the new range.
+        const eventsPage = background ? prev.events.page : 1
+        const eventsLimit = prev.events.limit
+        void get().loadEvents({ page: eventsPage, limit: eventsLimit, ...tr })
       }
     } catch {
       if (get()._refreshVersion !== version) return
       set({ loading: false })
     }
   },
-  loadHealth: async (tr?: TimeRangeParams) => {
+  loadHealth: async () => {
     const version = get()._healthVersion + 1
-    const params: TimeRangeParams = tr ?? buildTimeRange(get())
+    // Health is always a fixed 168h (7-day) window per the backend contract, so it
+    // stays independent of the page range selector and the currentSince/Hours state.
+    const params: TimeRangeParams = { hours: 168 }
     set({ _healthVersion: version })
     try {
       const serviceHealth = await fetchSub2ApiHealth(params)

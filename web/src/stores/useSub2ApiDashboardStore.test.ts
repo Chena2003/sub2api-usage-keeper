@@ -266,17 +266,18 @@ describe('useSub2ApiDashboardStore', () => {
     expect(useSub2ApiDashboardStore.getState().loading).toBe(false)
   })
 
-  it('loadHealth uses provided time range instead of currentHours', async () => {
+  it('loadHealth always requests a fixed 168h window, ignoring provided range', async () => {
     const healthData = { total_success: 50, total_failure: 2, success_rate: 96.15, rows: 3, columns: 48, bucket_seconds: 900, window_start: '', window_end: '', block_details: [] }
     mockedFetchSub2ApiHealth.mockResolvedValue(healthData as never)
 
+    // Even if a caller passes a narrower range, health must stay on the fixed 7-day grid.
     await useSub2ApiDashboardStore.getState().loadHealth({ hours: 8 })
 
-    expect(mockedFetchSub2ApiHealth).toHaveBeenCalledWith({ hours: 8 })
+    expect(mockedFetchSub2ApiHealth).toHaveBeenCalledWith({ hours: 168 })
     expect(useSub2ApiDashboardStore.getState().serviceHealth).toEqual(healthData)
   })
 
-  it('loadHealth uses since/until from currentSince when available', async () => {
+  it('loadHealth ignores currentSince/currentUntil and stays fixed at 168h', async () => {
     const healthData = { total_success: 50, total_failure: 2, success_rate: 96.15, rows: 3, columns: 48, bucket_seconds: 900, window_start: '', window_end: '', block_details: [] }
     mockedFetchSub2ApiHealth.mockResolvedValue(healthData as never)
     const since = '2026-07-10T00:00:00.000Z'
@@ -285,7 +286,7 @@ describe('useSub2ApiDashboardStore', () => {
 
     await useSub2ApiDashboardStore.getState().loadHealth()
 
-    expect(mockedFetchSub2ApiHealth).toHaveBeenCalledWith({ since, until })
+    expect(mockedFetchSub2ApiHealth).toHaveBeenCalledWith({ hours: 168 })
   })
 
   it('loadEvents catches errors and resets events state', async () => {
@@ -312,5 +313,65 @@ describe('useSub2ApiDashboardStore', () => {
     await refreshPromise
     expect(useSub2ApiDashboardStore.getState().loading).toBe(false)
     expect(useSub2ApiDashboardStore.getState().overview).toEqual(overview)
+  })
+
+  it('preserves last-good data when a fetcher rejects during refresh', async () => {
+    // Seed the store with previously loaded good data.
+    useSub2ApiDashboardStore.setState({
+      accounts: [account],
+      quotaAccounts: [account],
+      overview,
+      points: [point],
+      models: [model],
+      rankings: [ranking],
+    })
+
+    mockedFetchSub2ApiAccounts.mockRejectedValue(new Error('accounts down'))
+    mockedFetchSub2ApiOverview.mockResolvedValue(overview)
+    mockedFetchSub2ApiTimeseries.mockResolvedValue([point])
+    mockedFetchSub2ApiModels.mockResolvedValue([model])
+    mockedFetchSub2ApiRankings.mockResolvedValue([ranking])
+    mockedFetchSub2ApiRankingTrend.mockResolvedValue({ points: [], granularity: 'day' })
+    mockedFetchSub2ApiEvents.mockResolvedValue(eventsResponse)
+
+    await useSub2ApiDashboardStore.getState().refresh({ background: true })
+
+    const state = useSub2ApiDashboardStore.getState()
+    // Rejected accounts fetch must keep the last good value, not wipe to [].
+    expect(state.accounts).toEqual([account])
+    expect(state.quotaAccounts).toEqual([account])
+    // The failure is still surfaced via the error field.
+    expect(state.error).toBe('accounts down')
+  })
+
+  it('background refresh preserves the current events page', async () => {
+    mockedFetchSub2ApiAccounts.mockResolvedValue([account])
+    mockedFetchSub2ApiOverview.mockResolvedValue(overview)
+    mockedFetchSub2ApiTimeseries.mockResolvedValue([point])
+    mockedFetchSub2ApiModels.mockResolvedValue([model])
+    mockedFetchSub2ApiRankings.mockResolvedValue([ranking])
+    mockedFetchSub2ApiRankingTrend.mockResolvedValue({ points: [], granularity: 'day' })
+    mockedFetchSub2ApiEvents.mockResolvedValue(eventsResponse)
+    // User is browsing page 5.
+    useSub2ApiDashboardStore.setState({ events: { events: [], total: 500, page: 5, limit: 100 } })
+
+    await useSub2ApiDashboardStore.getState().refresh({ hours: 24, background: true })
+
+    expect(mockedFetchSub2ApiEvents).toHaveBeenCalledWith({ page: 5, limit: 100, hours: 24 })
+  })
+
+  it('foreground refresh resets the events page to 1', async () => {
+    mockedFetchSub2ApiAccounts.mockResolvedValue([account])
+    mockedFetchSub2ApiOverview.mockResolvedValue(overview)
+    mockedFetchSub2ApiTimeseries.mockResolvedValue([point])
+    mockedFetchSub2ApiModels.mockResolvedValue([model])
+    mockedFetchSub2ApiRankings.mockResolvedValue([ranking])
+    mockedFetchSub2ApiRankingTrend.mockResolvedValue({ points: [], granularity: 'day' })
+    mockedFetchSub2ApiEvents.mockResolvedValue(eventsResponse)
+    useSub2ApiDashboardStore.setState({ events: { events: [], total: 500, page: 5, limit: 100 } })
+
+    await useSub2ApiDashboardStore.getState().refresh({ hours: 24 })
+
+    expect(mockedFetchSub2ApiEvents).toHaveBeenCalledWith({ page: 1, limit: 100, hours: 24 })
   })
 })

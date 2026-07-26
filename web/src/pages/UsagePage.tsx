@@ -775,9 +775,11 @@ export function UsagePage({ onAuthRequired }: { onAuthRequired?: () => void }) {
 
   useEffect(() => {
     if (activeTab === 'overview') {
-      void loadHealth(getSub2ApiDashboardRange(timeRange, customTimeRange));
+      // Health is a fixed 168h (7-day) window per the backend contract, independent
+      // of the page range selector, so do not refetch when timeRange changes.
+      void loadHealth({ hours: 168 });
     }
-  }, [activeTab, loadHealth, timeRange, customTimeRange]);
+  }, [activeTab, loadHealth]);
 
   const lastSyncAt = useMemo(() => {
     if (!status?.last_run_at) return null;
