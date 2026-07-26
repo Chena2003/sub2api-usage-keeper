@@ -3,13 +3,13 @@ services:
     image: sub2api-usage-keeper:latest
     container_name: sub2api-usage-keeper
     restart: unless-stopped
+    env_file:
+      - .env
     environment:
-      SUB2API_DATABASE_URL: postgres://sub2api:${SUB2API_POSTGRES_PASSWORD}@sub2api-postgres:5432/sub2api?sslmode=disable
-      APP_PORT: "8080"
-      TZ: Asia/Shanghai
+      # 容器内数据目录固定为挂载卷路径，覆盖 .env 中的相对路径默认值。
       WORK_DIR: /data
     volumes:
-      - ./usage-dashboard/data:/data
+      - ./data:/data
     ports:
       - "127.0.0.1:8082:8080"
     networks:

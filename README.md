@@ -13,13 +13,6 @@ Sub2API Usage Keeper 是一个独立的 sidecar 仪表盘服务，用于 [Sub2AP
 
 服务端通过只读连接直接查询 Sub2API PostgreSQL，不消费 Redis usage 队列，也不把 Sub2API 请求事件复制到本地 SQLite。SQLite 仅用于应用自身仍保留的本地数据、清理和备份。
 
-## 预览
-
-<p float="left">
-  <img src="docs/screenshots/overview.png" width="49%" alt="总览面板" />
-  <img src="docs/screenshots/ranking.png" width="49%" alt="排行榜" />
-</p>
-
 ## 功能特性
 
 - 📊 **用量总览** — 请求量、Token 消耗、成本统计，支持日/时维度切换
@@ -159,9 +152,24 @@ sub2api-usage-keeper/
 - 浏览器 API **不返回**原始 credentials（email、access token、refresh token、password、session key 等）
 - 用户邮箱自动脱敏：本地部分 > 5 字符保留首 3 尾 2；短本地部分仅保留首字符；域名可见
 - 非邮箱用户标识进行哈希脱敏
-- 生产环境建议使用只读 PostgreSQL 用户
 - 当前没有内置登录页面或密码 session；不要把服务直接暴露到公网
 - 将容器端口绑定到 `127.0.0.1`，通过反向代理终止 HTTPS 并实施访问控制
+
+### 使用只读数据库用户
+
+应用代码本身只执行 `SELECT`，但这只是代码层面的自我约束。请在数据库层面强制只读，
+这样即使连接串泄露或代码将来被误改，也无法写入 Sub2API 生产数据：
+
+```sql
+CREATE USER sub2api_readonly WITH PASSWORD 'replace-with-strong-password';
+GRANT CONNECT ON DATABASE sub2api TO sub2api_readonly;
+GRANT USAGE ON SCHEMA public TO sub2api_readonly;
+GRANT SELECT ON ALL TABLES IN SCHEMA public TO sub2api_readonly;
+-- 让后续新建的表也自动只读
+ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT ON TABLES TO sub2api_readonly;
+```
+
+然后把 `SUB2API_DATABASE_URL` 指向该用户。
 
 ## 致谢
 

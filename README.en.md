@@ -13,13 +13,6 @@ This project is inspired by [CPA Usage Keeper](https://github.com/willxup/cpa-us
 
 The server queries Sub2API PostgreSQL directly through a read-only connection. It does not consume a Redis usage queue or copy Sub2API request events into local SQLite. SQLite is limited to the application's remaining local data, cleanup, and backups.
 
-## Preview
-
-<p float="left">
-  <img src="docs/screenshots/overview.png" width="49%" alt="Overview Panel" />
-  <img src="docs/screenshots/ranking.png" width="49%" alt="Rankings" />
-</p>
-
 ## Features
 
 - 📊 **Usage Overview** — Request volume, token consumption, cost statistics with daily/hourly granularity
@@ -159,9 +152,25 @@ sub2api-usage-keeper/
 - Browser APIs **never return** raw credentials (emails, access tokens, refresh tokens, passwords, session keys, etc.)
 - User emails are automatically masked: local part > 5 chars retains first 3 and last 2; short local parts keep only the first character; domain remains visible
 - Non-email user identifiers are hash-masked
-- Use a read-only PostgreSQL user in production
 - There is no built-in login page or password session; do not expose the service directly to the public Internet
 - Bind container ports to `127.0.0.1`, terminate HTTPS at the reverse proxy, and enforce access control there
+
+### Use a read-only database user
+
+The application only issues `SELECT` statements, but that is a code-level
+self-restriction. Enforce read-only access at the database layer so that neither a
+leaked connection string nor a future code change can write to production data:
+
+```sql
+CREATE USER sub2api_readonly WITH PASSWORD 'replace-with-strong-password';
+GRANT CONNECT ON DATABASE sub2api TO sub2api_readonly;
+GRANT USAGE ON SCHEMA public TO sub2api_readonly;
+GRANT SELECT ON ALL TABLES IN SCHEMA public TO sub2api_readonly;
+-- Make future tables read-only as well
+ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT ON TABLES TO sub2api_readonly;
+```
+
+Then point `SUB2API_DATABASE_URL` at that user.
 
 ## Acknowledgments
 
