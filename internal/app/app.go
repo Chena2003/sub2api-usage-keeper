@@ -6,7 +6,10 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"os"
+	"os/signal"
 	"sync"
+	"syscall"
 	"time"
 
 	"sub2api-usage-keeper/internal/api"
@@ -21,6 +24,9 @@ import (
 	"github.com/sirupsen/logrus"
 	"gorm.io/gorm"
 )
+
+// shutdownTimeout bounds how long in-flight requests have to drain on SIGTERM/SIGINT.
+const shutdownTimeout = 10 * time.Second
 
 // Runner 是 App 后台任务的最小接口，具体语义由字段名和实现方法表达。
 type Runner interface {
@@ -80,7 +86,7 @@ func NewWithConfig(cfg config.Config) (*App, error) {
 		_ = logCloser.Close()
 		return nil, err
 	}
-	sub2apiRepo, err := openSub2APIRepository(cfg.Sub2APIDatabaseURL)
+	sub2apiRepo, err := openSub2APIRepository(cfg.Sub2APIDatabaseURL, cfg.TimeZone)
 	if err != nil {
 		_ = closeGormDB(db)
 		_ = logCloser.Close()
@@ -176,16 +182,45 @@ func (a *App) Run() error {
 	}
 
 	server := &http.Server{
-		Addr:    ":" + a.Config.AppPort,
-		Handler: a.Router,
+		Addr:         ":" + a.Config.AppPort,
+		Handler:      a.Router,
 		ReadTimeout:  30 * time.Second,
 		WriteTimeout: 60 * time.Second,
 		IdleTimeout:  120 * time.Second,
 	}
-	if a.Config.TLSEnabled {
-		return server.ListenAndServeTLS(a.Config.TLSCertFile, a.Config.TLSKeyFile)
+
+	// Listen for termination signals so SIGTERM/SIGINT trigger a graceful
+	// shutdown (draining in-flight requests) instead of hard-killing the process
+	// and skipping background-task cleanup.
+	signalCtx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+
+	serveErr := make(chan error, 1)
+	go func() {
+		if a.Config.TLSEnabled {
+			serveErr <- server.ListenAndServeTLS(a.Config.TLSCertFile, a.Config.TLSKeyFile)
+			return
+		}
+		serveErr <- server.ListenAndServe()
+	}()
+
+	select {
+	case err := <-serveErr:
+		if errors.Is(err, http.ErrServerClosed) {
+			return nil
+		}
+		return err
+	case <-signalCtx.Done():
+		stop() // restore default signal handling so a second signal force-quits
+		logrus.Info("shutdown signal received, draining in-flight requests")
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), shutdownTimeout)
+		defer cancel()
+		if err := server.Shutdown(shutdownCtx); err != nil {
+			logrus.Errorf("graceful shutdown failed: %v", err)
+			return err
+		}
+		return nil
 	}
-	return server.ListenAndServe()
 }
 
 func (a *App) startBackgroundContext() context.Context {

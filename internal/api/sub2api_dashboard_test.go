@@ -17,8 +17,10 @@ import (
 type fakeSub2APIDashboardProvider struct {
 	accountsSince     time.Time
 	accountsUntil     time.Time
-	overviewDays      int
-	hourlyHours       int
+	overviewSince     time.Time
+	overviewUntil     time.Time
+	hourlySince       time.Time
+	hourlyUntil       time.Time
 	modelsSince       time.Time
 	modelsUntil       time.Time
 	modelsLimit       int
@@ -46,8 +48,9 @@ func (f *fakeSub2APIDashboardProvider) Accounts(_ context.Context, since time.Ti
 	}, nil
 }
 
-func (f *fakeSub2APIDashboardProvider) Overview(_ context.Context, days int) (quota.Sub2APIOverview, error) {
-	f.overviewDays = days
+func (f *fakeSub2APIDashboardProvider) OverviewByRange(_ context.Context, since time.Time, until time.Time) (quota.Sub2APIOverview, error) {
+	f.overviewSince = since
+	f.overviewUntil = until
 	return quota.Sub2APIOverview{
 		AccountCount:       1,
 		ActiveAccountCount: 1,
@@ -55,16 +58,9 @@ func (f *fakeSub2APIDashboardProvider) Overview(_ context.Context, days int) (qu
 	}, nil
 }
 
-func (f *fakeSub2APIDashboardProvider) OverviewByHours(_ context.Context, hours int) (quota.Sub2APIOverview, error) {
-	return quota.Sub2APIOverview{
-		AccountCount:       1,
-		ActiveAccountCount: 1,
-		TotalRequests:      10,
-	}, nil
-}
-
-func (f *fakeSub2APIDashboardProvider) Hourly(_ context.Context, hours int) ([]sub2api.UsageOverviewRow, error) {
-	f.hourlyHours = hours
+func (f *fakeSub2APIDashboardProvider) HourlyByRange(_ context.Context, since time.Time, until time.Time) ([]sub2api.UsageOverviewRow, error) {
+	f.hourlySince = since
+	f.hourlyUntil = until
 	return []sub2api.UsageOverviewRow{
 		{
 			BucketStart:   time.Date(2026, 5, 17, 12, 0, 0, 0, time.UTC),
@@ -163,11 +159,52 @@ func TestSub2APIOverviewRoute(t *testing.T) {
 	if resp.Code != http.StatusOK {
 		t.Fatalf("expected status 200, got %d", resp.Code)
 	}
-	if provider.overviewDays != 7 {
-		t.Fatalf("expected days 7, got %d", provider.overviewDays)
+	if dur := time.Since(provider.overviewSince); dur < 6*24*time.Hour-time.Minute || dur > 8*24*time.Hour+time.Minute {
+		t.Fatalf("expected overview since ~7d, got %v (dur %v)", provider.overviewSince, dur)
 	}
 	if body := resp.Body.String(); !strings.Contains(body, `"totalRequests":10`) {
 		t.Fatalf("unexpected response body: %s", body)
+	}
+}
+
+func TestSub2APIOverviewRouteHonorsSinceUntil(t *testing.T) {
+	provider := &fakeSub2APIDashboardProvider{}
+	router := gin.New()
+	registerSub2APIDashboardRoutes(router.Group("/api/v1"), provider)
+
+	since := "2026-05-10T00:00:00Z"
+	until := "2026-05-11T00:00:00Z"
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/sub2api/overview?since="+since+"&until="+until, nil)
+	resp := httptest.NewRecorder()
+	router.ServeHTTP(resp, req)
+
+	if resp.Code != http.StatusOK {
+		t.Fatalf("expected status 200, got %d", resp.Code)
+	}
+	wantSince, _ := time.Parse(time.RFC3339, since)
+	wantUntil, _ := time.Parse(time.RFC3339, until)
+	if !provider.overviewSince.Equal(wantSince) {
+		t.Fatalf("expected overview since %v, got %v", wantSince, provider.overviewSince)
+	}
+	if !provider.overviewUntil.Equal(wantUntil) {
+		t.Fatalf("expected overview until %v, got %v", wantUntil, provider.overviewUntil)
+	}
+}
+
+func TestSub2APIOverviewRouteHonorsHours(t *testing.T) {
+	provider := &fakeSub2APIDashboardProvider{}
+	router := gin.New()
+	registerSub2APIDashboardRoutes(router.Group("/api/v1"), provider)
+
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/sub2api/overview?hours=8", nil)
+	resp := httptest.NewRecorder()
+	router.ServeHTTP(resp, req)
+
+	if resp.Code != http.StatusOK {
+		t.Fatalf("expected status 200, got %d", resp.Code)
+	}
+	if dur := time.Since(provider.overviewSince); dur < 7*time.Hour || dur > 9*time.Hour {
+		t.Fatalf("expected overview since ~8h, got %v (dur %v)", provider.overviewSince, dur)
 	}
 }
 
@@ -183,11 +220,35 @@ func TestSub2APITimeseriesRoute(t *testing.T) {
 	if resp.Code != http.StatusOK {
 		t.Fatalf("expected status 200, got %d", resp.Code)
 	}
-	if provider.hourlyHours != 24 {
-		t.Fatalf("expected hours 24, got %d", provider.hourlyHours)
+	if dur := time.Since(provider.hourlySince); dur < 23*time.Hour || dur > 25*time.Hour {
+		t.Fatalf("expected timeseries since ~24h, got %v (dur %v)", provider.hourlySince, dur)
 	}
 	if body := resp.Body.String(); !strings.Contains(body, `"points":[`) {
 		t.Fatalf("unexpected response body: %s", body)
+	}
+}
+
+func TestSub2APITimeseriesRouteHonorsSinceUntil(t *testing.T) {
+	provider := &fakeSub2APIDashboardProvider{}
+	router := gin.New()
+	registerSub2APIDashboardRoutes(router.Group("/api/v1"), provider)
+
+	since := "2026-05-10T00:00:00Z"
+	until := "2026-05-11T00:00:00Z"
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/sub2api/timeseries?since="+since+"&until="+until, nil)
+	resp := httptest.NewRecorder()
+	router.ServeHTTP(resp, req)
+
+	if resp.Code != http.StatusOK {
+		t.Fatalf("expected status 200, got %d", resp.Code)
+	}
+	wantSince, _ := time.Parse(time.RFC3339, since)
+	wantUntil, _ := time.Parse(time.RFC3339, until)
+	if !provider.hourlySince.Equal(wantSince) {
+		t.Fatalf("expected timeseries since %v, got %v", wantSince, provider.hourlySince)
+	}
+	if !provider.hourlyUntil.Equal(wantUntil) {
+		t.Fatalf("expected timeseries until %v, got %v", wantUntil, provider.hourlyUntil)
 	}
 }
 
@@ -290,8 +351,8 @@ func TestSub2APIQueryClampsMaximums(t *testing.T) {
 			path: "/api/v1/sub2api/timeseries?hours=9999",
 			assertions: func(t *testing.T, provider *fakeSub2APIDashboardProvider) {
 				t.Helper()
-				if provider.hourlyHours != 2160 {
-					t.Fatalf("expected hours 2160, got %d", provider.hourlyHours)
+				if dur := time.Since(provider.hourlySince); dur < 89*24*time.Hour-time.Minute || dur > 91*24*time.Hour+time.Minute {
+					t.Fatalf("expected timeseries since ~90d, got %v (dur %v)", provider.hourlySince, dur)
 				}
 			},
 		},
@@ -362,8 +423,8 @@ func TestSub2APIQueryDefaults(t *testing.T) {
 			path: "/api/v1/sub2api/timeseries?hours=-1",
 			assertions: func(t *testing.T, provider *fakeSub2APIDashboardProvider) {
 				t.Helper()
-				if provider.hourlyHours != 24 {
-					t.Fatalf("expected hours 24, got %d", provider.hourlyHours)
+				if dur := time.Since(provider.hourlySince); dur < 6*24*time.Hour-time.Minute || dur > 8*24*time.Hour+time.Minute {
+					t.Fatalf("expected timeseries since ~7d default, got %v (dur %v)", provider.hourlySince, dur)
 				}
 			},
 		},

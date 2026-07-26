@@ -15,9 +15,8 @@ import (
 
 type Sub2APIDashboardProvider interface {
 	Accounts(context.Context, time.Time, time.Time) ([]quota.Sub2APIAccountQuota, error)
-	Overview(context.Context, int) (quota.Sub2APIOverview, error)
-	OverviewByHours(context.Context, int) (quota.Sub2APIOverview, error)
-	Hourly(context.Context, int) ([]sub2api.UsageOverviewRow, error)
+	OverviewByRange(context.Context, time.Time, time.Time) (quota.Sub2APIOverview, error)
+	HourlyByRange(context.Context, time.Time, time.Time) ([]sub2api.UsageOverviewRow, error)
 	Models(context.Context, time.Time, time.Time, int) ([]sub2api.ModelUsageRow, error)
 	Events(context.Context, time.Time, time.Time, int, int) (quota.Sub2APIEventsResponse, error)
 	Rankings(context.Context, string, time.Time, time.Time, int) ([]quota.Sub2APIRankingRow, error)
@@ -47,14 +46,7 @@ func registerSub2APIDashboardRoutes(router gin.IRoutes, provider Sub2APIDashboar
 			return
 		}
 
-		var overview quota.Sub2APIOverview
-		var err error
-		if hoursStr := c.Query("hours"); hoursStr != "" {
-			hours, _ := strconv.Atoi(hoursStr)
-			overview, err = provider.OverviewByHours(c.Request.Context(), hours)
-		} else {
-			overview, err = provider.Overview(c.Request.Context(), sub2APIDaysQuery(c))
-		}
+		overview, err := provider.OverviewByRange(c.Request.Context(), sub2APISinceTimeQuery(c), sub2APIUntilQuery(c))
 		if err != nil {
 			writeInternalError(c, "get sub2api overview failed", err)
 			return
@@ -69,7 +61,7 @@ func registerSub2APIDashboardRoutes(router gin.IRoutes, provider Sub2APIDashboar
 			return
 		}
 
-		points, err := provider.Hourly(c.Request.Context(), sub2APIHoursQuery(c))
+		points, err := provider.HourlyByRange(c.Request.Context(), sub2APISinceTimeQuery(c), sub2APIUntilQuery(c))
 		if err != nil {
 			writeInternalError(c, "get sub2api timeseries failed", err)
 			return
@@ -152,10 +144,6 @@ func registerSub2APIDashboardRoutes(router gin.IRoutes, provider Sub2APIDashboar
 
 		c.JSON(http.StatusOK, health)
 	})
-}
-
-func sub2APIDaysQuery(c *gin.Context) int {
-	return sub2api.ClampDashboardDays(sub2APIQueryInt(c, "days", 7))
 }
 
 // sub2APISinceQuery returns a since timestamp from the hours or days query parameter.

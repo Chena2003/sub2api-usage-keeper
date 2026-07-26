@@ -15,6 +15,8 @@ type Sub2APIReader interface {
 	GetFiveHourAccountUsage(context.Context) ([]sub2api.AccountUsageRow, error)
 	GetDailyOverview(context.Context, int) ([]sub2api.UsageOverviewRow, error)
 	GetHourlyOverview(context.Context, int) ([]sub2api.UsageOverviewRow, error)
+	GetDailyOverviewByRange(context.Context, time.Time, time.Time) ([]sub2api.UsageOverviewRow, error)
+	GetHourlyOverviewByRange(context.Context, time.Time, time.Time) ([]sub2api.UsageOverviewRow, error)
 	GetModelUsage(context.Context, time.Time, time.Time, int) ([]sub2api.ModelUsageRow, error)
 	GetEvents(context.Context, time.Time, time.Time, int, int) ([]sub2api.UsageEventRow, int64, error)
 	GetRankings(context.Context, string, time.Time, time.Time, int) ([]sub2api.RankingRow, error)
@@ -91,26 +93,7 @@ func (s *Sub2APIDashboardService) Overview(ctx context.Context, days int) (quota
 		return quota.Sub2APIOverview{}, err
 	}
 
-	overview := quota.Sub2APIOverview{AccountCount: int64(len(accounts))}
-	for _, account := range accounts {
-		if account.Status == "active" {
-			overview.ActiveAccountCount++
-		}
-	}
-	for _, row := range rows {
-		cacheTokens := row.CacheCreationTokens + row.CacheReadTokens
-		overview.TotalRequests += row.TotalRequests
-		overview.InputTokens += row.InputTokens
-		overview.OutputTokens += row.OutputTokens
-		overview.CacheTokens += cacheTokens
-		overview.ActualCost += row.ActualCost
-		overview.AccountCost += row.AccountCost
-		if row.ActiveUsers > overview.ActiveUsers {
-			overview.ActiveUsers = row.ActiveUsers
-		}
-	}
-	overview.TotalTokens = overview.InputTokens + overview.OutputTokens + overview.CacheTokens
-	return overview, nil
+	return accumulateOverview(accounts, rows), nil
 }
 
 func (s *Sub2APIDashboardService) OverviewByHours(ctx context.Context, hours int) (quota.Sub2APIOverview, error) {
@@ -127,6 +110,57 @@ func (s *Sub2APIDashboardService) OverviewByHours(ctx context.Context, hours int
 		return quota.Sub2APIOverview{}, err
 	}
 
+	return accumulateOverview(accounts, rows), nil
+}
+
+func (s *Sub2APIDashboardService) Hourly(ctx context.Context, hours int) ([]sub2api.UsageOverviewRow, error) {
+	if err := s.validate(); err != nil {
+		return nil, err
+	}
+	return s.reader.GetHourlyOverview(ctx, normalizeHours(hours))
+}
+
+// OverviewByRange aggregates the overview for an explicit [since, until] window.
+// It picks the hourly aggregation table for short windows (<= 48h) and the daily
+// table otherwise, mirroring how RankingTrend chooses its granularity.
+func (s *Sub2APIDashboardService) OverviewByRange(ctx context.Context, since time.Time, until time.Time) (quota.Sub2APIOverview, error) {
+	if err := s.validate(); err != nil {
+		return quota.Sub2APIOverview{}, err
+	}
+
+	accounts, err := s.reader.ListAccounts(ctx)
+	if err != nil {
+		return quota.Sub2APIOverview{}, err
+	}
+
+	normalizedSince, normalizedUntil := normalizeTimeRange(s.currentTime(), since, until)
+	hours := int(s.currentTime().Sub(normalizedSince).Hours())
+
+	var rows []sub2api.UsageOverviewRow
+	if hours <= 48 {
+		rows, err = s.reader.GetHourlyOverviewByRange(ctx, normalizedSince, normalizedUntil)
+	} else {
+		rows, err = s.reader.GetDailyOverviewByRange(ctx, normalizedSince, normalizedUntil)
+	}
+	if err != nil {
+		return quota.Sub2APIOverview{}, err
+	}
+
+	return accumulateOverview(accounts, rows), nil
+}
+
+// HourlyByRange returns hourly overview points for an explicit [since, until] window.
+func (s *Sub2APIDashboardService) HourlyByRange(ctx context.Context, since time.Time, until time.Time) ([]sub2api.UsageOverviewRow, error) {
+	if err := s.validate(); err != nil {
+		return nil, err
+	}
+	normalizedSince, normalizedUntil := normalizeTimeRange(s.currentTime(), since, until)
+	return s.reader.GetHourlyOverviewByRange(ctx, normalizedSince, normalizedUntil)
+}
+
+// accumulateOverview sums per-bucket usage rows into a single overview, taking the
+// MAX active users across buckets and recomputing TotalTokens.
+func accumulateOverview(accounts []sub2api.AccountRow, rows []sub2api.UsageOverviewRow) quota.Sub2APIOverview {
 	overview := quota.Sub2APIOverview{AccountCount: int64(len(accounts))}
 	for _, account := range accounts {
 		if account.Status == "active" {
@@ -146,14 +180,7 @@ func (s *Sub2APIDashboardService) OverviewByHours(ctx context.Context, hours int
 		}
 	}
 	overview.TotalTokens = overview.InputTokens + overview.OutputTokens + overview.CacheTokens
-	return overview, nil
-}
-
-func (s *Sub2APIDashboardService) Hourly(ctx context.Context, hours int) ([]sub2api.UsageOverviewRow, error) {
-	if err := s.validate(); err != nil {
-		return nil, err
-	}
-	return s.reader.GetHourlyOverview(ctx, normalizeHours(hours))
+	return overview
 }
 
 func (s *Sub2APIDashboardService) Models(ctx context.Context, since time.Time, until time.Time, limit int) ([]sub2api.ModelUsageRow, error) {
@@ -225,12 +252,16 @@ func (s *Sub2APIDashboardService) ServiceHealth(ctx context.Context, hours int) 
 	if err := s.validate(); err != nil {
 		return quota.Sub2APIServiceHealth{}, err
 	}
-	hours = sub2api.ClampDashboardHours(hours)
-	blocks, err := s.reader.GetHealthBlocks(ctx, hours)
+	// The health grid is always "today + 6 prior complete calendar days" = 168h,
+	// 7 rows × 96 cols × 15min. It is intentionally decoupled from the page range
+	// (the incoming hours is ignored) so the grid is fully occupied and 15-min SQL
+	// buckets align 1:1 with grid slots.
+	const healthWindowHours = 168
+	blocks, err := s.reader.GetHealthBlocks(ctx, healthWindowHours)
 	if err != nil {
 		return quota.Sub2APIServiceHealth{}, err
 	}
-	return quota.BuildSub2APIServiceHealth(blocks, hours), nil
+	return quota.BuildSub2APIServiceHealth(blocks, healthWindowHours), nil
 }
 
 func (s *Sub2APIDashboardService) validate() error {

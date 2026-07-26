@@ -347,6 +347,22 @@ func TestLoadFromEnvIgnoresRemovedLegacySyncEnvVars(t *testing.T) {
 	}
 }
 
+func TestLoadFromEnvIgnoresLegacyAuthEnvVars(t *testing.T) {
+	setRequiredSub2APIEnv(t)
+	t.Setenv("AUTH_ENABLED", "true")
+	t.Setenv("LOGIN_PASSWORD", "secret")
+	t.Setenv("AUTH_SESSION_TTL", "1h")
+
+	cfg, err := LoadFromEnv()
+	if err != nil {
+		t.Fatalf("LoadFromEnv should ignore legacy auth env vars, got error: %v", err)
+	}
+	// The app has no auth config field; these vars are ignored (only warned about).
+	if cfg == nil {
+		t.Fatal("expected config to load despite legacy auth env vars")
+	}
+}
+
 func TestLoadFromEnvParsesOverrides(t *testing.T) {
 	setRequiredSub2APIEnv(t)
 	t.Setenv("WORK_DIR", "/tmp/work")

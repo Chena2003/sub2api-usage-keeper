@@ -11,7 +11,18 @@ import (
 	"time"
 
 	"github.com/joho/godotenv"
+	"github.com/sirupsen/logrus"
 )
+
+// legacyAuthEnvKeys are security-related environment variables from earlier
+// designs. This service has NO built-in authentication, so these are silently
+// ignored — we warn operators who set them to avoid a false sense of protection.
+var legacyAuthEnvKeys = []string{
+	"AUTH_ENABLED",
+	"LOGIN_PASSWORD",
+	"AUTH_SESSION_TTL",
+	"PUBLIC_MODE",
+}
 
 const DefaultTimeZone = "Asia/Shanghai"
 
@@ -38,6 +49,8 @@ type Config struct {
 	TLSKeyFile string
 	// Sub2APIDatabaseURL 是 Sub2API PostgreSQL 数据库连接地址。
 	Sub2APIDatabaseURL string
+	// TimeZone 是应用时区名称（IANA），用于 time.Local 以及跨服务的 bucket_date 时区契约。
+	TimeZone string
 	// WorkDir 是应用工作目录，数据库、日志和备份默认从这里派生。
 	WorkDir string
 	// SQLitePath 是 SQLite 数据库文件路径。
@@ -81,7 +94,8 @@ func Load(options LoadOptions) (*Config, error) {
 	if err != nil {
 		return nil, err
 	}
-	if err := applyProjectTimeZone(); err != nil {
+	timeZone, err := applyProjectTimeZone()
+	if err != nil {
 		return nil, err
 	}
 
@@ -137,6 +151,7 @@ func Load(options LoadOptions) (*Config, error) {
 		TLSCertFile:          strings.TrimSpace(os.Getenv("TLS_CERT_FILE")),
 		TLSKeyFile:           strings.TrimSpace(os.Getenv("TLS_KEY_FILE")),
 		Sub2APIDatabaseURL:   strings.TrimSpace(os.Getenv("SUB2API_DATABASE_URL")),
+		TimeZone:             timeZone,
 		WorkDir:              workDir,
 		SQLitePath:           filepath.Join(workDir, workDirDatabaseName),
 		BackupEnabled:        backupEnabled,
@@ -161,23 +176,40 @@ func Load(options LoadOptions) (*Config, error) {
 	}
 	cfg.resolveRelativePaths(envBaseDir)
 
+	warnIgnoredLegacyAuthEnv()
+
 	return cfg, nil
 }
 
-func applyProjectTimeZone() error {
+// warnIgnoredLegacyAuthEnv emits a single warning when any legacy auth-related
+// environment variable is set, since this service has no built-in authentication
+// and these variables are ignored.
+func warnIgnoredLegacyAuthEnv() {
+	var present []string
+	for _, key := range legacyAuthEnvKeys {
+		if _, ok := os.LookupEnv(key); ok {
+			present = append(present, key)
+		}
+	}
+	if len(present) > 0 {
+		logrus.Warnf("ignoring legacy auth environment variables %s: this service has no built-in authentication; protect it with a reverse proxy or network access control", strings.Join(present, ", "))
+	}
+}
+
+func applyProjectTimeZone() (string, error) {
 	zoneName := strings.TrimSpace(os.Getenv("TZ"))
 	if zoneName == "" {
 		zoneName = DefaultTimeZone
 		if err := os.Setenv("TZ", zoneName); err != nil {
-			return fmt.Errorf("set default TZ: %w", err)
+			return "", fmt.Errorf("set default TZ: %w", err)
 		}
 	}
 	location, err := time.LoadLocation(zoneName)
 	if err != nil {
-		return fmt.Errorf("TZ is invalid: %w", err)
+		return "", fmt.Errorf("TZ is invalid: %w", err)
 	}
 	time.Local = location
-	return nil
+	return zoneName, nil
 }
 
 func loadDotEnv(options LoadOptions) (string, error) {

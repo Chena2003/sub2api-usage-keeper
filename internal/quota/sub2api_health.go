@@ -67,16 +67,16 @@ func BuildSub2APIServiceHealth(blocks []sub2api.HealthBlockRow, hours int) Sub2A
 		if idx < 0 || idx >= totalBlocks {
 			continue
 		}
-		rate := float64(-1)
-		if b.TotalCount > 0 {
-			rate = float64(b.SuccessCount) / float64(b.TotalCount) * 100
-		}
-		details[idx] = Sub2APIServiceHealthBlock{
-			StartTime: b.BucketStart,
-			EndTime:   b.BucketEnd,
-			Success:   b.SuccessCount,
-			Failure:   b.FailureCount,
-			Rate:      rate,
+		// Accumulate into the slot rather than overwrite: when bucketSpan exceeds
+		// the SQL bucket granularity (defense-in-depth), multiple SQL buckets can
+		// map to one grid slot. With the fixed 168h window bucketSpan is 15min and
+		// this is a 1:1 no-op. StartTime/EndTime track the grid slot bounds.
+		slot := &details[idx]
+		slot.Success += b.SuccessCount
+		slot.Failure += b.FailureCount
+		total := slot.Success + slot.Failure
+		if total > 0 {
+			slot.Rate = float64(slot.Success) / float64(total) * 100
 		}
 	}
 

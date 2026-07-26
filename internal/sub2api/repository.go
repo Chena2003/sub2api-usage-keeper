@@ -3,6 +3,8 @@ package sub2api
 import (
 	"context"
 	"fmt"
+	"net/url"
+	"strings"
 	"time"
 
 	"gorm.io/driver/postgres"
@@ -20,7 +22,13 @@ type Repository struct {
 	db *gorm.DB
 }
 
-func Open(databaseURL string) (*Repository, error) {
+func Open(databaseURL string, timeZone string) (*Repository, error) {
+	// Pin the DB session timezone so current_date / date_trunc align with the
+	// timezone upstream Sub2API uses to write bucket_date (cross-service contract).
+	// Without this, GetDailyOverview's `current_date` would depend on the server's
+	// unspecified session timezone and could select the wrong calendar days.
+	databaseURL = withDSNTimeZone(databaseURL, timeZone)
+
 	db, err := gorm.Open(postgres.Open(databaseURL), &gorm.Config{})
 	if err != nil {
 		return nil, fmt.Errorf("open sub2api postgres: %w", err)
@@ -40,6 +48,37 @@ func Open(databaseURL string) (*Repository, error) {
 
 func NewRepository(db *gorm.DB) *Repository {
 	return &Repository{db: db}
+}
+
+// withDSNTimeZone appends a TimeZone setting to the postgres DSN when the caller
+// has not already specified one. It supports both URL DSNs (postgres://...) and
+// keyword/value DSNs (host=... port=...). An empty timeZone leaves the DSN as-is.
+func withDSNTimeZone(databaseURL string, timeZone string) string {
+	timeZone = strings.TrimSpace(timeZone)
+	if timeZone == "" {
+		return databaseURL
+	}
+	if strings.HasPrefix(databaseURL, "postgres://") || strings.HasPrefix(databaseURL, "postgresql://") {
+		parsed, err := url.Parse(databaseURL)
+		if err != nil {
+			return databaseURL
+		}
+		query := parsed.Query()
+		if query.Get("TimeZone") != "" || query.Get("timezone") != "" {
+			return databaseURL
+		}
+		query.Set("TimeZone", timeZone)
+		parsed.RawQuery = query.Encode()
+		return parsed.String()
+	}
+	// Keyword/value DSN.
+	if strings.Contains(strings.ToLower(databaseURL), "timezone=") {
+		return databaseURL
+	}
+	if strings.TrimSpace(databaseURL) == "" {
+		return databaseURL
+	}
+	return strings.TrimSpace(databaseURL) + " TimeZone=" + timeZone
 }
 
 func (r *Repository) database() (*gorm.DB, error) {
@@ -207,6 +246,90 @@ func (r *Repository) GetHourlyOverview(ctx context.Context, hours int) ([]UsageO
 	return rows, nil
 }
 
+// GetDailyOverviewByRange returns daily overview rows within [since, until].
+// A zero until means "no upper bound". bucket_date is compared against the
+// timestamps directly (postgres casts the date to midnight); the session
+// timezone is pinned in Open so this aligns with upstream's bucket_date writes.
+func (r *Repository) GetDailyOverviewByRange(ctx context.Context, since time.Time, until time.Time) ([]UsageOverviewRow, error) {
+	db, err := r.database()
+	if err != nil {
+		return nil, fmt.Errorf("get sub2api daily overview by range: %w", err)
+	}
+
+	var rows []UsageOverviewRow
+	untilClause, untilArg := untilClauseColumnAndArg(until, "bucket_date")
+	query := fmt.Sprintf(`
+		SELECT
+			bucket_date,
+			total_requests,
+			input_tokens,
+			output_tokens,
+			cache_creation_tokens,
+			cache_read_tokens,
+			total_cost,
+			actual_cost,
+			account_cost,
+			total_duration_ms,
+			active_users
+		FROM usage_dashboard_daily
+		WHERE bucket_date >= ?
+		%s
+		ORDER BY bucket_date ASC
+	`, untilClause)
+	args := []any{since}
+	if untilArg != nil {
+		args = append(args, untilArg)
+	}
+	if err := db.WithContext(ctx).Raw(query, args...).Scan(&rows).Error; err != nil {
+		return nil, fmt.Errorf("get sub2api daily overview by range: %w", err)
+	}
+	if rows == nil {
+		rows = []UsageOverviewRow{}
+	}
+	return rows, nil
+}
+
+// GetHourlyOverviewByRange returns hourly overview rows within [since, until].
+// A zero until means "no upper bound".
+func (r *Repository) GetHourlyOverviewByRange(ctx context.Context, since time.Time, until time.Time) ([]UsageOverviewRow, error) {
+	db, err := r.database()
+	if err != nil {
+		return nil, fmt.Errorf("get sub2api hourly overview by range: %w", err)
+	}
+
+	var rows []UsageOverviewRow
+	untilClause, untilArg := untilClauseColumnAndArg(until, "bucket_start")
+	query := fmt.Sprintf(`
+		SELECT
+			bucket_start,
+			total_requests,
+			input_tokens,
+			output_tokens,
+			cache_creation_tokens,
+			cache_read_tokens,
+			total_cost,
+			actual_cost,
+			account_cost,
+			total_duration_ms,
+			active_users
+		FROM usage_dashboard_hourly
+		WHERE bucket_start >= ?
+		%s
+		ORDER BY bucket_start ASC
+	`, untilClause)
+	args := []any{since}
+	if untilArg != nil {
+		args = append(args, untilArg)
+	}
+	if err := db.WithContext(ctx).Raw(query, args...).Scan(&rows).Error; err != nil {
+		return nil, fmt.Errorf("get sub2api hourly overview by range: %w", err)
+	}
+	if rows == nil {
+		rows = []UsageOverviewRow{}
+	}
+	return rows, nil
+}
+
 func (r *Repository) GetModelUsage(ctx context.Context, since time.Time, until time.Time, limit int) ([]ModelUsageRow, error) {
 	limit = ClampDashboardLimit(limit, 20)
 
@@ -217,11 +340,13 @@ func (r *Repository) GetModelUsage(ctx context.Context, since time.Time, until t
 
 	var rows []ModelUsageRow
 	untilClause, untilArg := untilClauseAndArg(until)
+	// Aggregate purely by model. requested_model / upstream_model are nullable and
+	// often differ from model, so grouping by them splits one model into multiple
+	// partial rows (distorting Top-N and colliding React keys). Match the
+	// aggregation used by rankingColumn("model").
 	query := fmt.Sprintf(`
 		SELECT
 			model,
-			requested_model,
-			upstream_model,
 			COUNT(*) AS total_requests,
 			COALESCE(SUM(input_tokens), 0) AS input_tokens,
 			COALESCE(SUM(output_tokens), 0) AS output_tokens,
@@ -233,7 +358,7 @@ func (r *Repository) GetModelUsage(ctx context.Context, since time.Time, until t
 		FROM usage_logs
 		WHERE created_at >= ?
 		%s
-		GROUP BY model, requested_model, upstream_model
+		GROUP BY model
 		ORDER BY total_requests DESC
 		LIMIT ?
 	`, untilClause)
@@ -583,4 +708,13 @@ func untilClauseAndArg(until time.Time) (string, any) {
 		return "", nil
 	}
 	return "AND created_at <= ?", until
+}
+
+// untilClauseColumnAndArg is like untilClauseAndArg but for an arbitrary bucket
+// column (e.g. bucket_start / bucket_date) used by the overview tables.
+func untilClauseColumnAndArg(until time.Time, column string) (string, any) {
+	if until.IsZero() {
+		return "", nil
+	}
+	return fmt.Sprintf("AND %s <= ?", column), until
 }

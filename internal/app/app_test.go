@@ -4,7 +4,9 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"os"
 	"strings"
+	"syscall"
 	"testing"
 	"time"
 
@@ -77,7 +79,7 @@ func TestNewWithConfigSkipsBackupRunnerWhenDisabled(t *testing.T) {
 
 func TestNewWithConfigRequiresSub2APIRepository(t *testing.T) {
 	previous := openSub2APIRepository
-	openSub2APIRepository = func(string) (*sub2api.Repository, error) {
+	openSub2APIRepository = func(string, string) (*sub2api.Repository, error) {
 		return nil, fmt.Errorf("open sub2api postgres: dial failed")
 	}
 	t.Cleanup(func() { openSub2APIRepository = previous })
@@ -163,10 +165,54 @@ func TestRunCancelsBackgroundTasksWhenRouterStops(t *testing.T) {
 	}
 }
 
+func TestRunGracefulShutdownOnSignal(t *testing.T) {
+	cfg := testAppConfig(t)
+	cfg.AppPort = "0" // OS-assigned free port so ListenAndServe actually starts
+	backupCanceled := make(chan struct{})
+	backupRunner := NewDatabaseBackupRunner(&databaseBackupWriterStub{}, nil, time.Second, 0)
+	backupRunner.sleep = func(ctx context.Context, _ time.Duration) bool {
+		<-ctx.Done()
+		close(backupCanceled)
+		return false
+	}
+	app := &App{
+		Config:            &cfg,
+		Router:            gin.New(),
+		BackupMaintenance: backupRunner,
+	}
+
+	runErr := make(chan error, 1)
+	go func() { runErr <- app.Run() }()
+
+	// Give the server a moment to start, then deliver SIGTERM to ourselves.
+	time.Sleep(100 * time.Millisecond)
+	proc, err := os.FindProcess(os.Getpid())
+	if err != nil {
+		t.Fatalf("find process: %v", err)
+	}
+	if err := proc.Signal(syscall.SIGTERM); err != nil {
+		t.Fatalf("send SIGTERM: %v", err)
+	}
+
+	select {
+	case err := <-runErr:
+		if err != nil {
+			t.Fatalf("expected graceful shutdown to return nil, got %v", err)
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("expected Run to return after SIGTERM")
+	}
+	select {
+	case <-backupCanceled:
+	case <-time.After(time.Second):
+		t.Fatal("expected background task context to be canceled on shutdown")
+	}
+}
+
 func installSub2APITestRepository(t *testing.T) {
 	t.Helper()
 	previous := openSub2APIRepository
-	openSub2APIRepository = func(string) (*sub2api.Repository, error) {
+	openSub2APIRepository = func(string, string) (*sub2api.Repository, error) {
 		db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
 		if err != nil {
 			return nil, err

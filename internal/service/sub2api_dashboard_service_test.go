@@ -20,6 +20,10 @@ type fakeSub2APIReader struct {
 	eventsTotal          int64
 	lastDailyDays        int
 	lastHourlyHours      int
+	lastDailyRangeSince  time.Time
+	lastDailyRangeUntil  time.Time
+	lastHourlyRangeSince time.Time
+	lastHourlyRangeUntil time.Time
 	lastAccountSince     time.Time
 	lastAccountUntil     time.Time
 	lastModelSince       time.Time
@@ -54,6 +58,18 @@ func (f *fakeSub2APIReader) GetDailyOverview(_ context.Context, days int) ([]sub
 
 func (f *fakeSub2APIReader) GetHourlyOverview(_ context.Context, hours int) ([]sub2api.UsageOverviewRow, error) {
 	f.lastHourlyHours = hours
+	return f.hourlyOverview, nil
+}
+
+func (f *fakeSub2APIReader) GetDailyOverviewByRange(_ context.Context, since time.Time, until time.Time) ([]sub2api.UsageOverviewRow, error) {
+	f.lastDailyRangeSince = since
+	f.lastDailyRangeUntil = until
+	return f.dailyOverview, nil
+}
+
+func (f *fakeSub2APIReader) GetHourlyOverviewByRange(_ context.Context, since time.Time, until time.Time) ([]sub2api.UsageOverviewRow, error) {
+	f.lastHourlyRangeSince = since
+	f.lastHourlyRangeUntil = until
 	return f.hourlyOverview, nil
 }
 
@@ -370,6 +386,73 @@ func TestSub2APIDashboardValidateDoesNotSetDefaultNow(t *testing.T) {
 	}
 	if service.now != nil {
 		t.Fatal("expected validate to leave now unset")
+	}
+}
+
+func TestSub2APIDashboardOverviewByRangeUsesHourlyForShortWindow(t *testing.T) {
+	reader := &fakeSub2APIReader{
+		accounts: []sub2api.AccountRow{{ID: 1, Status: "active"}},
+		hourlyOverview: []sub2api.UsageOverviewRow{
+			{TotalRequests: 3, InputTokens: 10, OutputTokens: 20, CacheReadTokens: 2, ActiveUsers: 2},
+			{TotalRequests: 7, InputTokens: 30, OutputTokens: 40, CacheReadTokens: 4, ActiveUsers: 5},
+		},
+	}
+	fixedNow := time.Date(2026, time.May, 17, 12, 30, 0, 0, time.UTC)
+	service := NewSub2APIDashboardService(reader)
+	service.now = func() time.Time { return fixedNow }
+
+	since := fixedNow.Add(-8 * time.Hour)
+	until := fixedNow
+	overview, err := service.OverviewByRange(context.Background(), since, until)
+	if err != nil {
+		t.Fatalf("OverviewByRange returned error: %v", err)
+	}
+	if !reader.lastHourlyRangeSince.Equal(since) || !reader.lastHourlyRangeUntil.Equal(until) {
+		t.Fatalf("expected hourly range [%v,%v], got [%v,%v]", since, until, reader.lastHourlyRangeSince, reader.lastHourlyRangeUntil)
+	}
+	if !reader.lastDailyRangeSince.IsZero() {
+		t.Fatal("expected daily range NOT to be queried for short window")
+	}
+	if overview.TotalRequests != 10 || overview.TotalTokens != 106 || overview.ActiveUsers != 5 {
+		t.Fatalf("unexpected overview: %#v", overview)
+	}
+}
+
+func TestSub2APIDashboardOverviewByRangeUsesDailyForLongWindow(t *testing.T) {
+	reader := &fakeSub2APIReader{
+		accounts:      []sub2api.AccountRow{{ID: 1, Status: "active"}},
+		dailyOverview: []sub2api.UsageOverviewRow{{TotalRequests: 5, InputTokens: 1}},
+	}
+	fixedNow := time.Date(2026, time.May, 17, 12, 30, 0, 0, time.UTC)
+	service := NewSub2APIDashboardService(reader)
+	service.now = func() time.Time { return fixedNow }
+
+	since := fixedNow.Add(-72 * time.Hour)
+	until := fixedNow
+	if _, err := service.OverviewByRange(context.Background(), since, until); err != nil {
+		t.Fatalf("OverviewByRange returned error: %v", err)
+	}
+	if !reader.lastDailyRangeSince.Equal(since) || !reader.lastDailyRangeUntil.Equal(until) {
+		t.Fatalf("expected daily range [%v,%v], got [%v,%v]", since, until, reader.lastDailyRangeSince, reader.lastDailyRangeUntil)
+	}
+	if !reader.lastHourlyRangeSince.IsZero() {
+		t.Fatal("expected hourly range NOT to be queried for long window")
+	}
+}
+
+func TestSub2APIDashboardHourlyByRangePassesRange(t *testing.T) {
+	reader := &fakeSub2APIReader{}
+	fixedNow := time.Date(2026, time.May, 17, 12, 30, 0, 0, time.UTC)
+	service := NewSub2APIDashboardService(reader)
+	service.now = func() time.Time { return fixedNow }
+
+	since := fixedNow.Add(-24 * time.Hour)
+	until := fixedNow
+	if _, err := service.HourlyByRange(context.Background(), since, until); err != nil {
+		t.Fatalf("HourlyByRange returned error: %v", err)
+	}
+	if !reader.lastHourlyRangeSince.Equal(since) || !reader.lastHourlyRangeUntil.Equal(until) {
+		t.Fatalf("expected hourly range [%v,%v], got [%v,%v]", since, until, reader.lastHourlyRangeSince, reader.lastHourlyRangeUntil)
 	}
 }
 

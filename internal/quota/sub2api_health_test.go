@@ -93,3 +93,57 @@ func TestBuildSub2APIServiceHealth_IdleSlots(t *testing.T) {
 		}
 	}
 }
+
+// TestBuildSub2APIServiceHealth_FixedWindowIgnoresShortHours proves the grid is
+// always 168h / 672 15-min blocks even when the page range (hours) is small.
+func TestBuildSub2APIServiceHealth_FixedWindowIgnoresShortHours(t *testing.T) {
+	for _, hours := range []int{8, 24, 168} {
+		result := BuildSub2APIServiceHealth(nil, hours)
+		if len(result.BlockDetails) != healthRows*healthDefaultColumns {
+			t.Fatalf("hours=%d: BlockDetails length = %d, want %d", hours, len(result.BlockDetails), healthRows*healthDefaultColumns)
+		}
+		if result.BucketSeconds != 900 {
+			t.Fatalf("hours=%d: BucketSeconds = %d, want 900", hours, result.BucketSeconds)
+		}
+		expectedDuration := time.Duration(healthRows*healthDefaultColumns) * 15 * time.Minute
+		if got := result.WindowEnd.Sub(result.WindowStart); got != expectedDuration {
+			t.Fatalf("hours=%d: window span = %v, want %v (168h)", hours, got, expectedDuration)
+		}
+	}
+}
+
+// TestBuildSub2APIServiceHealth_AccumulatesColocatedBlocks proves that when two
+// SQL buckets land in the same grid slot their counts accumulate (defense-in-depth
+// for bucketSpan > SQL granularity) rather than the second overwriting the first.
+func TestBuildSub2APIServiceHealth_AccumulatesColocatedBlocks(t *testing.T) {
+	now := time.Now()
+	windowEnd := time.Date(now.Year(), now.Month(), now.Day()+1, 0, 0, 0, 0, time.Local)
+	totalBlocks := healthRows * healthDefaultColumns
+	windowStart := windowEnd.Add(-time.Duration(totalBlocks) * 15 * time.Minute)
+
+	// Two blocks both mapping to index 0 (same 15-min grid slot).
+	blockA := sub2api.HealthBlockRow{
+		BucketStart:  windowStart,
+		BucketEnd:    windowStart.Add(15 * time.Minute),
+		SuccessCount: 8,
+		FailureCount: 2,
+		TotalCount:   10,
+	}
+	blockB := sub2api.HealthBlockRow{
+		BucketStart:  windowStart.Add(5 * time.Minute),
+		BucketEnd:    windowStart.Add(15 * time.Minute),
+		SuccessCount: 2,
+		FailureCount: 3,
+		TotalCount:   5,
+	}
+
+	result := BuildSub2APIServiceHealth([]sub2api.HealthBlockRow{blockA, blockB}, 168)
+
+	if result.BlockDetails[0].Success != 10 || result.BlockDetails[0].Failure != 5 {
+		t.Fatalf("idx 0: got success=%d failure=%d, want 10/5", result.BlockDetails[0].Success, result.BlockDetails[0].Failure)
+	}
+	// rate = 10 / 15 * 100
+	if got := result.BlockDetails[0].Rate; got < 66.6 || got > 66.7 {
+		t.Fatalf("idx 0 rate = %f, want ~66.67", got)
+	}
+}

@@ -232,6 +232,182 @@ func TestRepositoryRankingsAndEventsUseSub2APIUsageLogColumns(t *testing.T) {
 	}
 }
 
+func TestGetModelUsageAggregatesByModelOnly(t *testing.T) {
+	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
+	if err != nil {
+		t.Fatalf("open sqlite database: %v", err)
+	}
+	if err := db.Exec(`
+		CREATE TABLE usage_logs (
+			id INTEGER PRIMARY KEY,
+			created_at DATETIME NOT NULL,
+			model TEXT,
+			requested_model TEXT,
+			upstream_model TEXT,
+			input_tokens INTEGER,
+			output_tokens INTEGER,
+			cache_creation_tokens INTEGER,
+			cache_read_tokens INTEGER,
+			total_cost REAL,
+			actual_cost REAL,
+			duration_ms INTEGER
+		)
+	`).Error; err != nil {
+		t.Fatalf("create usage_logs table: %v", err)
+	}
+
+	createdAt := time.Now().Add(-time.Hour)
+	// Same model, differing requested_model / upstream_model. Previously this
+	// split into 3 rows; now it must collapse into 1 aggregated row.
+	insert := func(id int, requested, upstream string, in int) {
+		if err := db.Exec(`
+			INSERT INTO usage_logs (id, created_at, model, requested_model, upstream_model, input_tokens, output_tokens, cache_creation_tokens, cache_read_tokens, total_cost, actual_cost, duration_ms)
+			VALUES (?, ?, 'claude-sonnet', ?, ?, ?, 0, 0, 0, 0, 0, 100)
+		`, id, createdAt, requested, upstream, in).Error; err != nil {
+			t.Fatalf("insert usage log %d: %v", id, err)
+		}
+	}
+	insert(1, "sonnet", "claude-3-5-sonnet", 10)
+	insert(2, "", "claude-3-5-sonnet", 20)
+	insert(3, "sonnet", "", 30)
+
+	repository := NewRepository(db)
+	rows, err := repository.GetModelUsage(context.Background(), time.Now().Add(-24*time.Hour), time.Time{}, 20)
+	if err != nil {
+		t.Fatalf("GetModelUsage() error = %v", err)
+	}
+	if len(rows) != 1 {
+		t.Fatalf("GetModelUsage() = %+v, want a single aggregated model row", rows)
+	}
+	if rows[0].Model != "claude-sonnet" || rows[0].TotalRequests != 3 || rows[0].InputTokens != 60 {
+		t.Fatalf("unexpected aggregated row: %+v", rows[0])
+	}
+}
+
+func TestGetOverviewByRangeFiltersBucketColumns(t *testing.T) {
+	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
+	if err != nil {
+		t.Fatalf("open sqlite database: %v", err)
+	}
+	if err := db.Exec(`
+		CREATE TABLE usage_dashboard_hourly (
+			bucket_start DATETIME,
+			total_requests INTEGER,
+			input_tokens INTEGER,
+			output_tokens INTEGER,
+			cache_creation_tokens INTEGER,
+			cache_read_tokens INTEGER,
+			total_cost REAL,
+			actual_cost REAL,
+			account_cost REAL,
+			total_duration_ms INTEGER,
+			active_users INTEGER
+		)
+	`).Error; err != nil {
+		t.Fatalf("create usage_dashboard_hourly: %v", err)
+	}
+	if err := db.Exec(`
+		CREATE TABLE usage_dashboard_daily (
+			bucket_date DATETIME,
+			total_requests INTEGER,
+			input_tokens INTEGER,
+			output_tokens INTEGER,
+			cache_creation_tokens INTEGER,
+			cache_read_tokens INTEGER,
+			total_cost REAL,
+			actual_cost REAL,
+			account_cost REAL,
+			total_duration_ms INTEGER,
+			active_users INTEGER
+		)
+	`).Error; err != nil {
+		t.Fatalf("create usage_dashboard_daily: %v", err)
+	}
+
+	base := time.Date(2026, 5, 17, 0, 0, 0, 0, time.UTC)
+	for i := 0; i < 5; i++ {
+		if err := db.Exec(`INSERT INTO usage_dashboard_hourly (bucket_start, total_requests) VALUES (?, ?)`, base.Add(time.Duration(i)*time.Hour), int64(i+1)).Error; err != nil {
+			t.Fatalf("insert hourly: %v", err)
+		}
+	}
+	for i := 0; i < 5; i++ {
+		if err := db.Exec(`INSERT INTO usage_dashboard_daily (bucket_date, total_requests) VALUES (?, ?)`, base.AddDate(0, 0, i), int64(i+1)).Error; err != nil {
+			t.Fatalf("insert daily: %v", err)
+		}
+	}
+
+	repository := NewRepository(db)
+
+	// Hourly: [base+1h, base+3h] must yield buckets at +1,+2,+3 => 3 rows.
+	hourly, err := repository.GetHourlyOverviewByRange(context.Background(), base.Add(time.Hour), base.Add(3*time.Hour))
+	if err != nil {
+		t.Fatalf("GetHourlyOverviewByRange() error = %v", err)
+	}
+	if len(hourly) != 3 {
+		t.Fatalf("GetHourlyOverviewByRange() returned %d rows, want 3", len(hourly))
+	}
+
+	// Zero until means no upper bound => all 5 rows from +1h onward except first.
+	hourlyOpen, err := repository.GetHourlyOverviewByRange(context.Background(), base.Add(time.Hour), time.Time{})
+	if err != nil {
+		t.Fatalf("GetHourlyOverviewByRange(open) error = %v", err)
+	}
+	if len(hourlyOpen) != 4 {
+		t.Fatalf("GetHourlyOverviewByRange(open) returned %d rows, want 4", len(hourlyOpen))
+	}
+
+	// Daily: [base+1d, base+2d] => 2 rows.
+	daily, err := repository.GetDailyOverviewByRange(context.Background(), base.AddDate(0, 0, 1), base.AddDate(0, 0, 2))
+	if err != nil {
+		t.Fatalf("GetDailyOverviewByRange() error = %v", err)
+	}
+	if len(daily) != 2 {
+		t.Fatalf("GetDailyOverviewByRange() returned %d rows, want 2", len(daily))
+	}
+}
+
+func TestWithDSNTimeZone(t *testing.T) {
+	tests := []struct {
+		name string
+		dsn  string
+		tz   string
+		want string
+	}{
+		{
+			name: "url dsn without timezone gets one",
+			dsn:  "postgres://u:p@h:5432/db?sslmode=disable",
+			tz:   "Asia/Shanghai",
+			want: "TimeZone=Asia%2FShanghai",
+		},
+		{
+			name: "keyword dsn without timezone gets one",
+			dsn:  "host=h port=5432 dbname=db",
+			tz:   "Asia/Shanghai",
+			want: "TimeZone=Asia/Shanghai",
+		},
+		{
+			name: "empty timezone leaves dsn untouched",
+			dsn:  "host=h port=5432 dbname=db",
+			tz:   "",
+			want: "host=h port=5432 dbname=db",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := withDSNTimeZone(tt.dsn, tt.tz)
+			if !strings.Contains(got, tt.want) {
+				t.Fatalf("withDSNTimeZone(%q, %q) = %q, want to contain %q", tt.dsn, tt.tz, got, tt.want)
+			}
+		})
+	}
+
+	// Existing TimeZone must not be duplicated / overridden.
+	dsn := "postgres://u:p@h:5432/db?TimeZone=UTC"
+	if got := withDSNTimeZone(dsn, "Asia/Shanghai"); got != dsn {
+		t.Fatalf("withDSNTimeZone should not override existing TimeZone, got %q", got)
+	}
+}
+
 func TestUsageSummaryTotalTokens(t *testing.T) {
 	row := UsageOverviewRow{
 		InputTokens:         10,
