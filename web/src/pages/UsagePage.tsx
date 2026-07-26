@@ -25,7 +25,6 @@ import { IconRefreshCw } from '@/components/ui/icons';
 import { useHeaderRefresh } from '@/hooks/useHeaderRefresh';
 import { useThemeStore } from '@/stores';
 import {
-  useUsageData,
   usePricingData
 } from '@/components/usage';
 import { AccountQuotasCard, RequestEventsPanel, Sub2ApiOverviewPanel, TokenRankingCard, RankingTrendChart, ModelPricingReferenceCard } from '@/components/sub2api';
@@ -33,8 +32,6 @@ import { useSub2ApiDashboardStore } from '@/stores/useSub2ApiDashboardStore';
 import type { TimeRangeParams } from '@/lib/sub2apiApi';
 import { buildUsageRangeQuery } from '@/utils/usage/rangeQuery';
 import {
-  getModelNamesFromUsage,
-  sanitizeChartLines,
   type UsageFilterWindow,
   type UsageTimeRange
 } from '@/utils/usage';
@@ -55,13 +52,10 @@ ChartJS.register(
   Filler
 );
 
-const CHART_LINES_STORAGE_KEY = 'cli-proxy-usage-chart-lines-v1';
 const TIME_RANGE_STORAGE_KEY = 'cli-proxy-usage-time-range-v1';
 const CUSTOM_TIME_RANGE_STORAGE_KEY = 'cli-proxy-usage-custom-range-v1';
-const DEFAULT_CHART_LINES = ['all'];
 const DEFAULT_TIME_RANGE: UsageTimeRange = '8h';
 const DEFAULT_CUSTOM_WINDOW_HOURS = 8;
-const MAX_CHART_LINES = 9;
 const TIME_RANGE_OPTIONS: ReadonlyArray<{ value: UsageTimeRange; labelKey: string }> = [
   { value: '4h', labelKey: 'usage_stats.range_4h' },
   { value: '8h', labelKey: 'usage_stats.range_8h' },
@@ -117,7 +111,6 @@ type RefreshPageDataOptions = {
 
 type RefreshAutoRefreshTabOptions = {
   activeTab: UsageTab;
-  loadUsage: () => Promise<void>;
   refreshSub2API: () => Promise<void>;
 };
 
@@ -136,14 +129,11 @@ export const refreshPageData = async ({ refreshActiveTab }: RefreshPageDataOptio
 
 export const refreshAutoRefreshTabData = async ({
   activeTab,
-  loadUsage,
   refreshSub2API,
 }: RefreshAutoRefreshTabOptions) => {
   if (activeTab === 'overview' || activeTab === 'analysis' || activeTab === 'events' || activeTab === 'ranking' || activeTab === 'quotas') {
     await refreshSub2API();
-    return;
   }
-  await loadUsage();
 };
 
 export const getOverviewDisplayLoading = ({ loading, hasUsage }: { loading: boolean; hasUsage: boolean }) => loading && !hasUsage;
@@ -315,35 +305,6 @@ const loadCustomTimeRange = () => {
   }
 };
 
-const normalizeChartLines = (value: unknown, maxLines = MAX_CHART_LINES): string[] => {
-  if (!Array.isArray(value)) {
-    return DEFAULT_CHART_LINES;
-  }
-
-  const filtered = value
-    .filter((item): item is string => typeof item === 'string')
-    .map((item) => item.trim())
-    .filter(Boolean)
-    .slice(0, maxLines);
-
-  return filtered.length ? filtered : DEFAULT_CHART_LINES;
-};
-
-const loadChartLines = (): string[] => {
-  try {
-    if (typeof localStorage === 'undefined') {
-      return DEFAULT_CHART_LINES;
-    }
-    const raw = localStorage.getItem(CHART_LINES_STORAGE_KEY);
-    if (!raw) {
-      return DEFAULT_CHART_LINES;
-    }
-    return normalizeChartLines(JSON.parse(raw));
-  } catch {
-    return DEFAULT_CHART_LINES;
-  }
-};
-
 const loadTimeRange = (): UsageTimeRange => {
   try {
     if (typeof localStorage === 'undefined') {
@@ -446,24 +407,8 @@ export function UsagePage({ onAuthRequired }: { onAuthRequired?: () => void }) {
   const theme = useThemeStore((state) => state.theme);
   const setTheme = useThemeStore((state) => state.setTheme);
   const [activeTab, setActiveTab] = useState<UsageTab>(loadUsageTab);
-  const [chartLines, setChartLines] = useState<string[]>(loadChartLines);
   const [timeRange, setTimeRange] = useState<UsageTimeRange>(loadTimeRange);
   const [customTimeRange, setCustomTimeRange] = useState<{ start: string; end: string }>(loadCustomTimeRange);
-  const isOverviewTab = activeTab === 'overview';
-
-  const {
-    usage,
-    loading,
-    error,
-    lastRefreshedAt,
-    loadUsage
-  } = useUsageData({
-    onAuthRequired,
-    range: timeRange,
-    customStart: customTimeRange.start,
-    customEnd: customTimeRange.end,
-    enabled: activeTab === 'overview',
-  });
   const {
     loadPricing,
   } = usePricingData({
@@ -554,17 +499,6 @@ export function UsagePage({ onAuthRequired }: { onAuthRequired?: () => void }) {
       if (typeof localStorage === 'undefined') {
         return;
       }
-      localStorage.setItem(CHART_LINES_STORAGE_KEY, JSON.stringify(chartLines));
-    } catch {
-      // Ignore storage errors.
-    }
-  }, [chartLines]);
-
-  useEffect(() => {
-    try {
-      if (typeof localStorage === 'undefined') {
-        return;
-      }
       localStorage.setItem(TIME_RANGE_STORAGE_KEY, timeRange);
     } catch {
       // Ignore storage errors.
@@ -596,9 +530,9 @@ export function UsagePage({ onAuthRequired }: { onAuthRequired?: () => void }) {
   useEffect(() => {
     if (timeRange !== 'custom') return;
     if (customTimeRange.start && customTimeRange.end) return;
-    const anchorMs = lastRefreshedAt?.getTime() ?? Date.now();
+    const anchorMs = Date.now();
     setCustomTimeRange(buildDefaultCustomRange(anchorMs));
-  }, [customTimeRange.end, customTimeRange.start, lastRefreshedAt, timeRange]);
+  }, [customTimeRange.end, customTimeRange.start, timeRange]);
 
   useEffect(() => {
     let controller: AbortController | null = null;
@@ -648,14 +582,12 @@ export function UsagePage({ onAuthRequired }: { onAuthRequired?: () => void }) {
     }
     if (activeTab === 'settings') {
       await loadPricing();
-      return;
     }
-    await loadUsage();
-  }, [activeTab, loadPricing, loadUsage, refreshSub2API]);
+  }, [activeTab, loadPricing, refreshSub2API]);
 
   const refreshAutoRefreshTab = useCallback(async () => {
-    await refreshAutoRefreshTabData({ activeTab, loadUsage, refreshSub2API: refreshSub2APIBackground });
-  }, [activeTab, loadUsage, refreshSub2APIBackground]);
+    await refreshAutoRefreshTabData({ activeTab, refreshSub2API: refreshSub2APIBackground });
+  }, [activeTab, refreshSub2APIBackground]);
 
   const autoRefreshEnabled = shouldAutoRefreshUsageTab({ activeTab });
 
@@ -741,22 +673,7 @@ export function UsagePage({ onAuthRequired }: { onAuthRequired?: () => void }) {
   }, [status?.last_run_at]);
   // 只有需要时间范围的 tab 才渲染 Range 控件，避免 Credentials/Pricing 产生空白占位。
   const showRangeControls = shouldShowRangeControls(activeTab);
-  const overviewModelNames = useMemo(
-    () => getModelNamesFromUsage(usage?.usage ?? null),
-    [usage]
-  );
-
-  useEffect(() => {
-    if (!isOverviewTab) return;
-    setChartLines((current) => {
-      const next = sanitizeChartLines(current, overviewModelNames);
-      if (next.length === current.length && next.every((line, index) => line === current[index])) {
-        return current;
-      }
-      return next;
-    });
-  }, [isOverviewTab, overviewModelNames]);
-  const overviewDisplayLoading = getOverviewDisplayLoading({ loading, hasUsage: Boolean(usage) }) || sub2apiLoading;
+  const overviewDisplayLoading = getOverviewDisplayLoading({ loading: sub2apiLoading, hasUsage: Boolean(sub2apiOverview) });
 
   return (
     <div className={styles.pageShell}>
@@ -813,7 +730,7 @@ export function UsagePage({ onAuthRequired }: { onAuthRequired?: () => void }) {
 
         <main className={styles.contentColumn}>
           <div className={styles.container}>
-            {loading && !usage && activeTab === 'overview' && (
+            {overviewDisplayLoading && activeTab === 'overview' && (
               <div className={styles.loadingOverlay} aria-busy="true">
                 <div className={styles.loadingOverlayContent}>
                   <LoadingSpinner size={28} className={styles.loadingOverlaySpinner} />
@@ -948,15 +865,13 @@ export function UsagePage({ onAuthRequired }: { onAuthRequired?: () => void }) {
               )}
             </div>
 
-            {activeTab === 'overview' && error && <div className={styles.errorBox} role="alert">{error === 'AUTH_REQUIRED' ? t('auth.session_expired') : error}</div>}
-            {!(activeTab === 'overview' ? error : '') && statusError && <div className={styles.errorBox} role="alert">{statusError}</div>}
+            {statusError && <div className={styles.errorBox} role="alert">{statusError}</div>}
 
             {activeTab === 'overview' && (
               <Sub2ApiOverviewPanel
                 overview={sub2apiOverview}
                 points={sub2apiPoints}
                 quotaAccounts={sub2apiQuotaAccounts}
-                usage={usage}
                 serviceHealth={sub2apiServiceHealth}
                 loading={overviewDisplayLoading}
                 error={sub2apiError}

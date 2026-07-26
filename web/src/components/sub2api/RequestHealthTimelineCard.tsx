@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useTranslation } from 'react-i18next'
-import type { UsageOverviewPayload } from '@/components/usage/hooks/useUsageData'
 import type { ServiceHealthData, StatusBlockDetail } from '@/utils/usage'
 import type { Sub2ApiServiceHealth } from '@/lib/sub2apiTypes'
 import { Panel } from '@/components/ui/Panel'
@@ -34,7 +33,6 @@ interface ActiveTooltipState {
 }
 
 export interface RequestHealthTimelineCardProps {
-  usage: UsageOverviewPayload | null
   serviceHealth?: Sub2ApiServiceHealth | null
   loading: boolean
 }
@@ -77,14 +75,13 @@ function RequestHealthTimelineTitle({ title, subtitle, eyebrow }: { title: strin
   )
 }
 
-export function RequestHealthTimelineCard({ usage, serviceHealth, loading }: RequestHealthTimelineCardProps) {
+export function RequestHealthTimelineCard({ serviceHealth, loading }: RequestHealthTimelineCardProps) {
   const { t } = useTranslation()
   const [activeTooltip, setActiveTooltip] = useState<ActiveTooltipState | null>(null)
   const gridRef = useRef<HTMLDivElement>(null)
 
   const healthData: ServiceHealthData = useMemo(() => {
-    // Prefer dedicated serviceHealth prop; fall back to usage?.service_health
-    const sh = serviceHealth ?? usage?.service_health
+    const sh = serviceHealth
     // Render ALL returned blocks. The backend builds a fixed 168h grid ending at
     // the next local midnight and marks empty slots idle (rate=-1); do not filter
     // by a frozen client timestamp or the newest blocks stop updating on the
@@ -108,7 +105,7 @@ export function RequestHealthTimelineCard({ usage, serviceHealth, loading }: Req
       windowEnd: parseTime(sh?.window_end),
       blockDetails,
     }
-  }, [usage, serviceHealth])
+  }, [serviceHealth])
 
   const hasData = healthData.totalSuccess + healthData.totalFailure > 0
 

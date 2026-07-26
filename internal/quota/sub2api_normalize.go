@@ -58,21 +58,28 @@ func NormalizeSub2APIAccount(row sub2api.AccountRow, usage *sub2api.AccountUsage
 }
 
 // deriveSub2APIStatus mirrors the gateway's AccountStatusIndicator priority:
-// error -> rate-limited(429) -> overloaded(529) -> temp-unschedulable -> paused
-// -> inactive -> active. Transient states carry their recovery time. The raw
-// error_message / temp_unschedulable_reason text is intentionally NOT exposed.
+// rate-limited(429) -> overloaded(529) -> error -> temp-unschedulable -> paused
+// -> inactive -> active. This matches AccountStatusIndicator.vue: the badge
+// template picks isRateLimited / isOverloaded first (lines 4-13), and within
+// the remaining "else" branch, statusClass/statusText check hasError before
+// isTempUnschedulable (lines 318-355), so an "error" status outranks an
+// active temp-unschedulable window. Transient states carry their recovery
+// time. The raw error_message / temp_unschedulable_reason text is
+// intentionally NOT exposed; HasError is reported independently so the
+// frontend error indicator stays correct even when a higher-priority status
+// (e.g. rate_limited) wins the main badge.
 func deriveSub2APIStatus(row sub2api.AccountRow) (detail string, resetAt *time.Time, hasError bool) {
 	now := time.Now()
 	status := strings.TrimSpace(strings.ToLower(row.Status))
 	hasError = status == "error" || strings.TrimSpace(row.ErrorMessage) != ""
 
 	switch {
-	case status == "error":
-		return "error", nil, hasError
 	case row.RateLimitResetAt != nil && row.RateLimitResetAt.After(now):
 		return "rate_limited", row.RateLimitResetAt, hasError
 	case row.OverloadUntil != nil && row.OverloadUntil.After(now):
 		return "overloaded", row.OverloadUntil, hasError
+	case status == "error":
+		return "error", nil, hasError
 	case row.TempUnschedulableUntil != nil && row.TempUnschedulableUntil.After(now):
 		return "temp_unschedulable", row.TempUnschedulableUntil, hasError
 	case !row.Schedulable:

@@ -8,13 +8,11 @@ import { Kpi } from '@/components/ui/Kpi'
 import { StatusPill } from '@/components/ui/StatusPill'
 import styles from './Sub2ApiOverviewPanel.module.scss'
 import { RequestHealthTimelineCard } from './RequestHealthTimelineCard'
-import type { UsageOverviewPayload } from '@/components/usage/hooks/useUsageData'
 
 type Sub2ApiOverviewPanelProps = {
   overview: Sub2ApiOverview | null
   points: Sub2ApiTimeseriesPoint[]
   quotaAccounts: Sub2ApiAccount[]
-  usage?: UsageOverviewPayload | null
   serviceHealth?: Sub2ApiServiceHealth | null
   loading?: boolean
   error?: string | null
@@ -37,7 +35,7 @@ const isQuotaAtRisk = (account: Sub2ApiAccount) => {
   })
 }
 
-export function Sub2ApiOverviewPanel({ overview, points, quotaAccounts, usage, serviceHealth, loading, error, onRetry }: Sub2ApiOverviewPanelProps) {
+export function Sub2ApiOverviewPanel({ overview, points, quotaAccounts, serviceHealth, loading, error, onRetry }: Sub2ApiOverviewPanelProps) {
   const { t } = useTranslation()
   const hasData = Boolean(overview) || points.length > 0 || quotaAccounts.length > 0
   const quotaRiskCount = quotaAccounts.filter(isQuotaAtRisk).length
@@ -260,7 +258,7 @@ export function Sub2ApiOverviewPanel({ overview, points, quotaAccounts, usage, s
 
       {/* ── Full-width: Request Health Timeline ─────────────── */}
       <div className={styles.healthPanel}>
-        <RequestHealthTimelineCard usage={usage ?? null} serviceHealth={serviceHealth} loading={!!loading} />
+        <RequestHealthTimelineCard serviceHealth={serviceHealth} loading={!!loading} />
       </div>
 
       {/* ── Mini charts row (4 cols) ─────────────────────────── */}

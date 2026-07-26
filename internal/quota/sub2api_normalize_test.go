@@ -273,6 +273,26 @@ func TestDeriveSub2APIStatusPriority(t *testing.T) {
 			wantDetail:   "active",
 			wantHasError: true,
 		},
+		{
+			name:         "error status with active rate limit -> rate_limited wins",
+			row:          sub2api.AccountRow{Status: "error", Schedulable: true, RateLimitResetAt: &future},
+			wantDetail:   "rate_limited",
+			wantHasReset: true,
+			wantHasError: true,
+		},
+		{
+			name:         "error status with active overload -> overloaded wins",
+			row:          sub2api.AccountRow{Status: "error", Schedulable: true, OverloadUntil: &future},
+			wantDetail:   "overloaded",
+			wantHasReset: true,
+			wantHasError: true,
+		},
+		{
+			name:         "error status with active temp unschedulable -> error wins",
+			row:          sub2api.AccountRow{Status: "error", Schedulable: true, TempUnschedulableUntil: &future},
+			wantDetail:   "error",
+			wantHasError: true,
+		},
 	}
 
 	for _, tc := range cases {

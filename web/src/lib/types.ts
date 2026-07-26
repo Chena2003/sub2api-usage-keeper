@@ -318,14 +318,6 @@ export interface AnalysisResponse {
   heatmap: AnalysisHeatmapPayload
 }
 
-export interface CpaApiKeySettingsItem {
-  id: string
-  keyAlias: string
-  displayKey: string
-  label: string
-  lastSyncedAt: string | null
-}
-
 export interface PricingEntry {
   model: string
   prompt_price_per_1m: number

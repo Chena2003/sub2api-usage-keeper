@@ -210,33 +210,35 @@ describe('UsagePage Overview auto-refresh', () => {
 
 describe('UsagePage active tab auto-refresh callback', () => {
   it('refreshes Sub2API dashboard data for the Overview tab', async () => {
-    const loadUsage = vi.fn().mockResolvedValue(undefined);
     const refreshSub2API = vi.fn().mockResolvedValue(undefined);
 
-    await refreshAutoRefreshTabData({ activeTab: 'overview', loadUsage, refreshSub2API });
+    await refreshAutoRefreshTabData({ activeTab: 'overview', refreshSub2API });
 
     expect(refreshSub2API).toHaveBeenCalledTimes(1);
-    expect(loadUsage).not.toHaveBeenCalled();
   });
 
   it('refreshes only Sub2API dashboard data for the Analysis tab', async () => {
-    const loadUsage = vi.fn().mockResolvedValue(undefined);
     const refreshSub2API = vi.fn().mockResolvedValue(undefined);
 
-    await refreshAutoRefreshTabData({ activeTab: 'analysis', loadUsage, refreshSub2API });
+    await refreshAutoRefreshTabData({ activeTab: 'analysis', refreshSub2API });
 
     expect(refreshSub2API).toHaveBeenCalledTimes(1);
-    expect(loadUsage).not.toHaveBeenCalled();
   });
 
   it('refreshes only Sub2API dashboard data for the Events tab', async () => {
-    const loadUsage = vi.fn().mockResolvedValue(undefined);
     const refreshSub2API = vi.fn().mockResolvedValue(undefined);
 
-    await refreshAutoRefreshTabData({ activeTab: 'events', loadUsage, refreshSub2API });
+    await refreshAutoRefreshTabData({ activeTab: 'events', refreshSub2API });
 
     expect(refreshSub2API).toHaveBeenCalledTimes(1);
-    expect(loadUsage).not.toHaveBeenCalled();
+  });
+
+  it('does not refresh for the Settings tab, which has no auto-refresh source', async () => {
+    const refreshSub2API = vi.fn().mockResolvedValue(undefined);
+
+    await refreshAutoRefreshTabData({ activeTab: 'settings', refreshSub2API });
+
+    expect(refreshSub2API).not.toHaveBeenCalled();
   });
 });
 
@@ -436,15 +438,15 @@ describe('UsagePage refresh action', () => {
     expect(syncCalls).toBe(0);
   });
 
-  it('routes Overview manual and header refresh through Sub2API refresh instead of legacy usage loading', () => {
+  it('routes Overview manual and header refresh through Sub2API refresh, with no legacy usage loading fallback', () => {
     const refreshActiveTabSource = usagePageSource.match(/const refreshActiveTab = useCallback\(async \(\) => \{[\s\S]*?\n {2}\}, \[activeTab/)?.[0] ?? '';
     const overviewRefreshIndex = refreshActiveTabSource.indexOf("activeTab === 'overview'");
     const refreshSub2APIIndex = refreshActiveTabSource.indexOf('await refreshSub2API()', overviewRefreshIndex);
-    const loadUsageFallbackIndex = refreshActiveTabSource.indexOf('await loadUsage()');
 
     expect(overviewRefreshIndex).toBeGreaterThanOrEqual(0);
     expect(refreshSub2APIIndex).toBeGreaterThan(overviewRefreshIndex);
-    expect(refreshSub2APIIndex).toBeLessThan(loadUsageFallbackIndex);
+    expect(refreshActiveTabSource).not.toContain('await loadUsage()');
+    expect(usagePageSource).not.toContain('useUsageData');
   });
 });
 
@@ -457,11 +459,9 @@ describe('UsagePage request health timeline data', () => {
     expect(settingsBlockSource).not.toContain('RequestHealthTimelineCard');
   });
 
-  it('enables legacy usage data only while Overview renders the real health timeline', () => {
-    const usageDataOptionsSource = usagePageSource.match(/useUsageData\(\{[\s\S]*?\n {2}\}\);/)?.[0] ?? '';
-
-    expect(usageDataOptionsSource).toContain("enabled: activeTab === 'overview'");
-    expect(usageDataOptionsSource).not.toContain("enabled: activeTab === 'settings'");
+  it('drives the Overview health timeline solely from the real Sub2API health pipeline', () => {
+    expect(usagePageSource).not.toContain('useUsageData');
+    expect(usagePageSource).toContain('<Sub2ApiOverviewPanel');
   });
 });
 

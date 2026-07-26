@@ -71,7 +71,7 @@ export function RequestEventsPanel({ events, loading, error, onRetry, onPageChan
             </thead>
             <tbody>
               {events.events.map((event) => (
-                <tr key={event.id}>
+                <tr key={`${event.status}-${event.id}`}>
                   <td className={styles.mono}>{formatDateTime(event.createdAt)}</td>
                   <td className={styles.truncate}>{event.user || '-'}</td>
                   <td><code className={styles.code}>{event.apiKey ? event.apiKey.slice(0, 8) + '…' : '-'}</code></td>
