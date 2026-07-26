@@ -65,7 +65,7 @@ docker run -d \
   sub2api-usage-keeper:latest
 ```
 
-> The current version has no built-in login protection. Bind it to `127.0.0.1` or a protected private network, and use upstream infrastructure such as Caddy, Nginx, or Cloudflare Access for HTTPS and access control.
+> The current version has no built-in login: anyone who can reach it sees the dashboard. This is intentional — the service targets a "public read-only dashboard" use case. To go public, expose it through your ingress (e.g. Cloudflare Tunnel / a reverse proxy); to keep it private, add access control at the edge or bind it to an internal network only. Either way, pair it with the read-only database user described under "Security" below.
 
 ## Configuration
 
@@ -149,17 +149,20 @@ sub2api-usage-keeper/
 
 ## Security
 
+This service is designed as a **publicly accessible, read-only dashboard**: there is no built-in login, and anyone who can reach it can see the page. The security model is therefore not "block visitors" but "ensure only masked, aggregated data is ever exposed."
+
+Browser API output boundaries (hold whether public or private):
+
 - Browser APIs **never return** raw credentials (emails, access tokens, refresh tokens, passwords, session keys, etc.)
 - User emails are automatically masked: local part > 5 chars retains first 3 and last 2; short local parts keep only the first character; domain remains visible
 - Non-email user identifiers are hash-masked
-- There is no built-in login page or password session; do not expose the service directly to the public Internet
-- Bind container ports to `127.0.0.1`, terminate HTTPS at the reverse proxy, and enforce access control there
+- Raw account error messages and temp-unschedulable reasons are never exposed
 
-### Use a read-only database user
+One thing to weigh when deploying: the dashboard publicly displays **aggregate cost, token usage, account counts, and model distribution**. For personal projects this is usually fine; if you don't want those figures public, either stop rendering the cost columns in the frontend or add access control at the edge (e.g. Cloudflare Access). You do **not** need to add Access just to "lock it down" — that is meant for private admin surfaces that lack a login, and conflicts with a public dashboard's purpose.
 
-The application only issues `SELECT` statements, but that is a code-level
-self-restriction. Enforce read-only access at the database layer so that neither a
-leaked connection string nor a future code change can write to production data:
+### Use a read-only database user (required for public deployments)
+
+The application only issues `SELECT` statements, but that is a code-level self-restriction. **When the dashboard is publicly reachable, anyone can trigger its database queries**, so enforce read-only access at the database layer — that way the worst case is still just reads, never writes or deletes against production data:
 
 ```sql
 CREATE USER sub2api_readonly WITH PASSWORD 'replace-with-strong-password';
@@ -168,6 +171,8 @@ GRANT USAGE ON SCHEMA public TO sub2api_readonly;
 GRANT SELECT ON ALL TABLES IN SCHEMA public TO sub2api_readonly;
 -- Make future tables read-only as well
 ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT ON TABLES TO sub2api_readonly;
+-- Belt and suspenders: force read-only transactions even if a grant is missed
+ALTER USER sub2api_readonly SET default_transaction_read_only = on;
 ```
 
 Then point `SUB2API_DATABASE_URL` at that user.

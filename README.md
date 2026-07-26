@@ -65,7 +65,7 @@ docker run -d \
   sub2api-usage-keeper:latest
 ```
 
-> 当前版本不提供内置登录保护。必须绑定 `127.0.0.1` 或置于受保护的私有网络，并由 Caddy / Nginx / Cloudflare Access 等上游设施负责 HTTPS 和访问控制。
+> 当前版本没有内置登录，任何能访问到它的人都能看到看板内容。这是有意的：本服务面向"公开只读看板"场景。若你想公开，直接经入口（如 Cloudflare Tunnel / 反向代理）对外即可；若想私有，则在入口层加访问控制或仅绑定内网。无论哪种，务必配合下方「安全说明」里的只读数据库用户。
 
 ## 配置
 
@@ -149,16 +149,20 @@ sub2api-usage-keeper/
 
 ## 安全说明
 
-- 浏览器 API **不返回**原始 credentials（email、access token、refresh token、password、session key 等）
+本服务设计为**可公开访问的只读看板**：没有内置登录，任何能访问到它的人都能看到页面内容。因此安全模型不是"挡住访问者"，而是"确保对外暴露的只有脱敏后的聚合数据"。
+
+浏览器 API 的输出边界（无论公开与否都成立）：
+
+- **不返回**原始 credentials（email、access token、refresh token、password、session key 等）
 - 用户邮箱自动脱敏：本地部分 > 5 字符保留首 3 尾 2；短本地部分仅保留首字符；域名可见
 - 非邮箱用户标识进行哈希脱敏
-- 当前没有内置登录页面或密码 session；不要把服务直接暴露到公网
-- 将容器端口绑定到 `127.0.0.1`，通过反向代理终止 HTTPS 并实施访问控制
+- 账号原始错误消息、临时不可调度原因等文本不外泄
 
-### 使用只读数据库用户
+部署时你需要自己权衡的一点：看板会公开展示**聚合成本、token 用量、账号数量、模型分布**等运营数据。个人项目通常无所谓；若你不希望这些数字对外，可在前端相应面板中不渲染成本列，或在入口层（如 Cloudflare Access）加访问控制。**不需要**为了"加锁"而套 Access——那是给本该私有的后台补登录用的，与公开看板的定位冲突。
 
-应用代码本身只执行 `SELECT`，但这只是代码层面的自我约束。请在数据库层面强制只读，
-这样即使连接串泄露或代码将来被误改，也无法写入 Sub2API 生产数据：
+### 使用只读数据库用户（公开部署下为必做项）
+
+应用代码本身只执行 `SELECT`，但这只是代码层面的自我约束。**当看板公开可达时，任何人都能触发它的数据库查询**，因此务必在数据库层面强制只读，这样最坏情况也只是被读，不可能写入或删除 Sub2API 生产数据：
 
 ```sql
 CREATE USER sub2api_readonly WITH PASSWORD 'replace-with-strong-password';
@@ -167,6 +171,8 @@ GRANT USAGE ON SCHEMA public TO sub2api_readonly;
 GRANT SELECT ON ALL TABLES IN SCHEMA public TO sub2api_readonly;
 -- 让后续新建的表也自动只读
 ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT ON TABLES TO sub2api_readonly;
+-- 双保险：即使某处漏授权，该用户的事务也强制只读
+ALTER USER sub2api_readonly SET default_transaction_read_only = on;
 ```
 
 然后把 `SUB2API_DATABASE_URL` 指向该用户。
