@@ -462,7 +462,7 @@ func (r *Repository) GetRankings(ctx context.Context, dimension string, since ti
 	}
 
 	var rows []RankingRow
-	untilClause, untilArg := untilClauseAndArg(until)
+	untilClause, untilArg := untilClauseColumnAndArg(until, "l.created_at")
 	query := fmt.Sprintf(`
 		SELECT
 			COALESCE(NULLIF(%s, ''), 'unknown') AS name,
@@ -508,7 +508,7 @@ func (r *Repository) GetEvents(ctx context.Context, since time.Time, until time.
 	var total int64
 	untilClause, untilArg := untilClauseAndArg(until)
 	countQuery := fmt.Sprintf(`
-		SELECT (SELECT COUNT(*) FROM usage_logs WHERE created_at >= ?%s) + (SELECT COUNT(*) FROM ops_error_logs WHERE created_at >= ?%s)
+		SELECT (SELECT COUNT(*) FROM usage_logs WHERE created_at >= ? %s) + (SELECT COUNT(*) FROM ops_error_logs WHERE created_at >= ? %s)
 	`, untilClause, untilClause)
 	countArgs := []any{since}
 	if untilArg != nil {
@@ -523,6 +523,8 @@ func (r *Repository) GetEvents(ctx context.Context, since time.Time, until time.
 	}
 
 	var rows []UsageEventRow
+	untilClauseL, _ := untilClauseColumnAndArg(until, "l.created_at")
+	untilClauseE, _ := untilClauseColumnAndArg(until, "e.created_at")
 	eventsQuery := fmt.Sprintf(`
 		SELECT
 			l.id,
@@ -571,7 +573,7 @@ func (r *Repository) GetEvents(ctx context.Context, since time.Time, until time.
 		%s
 		ORDER BY created_at DESC
 		LIMIT ? OFFSET ?
-	`, untilClause, untilClause)
+	`, untilClauseL, untilClauseE)
 	eventsArgs := []any{since}
 	if untilArg != nil {
 		eventsArgs = append(eventsArgs, untilArg)
@@ -654,7 +656,7 @@ func (r *Repository) GetRankingTrend(ctx context.Context, dimension string, sinc
 	column := rankingColumn(dimension)
 
 	var rows []RankingTrendRow
-	untilClause, untilArg := untilClauseAndArg(until)
+	untilClause, untilArg := untilClauseColumnAndArg(until, "l.created_at")
 	query := fmt.Sprintf(`
 		WITH top_entities AS (
 			SELECT %s AS entity_name
