@@ -82,6 +82,17 @@ docker run -d \
 | `BACKUP_ENABLED` | | `true` | 启用 SQLite 备份 |
 | `BACKUP_INTERVAL` | | `24h` | 备份间隔 |
 | `BACKUP_RETENTION_DAYS` | | `7` | 备份保留天数 |
+| `MODELS_DEV_API_URL` | | `https://models.dev/api.json` | models.dev 模型目录地址 |
+| `MODELS_DEV_CACHE_TTL` | | `24h` | 官方模型价格缓存有效期 |
+| `MODELS_DEV_HTTP_TIMEOUT` | | `10s` | 拉取 models.dev 数据的 HTTP 超时时间 |
+
+### Models.dev 官方模型价格
+
+设置页的“模型定价参考”通过 `GET /api/v1/sub2api/model-pricing` 读取 `https://models.dev/api.json`，并且只展示以下模型厂商的官方供应商（official provider）价格：Anthropic、OpenAI、Google、xAI、DeepSeek、Mistral、Moonshot AI 和 Alibaba。OpenRouter、Amazon Bedrock、Azure、Vertex AI 等第三方托管、转售或地区镜像价格会被有意排除。
+
+价格目录默认缓存 24 小时。缓存过期后若刷新失败，只有在此前至少成功拉取过一次的情况下才会继续返回旧数据，并在响应中标记 `stale: true`；冷启动时上游不可用则接口返回 HTTP 503。这里展示的价格仅供参考，不会重写或重新计算 Sub2API 已记录的 usage cost。
+
+可通过 `MODELS_DEV_API_URL`、`MODELS_DEV_CACHE_TTL` 和 `MODELS_DEV_HTTP_TIMEOUT` 覆盖默认的数据源、缓存时间和请求超时；默认值见上方配置表。
 
 ## 本地开发
 

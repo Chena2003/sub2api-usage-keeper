@@ -1,5 +1,6 @@
 import { ApiError, apiPath } from './api'
 import type {
+  OfficialModelPricingResponse,
   Sub2ApiAccount,
   Sub2ApiEventsResponse,
   Sub2ApiModelUsage,
@@ -115,4 +116,8 @@ export async function fetchSub2ApiRankingTrend(
   })
   appendTimeRangeParams(params, tr)
   return getJson<Sub2ApiRankingTrendResponse>(`/rankings-trend?${params.toString()}`)
+}
+
+export function fetchSub2ApiModelPricing(): Promise<OfficialModelPricingResponse> {
+  return getJson<OfficialModelPricingResponse>('/model-pricing')
 }

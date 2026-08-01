@@ -30,6 +30,7 @@ type OptionalProviders struct {
 	Quota            QuotaProvider
 	Pricing          service.PricingProvider
 	Sub2APIDashboard Sub2APIDashboardProvider
+	OfficialPricing  OfficialPricingProvider
 }
 
 func NewRouter(
@@ -59,11 +60,13 @@ func NewRouter(
 	var quotaProvider QuotaProvider
 	var pricingProvider service.PricingProvider
 	var sub2apiDashboardProvider Sub2APIDashboardProvider
+	var officialPricingProvider OfficialPricingProvider
 	if len(optionalProviders) > 0 {
 		usageIdentityProvider = optionalProviders[0].UsageIdentity
 		quotaProvider = optionalProviders[0].Quota
 		pricingProvider = optionalProviders[0].Pricing
 		sub2apiDashboardProvider = optionalProviders[0].Sub2APIDashboard
+		officialPricingProvider = optionalProviders[0].OfficialPricing
 	}
 
 	dashboardRoutes := apiV1.Group("")
@@ -75,6 +78,7 @@ func NewRouter(
 	registerPricingRoutes(dashboardRoutes, pricingProvider)
 	registerQuotaRoutes(dashboardRoutes, quotaProvider)
 	registerSub2APIDashboardRoutes(dashboardRoutes, sub2apiDashboardProvider)
+	registerModelPricingRoutes(dashboardRoutes, officialPricingProvider)
 
 	if staticFS != nil {
 		if indexFile, err := staticFS.Open("index.html"); err == nil {

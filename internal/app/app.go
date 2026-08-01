@@ -15,6 +15,7 @@ import (
 	"sub2api-usage-keeper/internal/api"
 	"sub2api-usage-keeper/internal/config"
 	"sub2api-usage-keeper/internal/logging"
+	"sub2api-usage-keeper/internal/modelsdev"
 	"sub2api-usage-keeper/internal/repository"
 	"sub2api-usage-keeper/internal/service"
 	"sub2api-usage-keeper/internal/sub2api"
@@ -93,6 +94,12 @@ func NewWithConfig(cfg config.Config) (*App, error) {
 		return nil, err
 	}
 	sub2apiDashboardService := service.NewSub2APIDashboardService(sub2apiRepo)
+	modelsDevClient := modelsdev.NewClient(
+		cfg.ModelsDevAPIURL,
+		&http.Client{Timeout: cfg.ModelsDevHTTPTimeout},
+		modelsdev.DefaultMaxResponseBytes,
+	)
+	officialPricingService := modelsdev.NewService(modelsDevClient, cfg.ModelsDevCacheTTL)
 
 	var backupMaintenance *DatabaseBackupRunner
 	if cfg.BackupEnabled {
@@ -120,7 +127,10 @@ func NewWithConfig(cfg config.Config) (*App, error) {
 			webui.Static,
 			usageService,
 			cfg.AppBasePath,
-			api.OptionalProviders{Sub2APIDashboard: sub2apiDashboardService},
+			api.OptionalProviders{
+				Sub2APIDashboard: sub2apiDashboardService,
+				OfficialPricing:  officialPricingService,
+			},
 		),
 	}, nil
 }

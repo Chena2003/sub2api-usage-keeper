@@ -153,3 +153,36 @@ export type Sub2ApiRankingTrendResponse = {
   points: Sub2ApiRankingTrendPoint[]
   granularity: 'hour' | 'day'
 }
+
+export type OfficialModelCost = {
+  input: number | null
+  output: number | null
+  cacheRead: number | null
+  cacheWrite: number | null
+}
+
+export type OfficialModelCostTier = {
+  type: string
+  size: number
+  cost: OfficialModelCost
+}
+
+export type OfficialModelPricing = {
+  id: string
+  name: string
+  status?: string
+  cost: OfficialModelCost
+  tiers: OfficialModelCostTier[]
+}
+
+export type OfficialPricingProvider = {
+  id: string
+  name: string
+  models: OfficialModelPricing[]
+}
+
+export type OfficialModelPricingResponse = {
+  providers: OfficialPricingProvider[]
+  fetchedAt: string
+  stale: boolean
+}

@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { fetchSub2ApiEvents, fetchSub2ApiRankings, sub2apiEndpoint } from './sub2apiApi'
+import { fetchSub2ApiEvents, fetchSub2ApiModelPricing, fetchSub2ApiRankings, sub2apiEndpoint } from './sub2apiApi'
 
 describe('sub2apiEndpoint', () => {
   afterEach(() => {
@@ -55,6 +55,26 @@ describe('Sub2API data fetchers', () => {
     await expect(fetchSub2ApiRankings('user', { since: '2026-07-10T00:00:00.000Z', until: '2026-07-11T00:00:00.000Z' })).resolves.toEqual([])
 
     expect(fetchMock).toHaveBeenCalledWith('/api/v1/sub2api/rankings?dimension=user&limit=20&since=2026-07-10T00%3A00%3A00.000Z&until=2026-07-11T00%3A00%3A00.000Z', {
+      credentials: 'include',
+    })
+  })
+
+  it('fetches official model pricing with credentials', async () => {
+    vi.stubGlobal('window', { __APP_BASE_PATH__: undefined })
+    const response = {
+      providers: [],
+      fetchedAt: '2026-08-01T00:00:00Z',
+      stale: false,
+    }
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve(response),
+    })
+    vi.stubGlobal('fetch', fetchMock)
+
+    await expect(fetchSub2ApiModelPricing()).resolves.toEqual(response)
+
+    expect(fetchMock).toHaveBeenCalledWith('/api/v1/sub2api/model-pricing', {
       credentials: 'include',
     })
   })

@@ -51,6 +51,12 @@ type Config struct {
 	Sub2APIDatabaseURL string
 	// TimeZone 是应用时区名称（IANA），用于 time.Local 以及跨服务的 bucket_date 时区契约。
 	TimeZone string
+	// ModelsDevAPIURL 是 models.dev 官方价格目录地址。
+	ModelsDevAPIURL string
+	// ModelsDevCacheTTL 是模型价格目录在内存中的有效期。
+	ModelsDevCacheTTL time.Duration
+	// ModelsDevHTTPTimeout 是请求 models.dev 的 HTTP 超时时间。
+	ModelsDevHTTPTimeout time.Duration
 	// WorkDir 是应用工作目录，数据库、日志和备份默认从这里派生。
 	WorkDir string
 	// SQLitePath 是 SQLite 数据库文件路径。
@@ -112,6 +118,22 @@ func Load(options LoadOptions) (*Config, error) {
 		return nil, fmt.Errorf("BACKUP_INTERVAL must be positive")
 	}
 
+	modelsDevCacheTTL, err := getDuration("MODELS_DEV_CACHE_TTL", 24*time.Hour)
+	if err != nil {
+		return nil, err
+	}
+	if modelsDevCacheTTL <= 0 {
+		return nil, fmt.Errorf("MODELS_DEV_CACHE_TTL must be positive")
+	}
+
+	modelsDevHTTPTimeout, err := getDuration("MODELS_DEV_HTTP_TIMEOUT", 10*time.Second)
+	if err != nil {
+		return nil, err
+	}
+	if modelsDevHTTPTimeout <= 0 {
+		return nil, fmt.Errorf("MODELS_DEV_HTTP_TIMEOUT must be positive")
+	}
+
 	backupRetentionDays, err := getInt("BACKUP_RETENTION_DAYS", 7)
 	if err != nil {
 		return nil, err
@@ -152,6 +174,9 @@ func Load(options LoadOptions) (*Config, error) {
 		TLSKeyFile:           strings.TrimSpace(os.Getenv("TLS_KEY_FILE")),
 		Sub2APIDatabaseURL:   strings.TrimSpace(os.Getenv("SUB2API_DATABASE_URL")),
 		TimeZone:             timeZone,
+		ModelsDevAPIURL:      getString("MODELS_DEV_API_URL", "https://models.dev/api.json"),
+		ModelsDevCacheTTL:    modelsDevCacheTTL,
+		ModelsDevHTTPTimeout: modelsDevHTTPTimeout,
 		WorkDir:              workDir,
 		SQLitePath:           filepath.Join(workDir, workDirDatabaseName),
 		BackupEnabled:        backupEnabled,

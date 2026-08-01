@@ -15,6 +15,7 @@ var configEnvKeys = []string{
 	"SQLITE_PATH", "BACKUP_ENABLED", "BACKUP_DIR", "BACKUP_INTERVAL", "BACKUP_RETENTION_DAYS",
 	"REQUEST_TIMEOUT", "LOG_LEVEL", "LOG_FILE_ENABLED", "LOG_DIR", "LOG_RETENTION_DAYS",
 	"TZ", "TLS_ENABLED", "TLS_CERT_FILE", "TLS_KEY_FILE",
+	"MODELS_DEV_API_URL", "MODELS_DEV_CACHE_TTL", "MODELS_DEV_HTTP_TIMEOUT",
 }
 
 func TestMain(m *testing.M) {
@@ -388,7 +389,6 @@ func TestLoadFromEnvParsesOverrides(t *testing.T) {
 	}
 }
 
-
 func TestLoadFromEnvRejectsNonPositiveBackupInterval(t *testing.T) {
 	for _, value := range []string{"0s", "-1h"} {
 		t.Run(value, func(t *testing.T) {
@@ -433,3 +433,69 @@ func TestLoadFromEnvRejectsInvalidBasePath(t *testing.T) {
 	}
 }
 
+func TestLoadFromEnvUsesModelsDevDefaults(t *testing.T) {
+	setRequiredSub2APIEnv(t)
+	t.Setenv("MODELS_DEV_API_URL", "")
+	t.Setenv("MODELS_DEV_CACHE_TTL", "")
+	t.Setenv("MODELS_DEV_HTTP_TIMEOUT", "")
+
+	cfg, err := LoadFromEnv()
+	if err != nil {
+		t.Fatalf("LoadFromEnv returned error: %v", err)
+	}
+	if cfg.ModelsDevAPIURL != "https://models.dev/api.json" {
+		t.Fatalf("unexpected models.dev URL: %q", cfg.ModelsDevAPIURL)
+	}
+	if cfg.ModelsDevCacheTTL != 24*time.Hour {
+		t.Fatalf("unexpected models.dev cache TTL: %v", cfg.ModelsDevCacheTTL)
+	}
+	if cfg.ModelsDevHTTPTimeout != 10*time.Second {
+		t.Fatalf("unexpected models.dev HTTP timeout: %v", cfg.ModelsDevHTTPTimeout)
+	}
+}
+
+func TestLoadFromEnvParsesModelsDevOverrides(t *testing.T) {
+	setRequiredSub2APIEnv(t)
+	t.Setenv("MODELS_DEV_API_URL", "http://127.0.0.1:9999/api.json")
+	t.Setenv("MODELS_DEV_CACHE_TTL", "2h")
+	t.Setenv("MODELS_DEV_HTTP_TIMEOUT", "3s")
+
+	cfg, err := LoadFromEnv()
+	if err != nil {
+		t.Fatalf("LoadFromEnv returned error: %v", err)
+	}
+	if cfg.ModelsDevAPIURL != "http://127.0.0.1:9999/api.json" {
+		t.Fatalf("unexpected models.dev URL: %q", cfg.ModelsDevAPIURL)
+	}
+	if cfg.ModelsDevCacheTTL != 2*time.Hour {
+		t.Fatalf("unexpected models.dev cache TTL: %v", cfg.ModelsDevCacheTTL)
+	}
+	if cfg.ModelsDevHTTPTimeout != 3*time.Second {
+		t.Fatalf("unexpected models.dev HTTP timeout: %v", cfg.ModelsDevHTTPTimeout)
+	}
+}
+
+func TestLoadFromEnvRejectsNonPositiveModelsDevDurations(t *testing.T) {
+	tests := []struct {
+		name    string
+		key     string
+		value   string
+		message string
+	}{
+		{name: "zero cache TTL", key: "MODELS_DEV_CACHE_TTL", value: "0s", message: "MODELS_DEV_CACHE_TTL must be positive"},
+		{name: "negative cache TTL", key: "MODELS_DEV_CACHE_TTL", value: "-1s", message: "MODELS_DEV_CACHE_TTL must be positive"},
+		{name: "zero HTTP timeout", key: "MODELS_DEV_HTTP_TIMEOUT", value: "0s", message: "MODELS_DEV_HTTP_TIMEOUT must be positive"},
+		{name: "negative HTTP timeout", key: "MODELS_DEV_HTTP_TIMEOUT", value: "-1s", message: "MODELS_DEV_HTTP_TIMEOUT must be positive"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			setRequiredSub2APIEnv(t)
+			t.Setenv(tt.key, tt.value)
+
+			_, err := LoadFromEnv()
+			if err == nil || !strings.Contains(err.Error(), tt.message) {
+				t.Fatalf("expected %q validation error, got %v", tt.message, err)
+			}
+		})
+	}
+}
