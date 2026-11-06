@@ -34,6 +34,16 @@ func NormalizeSub2APIAccount(row sub2api.AccountRow, usage *sub2api.AccountUsage
 	}
 
 	statusDetail, statusResetAt, hasError := deriveSub2APIStatus(row)
+	fiveHourWindow := buildFiveHourWindow(row, fiveHourUsage)
+	weeklyWindow := buildWeeklyWindow(row)
+	switch platform := strings.ToLower(provider); platform {
+	case "kimi", "zhipu", "minimax":
+		if credentialFields(row.Credentials)["account_mode"] == "coding" {
+			extra := row.ExtraMap()
+			applyCodingPlanWindow(&fiveHourWindow, extra, platform+"_5h")
+			applyCodingPlanWindow(&weeklyWindow, extra, platform+"_weekly")
+		}
+	}
 
 	return Sub2APIAccountQuota{
 		ID:                  row.ID,
@@ -52,8 +62,8 @@ func NormalizeSub2APIAccount(row sub2api.AccountRow, usage *sub2api.AccountUsage
 		LastUsedAt:          row.LastUsedAt,
 		CredentialKeys:      publicCredentialKeys(row.Credentials),
 		Usage:               normalizeSub2APIAccountUsage(usage),
-		FiveHourWindow:      buildFiveHourWindow(row, fiveHourUsage),
-		WeeklyWindow:        buildWeeklyWindow(row),
+		FiveHourWindow:      fiveHourWindow,
+		WeeklyWindow:        weeklyWindow,
 	}
 }
 
@@ -283,6 +293,17 @@ func buildWeeklyWindow(row sub2api.AccountRow) Sub2APIQuotaWindow {
 
 func isOpenAIPlatform(platform string) bool {
 	return platform == "openai" || platform == "codex"
+}
+
+func applyCodingPlanWindow(window *Sub2APIQuotaWindow, extra map[string]any, prefix string) {
+	pct, ok := extraFloat(extra, prefix+"_used_percent")
+	if !ok {
+		return
+	}
+	window.Utilization = &pct
+	reset, _ := extraResetTime(extra, prefix+"_reset_at")
+	window.WindowEnd = reset
+	window.RefreshAt = reset
 }
 
 // extraFloat reads a numeric value from the decoded extra map.

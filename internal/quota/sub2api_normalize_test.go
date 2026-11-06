@@ -199,6 +199,61 @@ func TestBuildWindowsReadCodexExtraPercent(t *testing.T) {
 	}
 }
 
+func TestNormalizeSub2APICodingPlanWindows(t *testing.T) {
+	fiveHourReset := time.Date(2026, 11, 6, 10, 0, 0, 0, time.UTC)
+	weeklyReset := fiveHourReset.Add(72 * time.Hour)
+	accountReset := fiveHourReset.Add(time.Minute)
+	for _, tc := range []struct {
+		name, platform, mode, extra string
+		hasFiveHour, hasWeekly      bool
+		wantFiveHour, wantWeekly    float64
+	}{
+		{
+			name: "GLM snapshots for both windows", platform: "zhipu", mode: "coding",
+			extra: `{"zhipu_5h_used_percent":29,"zhipu_5h_reset_at":"2026-11-06T10:00:00Z",
+			         "zhipu_weekly_used_percent":23,"zhipu_weekly_reset_at":"2026-11-09T10:00:00Z"}`,
+			hasFiveHour: true, hasWeekly: true, wantFiveHour: 29, wantWeekly: 23,
+		},
+		{
+			name: "Kimi zero use with only a weekly snapshot", platform: "kimi", mode: "coding",
+			extra:     `{"kimi_weekly_used_percent":0,"kimi_weekly_reset_at":"2026-11-09T10:00:00Z"}`,
+			hasWeekly: true,
+		},
+		{
+			name: "pay-as-you-go ignores old coding snapshot", platform: "minimax", mode: "payg",
+			extra: `{"minimax_5h_used_percent":29,"minimax_weekly_used_percent":23}`,
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			account := NormalizeSub2APIAccount(sub2api.AccountRow{
+				Platform:         tc.platform,
+				Type:             "apikey",
+				Credentials:      json.RawMessage(`{"account_mode":"` + tc.mode + `"}`),
+				Extra:            json.RawMessage(tc.extra),
+				RateLimitResetAt: &accountReset,
+			}, nil, nil)
+			checkWindow := func(label string, window Sub2APIQuotaWindow, present bool, wantPct float64, wantReset time.Time) {
+				t.Helper()
+				if !present {
+					if window.Utilization != nil {
+						t.Fatalf("%s: want no utilization, got %v", label, *window.Utilization)
+					}
+					return
+				}
+				if window.Utilization == nil || *window.Utilization != wantPct {
+					t.Fatalf("%s: want utilization %v, got %#v", label, wantPct, window)
+				}
+				if window.RefreshAt == nil || !window.RefreshAt.Equal(wantReset) ||
+					window.WindowEnd == nil || !window.WindowEnd.Equal(wantReset) {
+					t.Fatalf("%s: want both reset fields to equal %v, got %#v", label, wantReset, window)
+				}
+			}
+			checkWindow("5h", account.FiveHourWindow, tc.hasFiveHour, tc.wantFiveHour, fiveHourReset)
+			checkWindow("weekly", account.WeeklyWindow, tc.hasWeekly, tc.wantWeekly, weeklyReset)
+		})
+	}
+}
+
 func TestBuildFiveHourWindowFallsBackToSessionStatus(t *testing.T) {
 	start := time.Date(2026, 5, 19, 8, 0, 0, 0, time.UTC)
 	end := start.Add(5 * time.Hour)
